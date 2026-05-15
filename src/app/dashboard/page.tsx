@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { createTripAction } from "@/app/actions/trips";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
-import { listTripsForOwner } from "@/lib/supabase/queries";
+import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
+import { listTripsForUser } from "@/lib/supabase/queries";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -12,7 +13,11 @@ export default async function DashboardPage() {
     redirect("/login?callbackUrl=/dashboard");
   }
 
-  const list = await listTripsForOwner(session.user.id);
+  if (session.user.email) {
+    await claimTripInvitesForUser(session.user.id, session.user.email);
+  }
+
+  const list = await listTripsForUser(session.user.id);
 
   return (
     <div className="shell" style={{ padding: "1.5rem 1.25rem 3rem" }}>
@@ -89,6 +94,11 @@ export default async function DashboardPage() {
                   <div className="row" style={{ justifyContent: "space-between" }}>
                     <div>
                       <strong style={{ color: "var(--color-fjord)" }}>{trip.name}</strong>
+                      {trip.access === "collaborator" ? (
+                        <span className="pill" style={{ marginLeft: "0.5rem", fontSize: "0.72rem" }}>
+                          Shared
+                        </span>
+                      ) : null}
                       {trip.tagline ? (
                         <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.9rem" }}>
                           {trip.tagline}

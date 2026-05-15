@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /** Auth.js tables — keep column names aligned with the Drizzle adapter */
@@ -158,6 +159,46 @@ export const trips = pgTable("trip", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+export const tripMembers = pgTable(
+  "trip_member",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trips.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("editor").$type<"editor">(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tripUserUnique: uniqueIndex("trip_member_trip_user_unique").on(t.tripId, t.userId),
+  }),
+);
+
+export const tripInvites = pgTable(
+  "trip_invite",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tripId: text("trip_id")
+      .notNull()
+      .references(() => trips.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    invitedByUserId: text("invited_by_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => ({
+    tripEmailUnique: uniqueIndex("trip_invite_trip_email_unique").on(t.tripId, t.email),
+  }),
+);
 
 export const surveys = pgTable("survey", {
   id: text("id")

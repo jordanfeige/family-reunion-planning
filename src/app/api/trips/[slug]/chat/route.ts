@@ -9,7 +9,7 @@ import {
 import { formatItineraryForPrompt, normalizeItinerary } from "@/lib/itinerary";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
 import {
-  getOwnedTripBySlug,
+  getTripForOrganizer,
   getSurveyByTripId,
   listSurveyResponsesForChat,
 } from "@/lib/supabase/queries";
@@ -28,9 +28,9 @@ export async function POST(
   }
 
   const { slug } = await ctx.params;
-  const trip = await getOwnedTripBySlug(slug, session.user.id);
+  const access = await getTripForOrganizer(slug, session.user.id);
 
-  if (!trip) {
+  if (!access) {
     return new Response("Not found", { status: 404 });
   }
 
@@ -60,6 +60,7 @@ export async function POST(
     rawMessages as Parameters<typeof convertToModelMessages>[0],
   );
 
+  const { trip } = access;
   const weekendSlots = filterValidFridays(trip.proposedDateSlots ?? []);
   const locationOptions = normalizeLocationOptions(trip.locationOptions ?? []);
 

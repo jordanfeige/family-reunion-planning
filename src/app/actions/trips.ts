@@ -23,7 +23,21 @@ import {
   type DayKey,
 } from "@/lib/itinerary";
 import { appOrigin } from "@/lib/appOrigin";
+import { sendCollaboratorInviteEmail } from "@/lib/sendCollaboratorInviteEmail";
 import { sendSurveyConfirmationEmail } from "@/lib/sendSurveyConfirmationEmail";
+import {
+  addTripMember,
+  deleteTripInvite,
+  deleteTripMember,
+  getTripInviteByEmail,
+  getTripMemberByUserId,
+  getUserByEmail,
+  getUserById,
+  insertTripInvite,
+  listTripInvites,
+  listTripMembers,
+} from "@/lib/supabase/collaborators";
+import { canManageCollaborators, canRemoveMembers } from "@/lib/tripAccess";
 import { getSurveyNextSteps } from "@/lib/surveyNextSteps";
 import type { SurveySummaryInput } from "@/lib/surveySummary";
 import { filterValidFridays, formatWeekendLabel, isValidFridayIso, parseProposedWeekends } from "@/lib/weekends";
@@ -35,7 +49,7 @@ import {
   deleteGalleryItem,
   deleteSurveyResponse,
   deleteTripOption,
-  getOwnedTripBySlug,
+  getTripForOrganizer,
   getSurveyAndTripByPublicToken,
   getSurveyByTripId,
   insertGalleryItem,
@@ -85,10 +99,10 @@ export async function createTripAction(formData: FormData) {
   redirect(`/t/${slug}#planner`);
 }
 
-async function loadOwnedTrip(slug: string, userId: string) {
-  const trip = await getOwnedTripBySlug(slug, userId);
-  if (!trip) throw new Error("Trip not found.");
-  return { trip };
+async function loadTripForOrganizer(slug: string, userId: string) {
+  const access = await getTripForOrganizer(slug, userId);
+  if (!access) throw new Error("Trip not found.");
+  return access;
 }
 
 export async function updateTripBasicsAction(formData: FormData) {
@@ -96,8 +110,7 @@ export async function updateTripBasicsAction(formData: FormData) {
   const slug = String(formData.get("slug") ?? "").trim();
   if (!slug) throw new Error("Missing trip.");
 
-  const trip = await getOwnedTripBySlug(slug, userId);
-  if (!trip) throw new Error("Trip not found.");
+  const { trip } = await loadTripForOrganizer(slug, userId);
 
   const proposedDateSlots = parseProposedWeekends(
     String(formData.get("proposed_weekends") ?? ""),
@@ -133,8 +146,7 @@ export async function addTripOptionAction(formData: FormData) {
     throw new Error("Title and plan details are required.");
   }
 
-  const trip = await getOwnedTripBySlug(slug, userId);
-  if (!trip) throw new Error("Trip not found.");
+  const { trip } = await loadTripForOrganizer(slug, userId);
 
   const sortOrder = await countTripOptions(trip.id);
   await insertTripOption({
@@ -154,8 +166,7 @@ export async function deleteTripOptionAction(formData: FormData) {
   const optionId = String(formData.get("option_id") ?? "").trim();
   if (!slug || !optionId) throw new Error("Missing fields.");
 
-  const trip = await getOwnedTripBySlug(slug, userId);
-  if (!trip) throw new Error("Trip not found.");
+  const { trip } = await loadTripForOrganizer(slug, userId);
 
   await deleteTripOption(trip.id, optionId);
   revalidatePath(`/t/${slug}`);
@@ -169,8 +180,7 @@ export async function addGalleryItemAction(formData: FormData) {
   const caption = String(formData.get("caption") ?? "").trim() || null;
   if (!slug || !url) throw new Error("Upload did not return a URL.");
 
-  const trip = await getOwnedTripBySlug(slug, userId);
-  if (!trip) throw new Error("Trip not found.");
+  const { trip } = await loadTripForOrganizer(slug, userId);
 
   await insertGalleryItem({
     tripId: trip.id,
@@ -188,8 +198,7 @@ export async function deleteGalleryItemAction(formData: FormData) {
   const itemId = String(formData.get("item_id") ?? "").trim();
   if (!slug || !itemId) throw new Error("Missing fields.");
 
-  const trip = await getOwnedTripBySlug(slug, userId);
-  if (!trip) throw new Error("Trip not found.");
+  const { trip } = await loadTripForOrganizer(slug, userId);
 
   await deleteGalleryItem(trip.id, itemId);
   revalidatePath(`/t/${slug}`);
@@ -310,7 +319,7 @@ export async function deleteSurveyResponseAction(formData: FormData) {
   const responseId = String(formData.get("response_id") ?? "").trim();
   if (!slug || !responseId) throw new Error("Missing fields.");
 
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
   const survey = await getSurveyByTripId(trip.id);
   if (!survey) throw new Error("Survey not found.");
 
@@ -325,7 +334,7 @@ export async function addLocationOptionAction(formData: FormData) {
   const summary = String(formData.get("summary") ?? "").trim() || undefined;
   if (!slug || !title) throw new Error("Location title is required.");
 
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
   const existing = normalizeLocationOptions(trip.locationOptions ?? []);
   const next: LocationOption[] = [
     ...existing,
@@ -342,7 +351,7 @@ export async function deleteLocationOptionAction(formData: FormData) {
   const locationId = String(formData.get("location_id") ?? "").trim();
   if (!slug || !locationId) throw new Error("Missing fields.");
 
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
   const existing = normalizeLocationOptions(trip.locationOptions ?? []);
   const next = existing.filter((l) => l.id !== locationId);
 
@@ -362,7 +371,7 @@ export async function publishLocationsFromChatAction(
     throw new Error("Add ANTHROPIC_API_KEY to publish locations from the AI planner.");
   }
 
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
 
   const { object } = await generateObject({
     model: plannerModel(),
@@ -413,7 +422,7 @@ export async function updateTripPlanContextAction(formData: FormData) {
     ? Math.max(1, Number.parseInt(headcountRaw, 10) || 1)
     : null;
 
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
   const locations = normalizeLocationOptions(trip.locationOptions ?? []);
   const weekends = filterValidFridays(trip.proposedDateSlots ?? []);
 
@@ -442,7 +451,7 @@ export async function generateItineraryAction(slug: string) {
     throw new Error("Add ANTHROPIC_API_KEY to generate an itinerary.");
   }
 
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
   const locationId = trip.selectedLocationId;
   const weekendFriday = trip.selectedWeekendFriday;
   const headcount = trip.planHeadcount ?? 1;
@@ -500,7 +509,7 @@ export async function updateItineraryBlockStatusAction(formData: FormData) {
 
   if (!slug || !dayKey || !blockId) throw new Error("Missing fields.");
 
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
   const itinerary = normalizeItinerary(
     trip.itinerary,
     trip.selectedWeekendFriday,
@@ -537,7 +546,7 @@ export async function refineItineraryDayAction(
     throw new Error("Add ANTHROPIC_API_KEY to refine the itinerary.");
   }
 
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
   const itinerary = normalizeItinerary(
     trip.itinerary,
     trip.selectedWeekendFriday,
@@ -586,7 +595,7 @@ Return the full updated day with realistic times and mark reservations as to_boo
 
 export async function publishItineraryAction(slug: string) {
   const userId = await requireSessionUserId();
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
 
   const itinerary = normalizeItinerary(
     trip.itinerary,
@@ -620,7 +629,7 @@ export async function publishItineraryAction(slug: string) {
 
 export async function unpublishItineraryAction(slug: string) {
   const userId = await requireSessionUserId();
-  const { trip } = await loadOwnedTrip(slug, userId);
+  const { trip } = await loadTripForOrganizer(slug, userId);
 
   await updateTripById(trip.id, { publishedItinerary: null });
 
@@ -688,4 +697,82 @@ export async function submitPlanConfirmationAction(formData: FormData) {
   revalidatePath(`/o/${token}`);
   revalidatePath(`/t/${trip.slug}`);
   redirect(`/o/${token}?confirmed=1`);
+}
+
+export async function inviteTripCollaboratorAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const emailRaw = String(formData.get("email") ?? "").trim();
+  if (!slug || !emailRaw) throw new Error("Enter an email address.");
+
+  const email = emailRaw.toLowerCase();
+  const { trip, role } = await loadTripForOrganizer(slug, userId);
+  if (!canManageCollaborators(role)) {
+    throw new Error("You do not have permission to invite collaborators.");
+  }
+
+  const owner = await getUserById(trip.ownerId);
+  if (owner?.email?.toLowerCase() === email) {
+    throw new Error("That person already owns this trip.");
+  }
+
+  const session = await auth();
+  if (session?.user?.email?.toLowerCase() === email) {
+    throw new Error("You are already on this trip.");
+  }
+
+  const existingMember = await getUserByEmail(email);
+  if (existingMember) {
+    if (existingMember.id === trip.ownerId) {
+      throw new Error("That person already owns this trip.");
+    }
+    const member = await getTripMemberByUserId(trip.id, existingMember.id);
+    if (member) throw new Error("They are already a co-planner on this trip.");
+    await addTripMember(trip.id, existingMember.id);
+  } else {
+    const pending = await getTripInviteByEmail(trip.id, email);
+    if (pending) throw new Error("An invite is already pending for that email.");
+    await insertTripInvite(trip.id, email, userId);
+  }
+
+  const loginUrl = `${appOrigin()}/login?callbackUrl=${encodeURIComponent(`/t/${slug}`)}`;
+  const inviter = session?.user?.name ?? session?.user?.email ?? null;
+  await sendCollaboratorInviteEmail(email, {
+    tripName: trip.name,
+    inviterName: inviter,
+    loginUrl,
+  });
+
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function cancelTripInviteAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const inviteId = String(formData.get("invite_id") ?? "").trim();
+  if (!slug || !inviteId) throw new Error("Missing fields.");
+
+  const { trip, role } = await loadTripForOrganizer(slug, userId);
+  if (!canManageCollaborators(role)) {
+    throw new Error("You do not have permission to manage invites.");
+  }
+
+  await deleteTripInvite(inviteId, trip.id);
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function removeTripMemberAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const memberId = String(formData.get("member_id") ?? "").trim();
+  if (!slug || !memberId) throw new Error("Missing fields.");
+
+  const { role } = await loadTripForOrganizer(slug, userId);
+  if (!canRemoveMembers(role)) {
+    throw new Error("Only the trip owner can remove co-planners.");
+  }
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  await deleteTripMember(memberId, trip.id);
+  revalidatePath(`/t/${slug}`);
 }

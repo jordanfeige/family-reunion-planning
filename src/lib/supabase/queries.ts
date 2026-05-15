@@ -66,20 +66,17 @@ export async function getTripBySlug(slug: string): Promise<Trip | null> {
   return data ? mapTrip(data as TripRow) : null;
 }
 
+/** @deprecated Use getTripForOrganizer from ./collaborators */
 export async function getOwnedTripBySlug(
   slug: string,
-  ownerId: string,
+  userId: string,
 ): Promise<Trip | null> {
-  const { data, error } = await supabase()
-    .from("trip")
-    .select("*")
-    .eq("slug", slug)
-    .eq("owner_id", ownerId)
-    .maybeSingle();
-
-  if (error) throwDb(error, "getOwnedTripBySlug");
-  return data ? mapTrip(data as TripRow) : null;
+  const { getTripForOrganizer } = await import("@/lib/supabase/collaborators");
+  const access = await getTripForOrganizer(slug, userId);
+  return access?.trip ?? null;
 }
+
+export { getTripForOrganizer, listTripsForUser } from "@/lib/supabase/collaborators";
 
 export async function getTripByShareToken(token: string): Promise<Trip | null> {
   const { data, error } = await supabase()

@@ -15,18 +15,24 @@ import { GalleryUploader } from "@/components/GalleryUploader";
 import { LocationOptionsManager } from "@/components/LocationOptionsManager";
 import { PlanConfirmationSnapshot } from "@/components/PlanConfirmationSnapshot";
 import { TripDecisionBar } from "@/components/TripDecisionBar";
+import { TripCollaborators } from "@/components/TripCollaborators";
 import { TripHubWizard } from "@/components/TripHubWizard";
 import { TripItineraryPanel } from "@/components/TripItineraryPanel";
 import { TripPlannerChat } from "@/components/TripPlannerChat";
 import { WeekendDatePicker } from "@/components/WeekendDatePicker";
 import {
-  getOwnedTripBySlug,
+  getTripForOrganizer,
   getSurveyByTripId,
   listGalleryItems,
   listSurveyResponses,
   listTripConfirmations,
   listTripOptions,
 } from "@/lib/supabase/queries";
+import {
+  getUserById,
+  listTripInvites,
+  listTripMembers,
+} from "@/lib/supabase/collaborators";
 import { appOrigin } from "@/lib/appOrigin";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
 import { itineraryHasContent, normalizeItinerary } from "@/lib/itinerary";
@@ -44,8 +50,14 @@ export default async function TripHubPage({
     redirect(`/login?callbackUrl=${encodeURIComponent(`/t/${slug}`)}`);
   }
 
-  const trip = await getOwnedTripBySlug(slug, session.user.id);
-  if (!trip) notFound();
+  const access = await getTripForOrganizer(slug, session.user.id);
+  if (!access) notFound();
+  const { trip, role } = access;
+
+  const owner = await getUserById(trip.ownerId);
+  const ownerLabel = owner?.name || owner?.email || "Trip owner";
+  const members = await listTripMembers(trip.id);
+  const pendingInvites = await listTripInvites(trip.id);
 
   const survey = await getSurveyByTripId(trip.id);
   const options = await listTripOptions(trip.id);
@@ -85,6 +97,11 @@ export default async function TripHubPage({
             <p className="pill">Trip hub · {trip.slug}</p>
             <h1 style={{ color: "var(--color-fjord)", margin: "0.35rem 0" }}>{trip.name}</h1>
             {trip.tagline ? <p className="muted">{trip.tagline}</p> : null}
+            {role === "editor" ? (
+              <p className="pill" style={{ marginTop: "0.5rem" }}>
+                Co-planner · shared with you
+              </p>
+            ) : null}
           </div>
           {trip.tripStart ? (
             <span className="pill">
@@ -97,6 +114,14 @@ export default async function TripHubPage({
           ) : null}
         </div>
       </header>
+
+      <TripCollaborators
+        slug={trip.slug}
+        role={role}
+        ownerLabel={ownerLabel}
+        members={members}
+        pendingInvites={pendingInvites}
+      />
 
       <TripHubWizard
         slug={trip.slug}
