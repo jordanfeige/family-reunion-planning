@@ -1,19 +1,52 @@
 "use server";
 
-import { eq, and } from "drizzle-orm";
+import { generateObject } from "ai";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 
 import { auth } from "@/auth";
-import { getDb } from "@/db";
+import { hasAnthropicApiKey, plannerModel } from "@/lib/ai";
 import {
-  galleryItems,
-  surveyResponses,
-  surveys,
-  tripOptions,
-  trips,
-} from "@/db/schema";
+  findLocationById,
+  normalizeLocationOptions,
+  type LocationOption,
+} from "@/lib/locations";
+import {
+  itineraryDaySchema,
+  itineraryFromGenerated,
+  itineraryGenerationSchema,
+  itineraryHasContent,
+  normalizeItinerary,
+  type PublishedItinerary,
+  type BlockStatus,
+  type DayKey,
+} from "@/lib/itinerary";
+import { appOrigin } from "@/lib/appOrigin";
+import { sendSurveyConfirmationEmail } from "@/lib/sendSurveyConfirmationEmail";
+import { getSurveyNextSteps } from "@/lib/surveyNextSteps";
+import type { SurveySummaryInput } from "@/lib/surveySummary";
+import { filterValidFridays, formatWeekendLabel, isValidFridayIso, parseProposedWeekends } from "@/lib/weekends";
 import { newSecretToken, newTripSlug } from "@/lib/tokens";
+import {
+  countTripOptions,
+  createSurvey,
+  createTrip,
+  deleteGalleryItem,
+  deleteSurveyResponse,
+  deleteTripOption,
+  getOwnedTripBySlug,
+  getSurveyAndTripByPublicToken,
+  getSurveyByTripId,
+  insertGalleryItem,
+  insertSurveyResponse,
+  insertTripOption,
+  listSurveyResponsesForChat,
+  listTripConfirmations,
+  updateTripById,
+  upsertTripConfirmation,
+  getTripByShareToken,
+} from "@/lib/supabase/queries";
 
 async function requireSessionUserId() {
   const session = await auth();
@@ -29,33 +62,33 @@ export async function createTripAction(formData: FormData) {
     throw new Error("Give your gathering a name.");
   }
 
-  const db = getDb();
   const slug = newTripSlug();
   const shareOptionsToken = newSecretToken();
   const surveyToken = newSecretToken();
 
-  const [trip] = await db
-    .insert(trips)
-    .values({
-      slug,
-      name,
-      tagline: String(formData.get("tagline") ?? "").trim() || null,
-      destinationNotes: String(formData.get("destination") ?? "").trim() || null,
-      targetBudget: String(formData.get("budget") ?? "").trim() || null,
-      shareOptionsToken,
-      ownerId: userId,
-    })
-    .returning();
+  const trip = await createTrip({
+    slug,
+    name,
+    tagline: String(formData.get("tagline") ?? "").trim() || null,
+    destinationNotes: String(formData.get("destination") ?? "").trim() || null,
+    targetBudget: String(formData.get("budget") ?? "").trim() || null,
+    shareOptionsToken,
+    ownerId: userId,
+  });
 
-  if (!trip) throw new Error("Could not create trip.");
-
-  await db.insert(surveys).values({
+  await createSurvey({
     tripId: trip.id,
     publicToken: surveyToken,
     title: "When can your crew join?",
   });
 
-  redirect(`/t/${slug}`);
+  redirect(`/t/${slug}#planner`);
+}
+
+async function loadOwnedTrip(slug: string, userId: string) {
+  const trip = await getOwnedTripBySlug(slug, userId);
+  if (!trip) throw new Error("Trip not found.");
+  return { trip };
 }
 
 export async function updateTripBasicsAction(formData: FormData) {
@@ -63,35 +96,22 @@ export async function updateTripBasicsAction(formData: FormData) {
   const slug = String(formData.get("slug") ?? "").trim();
   if (!slug) throw new Error("Missing trip.");
 
-  const db = getDb();
-  const [trip] = await db
-    .select()
-    .from(trips)
-    .where(and(eq(trips.slug, slug), eq(trips.ownerId, userId)))
-    .limit(1);
+  const trip = await getOwnedTripBySlug(slug, userId);
   if (!trip) throw new Error("Trip not found.");
 
-  const slotsRaw = String(formData.get("proposed_slots") ?? "").trim();
-  const proposedDateSlots = slotsRaw
-    ? slotsRaw
-        .split(/\n+/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
+  const proposedDateSlots = parseProposedWeekends(
+    String(formData.get("proposed_weekends") ?? ""),
+  );
 
-  await db
-    .update(trips)
-    .set({
-      name: String(formData.get("name") ?? trip.name).trim() || trip.name,
-      tagline: String(formData.get("tagline") ?? "").trim() || null,
-      destinationNotes: String(formData.get("destination") ?? "").trim() || null,
-      targetBudget: String(formData.get("budget") ?? "").trim() || null,
-      tripStart: parseOptionalDate(formData.get("trip_start")),
-      tripEnd: parseOptionalDate(formData.get("trip_end")),
-      proposedDateSlots,
-      updatedAt: new Date(),
-    })
-    .where(eq(trips.id, trip.id));
+  await updateTripById(trip.id, {
+    name: String(formData.get("name") ?? trip.name).trim() || trip.name,
+    tagline: String(formData.get("tagline") ?? "").trim() || null,
+    destinationNotes: String(formData.get("destination") ?? "").trim() || null,
+    targetBudget: String(formData.get("budget") ?? "").trim() || null,
+    tripStart: parseOptionalDate(formData.get("trip_start")),
+    tripEnd: parseOptionalDate(formData.get("trip_end")),
+    proposedDateSlots,
+  });
 
   revalidatePath(`/t/${slug}`);
 }
@@ -113,25 +133,16 @@ export async function addTripOptionAction(formData: FormData) {
     throw new Error("Title and plan details are required.");
   }
 
-  const db = getDb();
-  const [trip] = await db
-    .select()
-    .from(trips)
-    .where(and(eq(trips.slug, slug), eq(trips.ownerId, userId)))
-    .limit(1);
+  const trip = await getOwnedTripBySlug(slug, userId);
   if (!trip) throw new Error("Trip not found.");
 
-  const existing = await db
-    .select({ id: tripOptions.id })
-    .from(tripOptions)
-    .where(eq(tripOptions.tripId, trip.id));
-
-  await db.insert(tripOptions).values({
+  const sortOrder = await countTripOptions(trip.id);
+  await insertTripOption({
     tripId: trip.id,
     title,
     summary,
     contentMarkdown,
-    sortOrder: existing.length,
+    sortOrder,
   });
 
   revalidatePath(`/t/${slug}`);
@@ -143,18 +154,10 @@ export async function deleteTripOptionAction(formData: FormData) {
   const optionId = String(formData.get("option_id") ?? "").trim();
   if (!slug || !optionId) throw new Error("Missing fields.");
 
-  const db = getDb();
-  const [trip] = await db
-    .select()
-    .from(trips)
-    .where(and(eq(trips.slug, slug), eq(trips.ownerId, userId)))
-    .limit(1);
+  const trip = await getOwnedTripBySlug(slug, userId);
   if (!trip) throw new Error("Trip not found.");
 
-  await db
-    .delete(tripOptions)
-    .where(and(eq(tripOptions.id, optionId), eq(tripOptions.tripId, trip.id)));
-
+  await deleteTripOption(trip.id, optionId);
   revalidatePath(`/t/${slug}`);
 }
 
@@ -166,15 +169,10 @@ export async function addGalleryItemAction(formData: FormData) {
   const caption = String(formData.get("caption") ?? "").trim() || null;
   if (!slug || !url) throw new Error("Upload did not return a URL.");
 
-  const db = getDb();
-  const [trip] = await db
-    .select()
-    .from(trips)
-    .where(and(eq(trips.slug, slug), eq(trips.ownerId, userId)))
-    .limit(1);
+  const trip = await getOwnedTripBySlug(slug, userId);
   if (!trip) throw new Error("Trip not found.");
 
-  await db.insert(galleryItems).values({
+  await insertGalleryItem({
     tripId: trip.id,
     url,
     mediaType: mediaType === "video" ? "video" : "image",
@@ -190,57 +188,504 @@ export async function deleteGalleryItemAction(formData: FormData) {
   const itemId = String(formData.get("item_id") ?? "").trim();
   if (!slug || !itemId) throw new Error("Missing fields.");
 
-  const db = getDb();
-  const [trip] = await db
-    .select()
-    .from(trips)
-    .where(and(eq(trips.slug, slug), eq(trips.ownerId, userId)))
-    .limit(1);
+  const trip = await getOwnedTripBySlug(slug, userId);
   if (!trip) throw new Error("Trip not found.");
 
-  await db
-    .delete(galleryItems)
-    .where(and(eq(galleryItems.id, itemId), eq(galleryItems.tripId, trip.id)));
-
+  await deleteGalleryItem(trip.id, itemId);
   revalidatePath(`/t/${slug}`);
 }
 
 export async function submitSurveyResponseAction(formData: FormData) {
   const token = String(formData.get("token") ?? "").trim();
   const respondentName = String(formData.get("name") ?? "").trim();
-  const attendeeCount = Math.max(
-    1,
-    Number.parseInt(String(formData.get("attendee_count") ?? "1"), 10) || 1,
+  const adultCount = Math.max(
+    0,
+    Number.parseInt(String(formData.get("adult_count") ?? "1"), 10) || 0,
   );
+  const kidCount = Math.max(
+    0,
+    Number.parseInt(String(formData.get("kid_count") ?? "0"), 10) || 0,
+  );
+  const attendeeCount = Math.max(1, adultCount + kidCount);
+  if (adultCount < 1 && kidCount < 1) {
+    throw new Error("Please enter at least one adult or kid in your party.");
+  }
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const respondentEmail = String(formData.get("email") ?? "").trim() || null;
+  const sendEmailCopy = formData.get("send_email_copy") === "1";
 
   if (!token || !respondentName) {
     throw new Error("Please add your name.");
   }
 
   const selected = formData.getAll("slot") as string[];
+  const selectedLocationIds = formData.getAll("location") as string[];
 
-  const db = getDb();
-  const row = await db
-    .select({ survey: surveys, trip: trips })
-    .from(surveys)
-    .innerJoin(trips, eq(surveys.tripId, trips.id))
-    .where(eq(surveys.publicToken, token))
-    .limit(1);
-  const surveyRow = row[0];
+  const surveyRow = await getSurveyAndTripByPublicToken(token);
   if (!surveyRow) throw new Error("This link is not valid anymore.");
 
-  await db.insert(surveyResponses).values({
+  const allowed = filterValidFridays(surveyRow.trip.proposedDateSlots ?? []);
+  if (allowed.length > 0 && selected.length === 0) {
+    throw new Error("Please select at least one weekend that works for you.");
+  }
+  const validSelected = selected.filter((s) => allowed.includes(s));
+  if (selected.some((s) => !allowed.includes(s))) {
+    throw new Error("Invalid weekend selection.");
+  }
+
+  const locationOptions = normalizeLocationOptions(
+    surveyRow.trip.locationOptions ?? [],
+  );
+  const allowedLocationIds = locationOptions.map((l) => l.id);
+  if (allowedLocationIds.length > 0 && selectedLocationIds.length === 0) {
+    throw new Error("Please select at least one location you are interested in.");
+  }
+  const validLocations = selectedLocationIds.filter((id) =>
+    allowedLocationIds.includes(id),
+  );
+  if (selectedLocationIds.some((id) => !allowedLocationIds.includes(id))) {
+    throw new Error("Invalid location selection.");
+  }
+
+  await insertSurveyResponse({
     surveyId: surveyRow.survey.id,
     respondentName,
     respondentEmail,
-    selectedSlots: selected,
+    selectedSlots: validSelected,
+    selectedLocations: validLocations,
+    adultCount,
+    kidCount,
     attendeeCount,
     notes,
   });
 
+  let emailed = false;
+  if (sendEmailCopy && respondentEmail) {
+    const trip = surveyRow.trip;
+    const planReady = Boolean(trip.selectedLocationId && trip.selectedWeekendFriday);
+    const publishedRaw = trip.publishedItinerary as PublishedItinerary | null;
+    const planPublished = Boolean(
+      publishedRaw && itineraryHasContent(normalizeItinerary(publishedRaw)),
+    );
+    const lockedLocation = trip.selectedLocationId
+      ? findLocationById(locationOptions, trip.selectedLocationId)
+      : null;
+    const lockedWeekendLabel = trip.selectedWeekendFriday
+      ? formatWeekendLabel(trip.selectedWeekendFriday)
+      : null;
+    const planUrl = `${appOrigin()}/o/${trip.shareOptionsToken}`;
+    const nextSteps = getSurveyNextSteps({
+      planReady,
+      planPublished,
+      lockedLocationTitle: lockedLocation?.title ?? null,
+      lockedWeekendLabel,
+      submitted: true,
+    });
+
+    const summaryInput: SurveySummaryInput = {
+      tripName: trip.name,
+      respondentName,
+      adultCount,
+      kidCount,
+      notes,
+      selectedSlots: validSelected,
+      selectedLocations: validLocations,
+      locationOptions,
+      nextSteps,
+      planUrl: planReady ? planUrl : null,
+    };
+    const result = await sendSurveyConfirmationEmail(respondentEmail, summaryInput);
+    emailed = result.ok;
+  }
+
   revalidatePath(`/r/${token}`);
   revalidatePath(`/t/${surveyRow.trip.slug}`);
-  redirect(`/r/${token}?thanks=1`);
+  const qs = emailed ? "?thanks=1&emailed=1" : "?thanks=1";
+  redirect(`/r/${token}${qs}`);
+}
+
+export async function deleteSurveyResponseAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const responseId = String(formData.get("response_id") ?? "").trim();
+  if (!slug || !responseId) throw new Error("Missing fields.");
+
+  const { trip } = await loadOwnedTrip(slug, userId);
+  const survey = await getSurveyByTripId(trip.id);
+  if (!survey) throw new Error("Survey not found.");
+
+  await deleteSurveyResponse(survey.id, responseId);
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function addLocationOptionAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  const summary = String(formData.get("summary") ?? "").trim() || undefined;
+  if (!slug || !title) throw new Error("Location title is required.");
+
+  const { trip } = await loadOwnedTrip(slug, userId);
+  const existing = normalizeLocationOptions(trip.locationOptions ?? []);
+  const next: LocationOption[] = [
+    ...existing,
+    { id: crypto.randomUUID(), title, summary },
+  ];
+
+  await updateTripById(trip.id, { locationOptions: next });
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function deleteLocationOptionAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const locationId = String(formData.get("location_id") ?? "").trim();
+  if (!slug || !locationId) throw new Error("Missing fields.");
+
+  const { trip } = await loadOwnedTrip(slug, userId);
+  const existing = normalizeLocationOptions(trip.locationOptions ?? []);
+  const next = existing.filter((l) => l.id !== locationId);
+
+  await updateTripById(trip.id, { locationOptions: next });
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function publishLocationsFromChatAction(
+  slug: string,
+  assistantText: string,
+) {
+  const userId = await requireSessionUserId();
+  const text = assistantText.trim();
+  if (!text) throw new Error("No AI message to extract from.");
+
+  if (!hasAnthropicApiKey()) {
+    throw new Error("Add ANTHROPIC_API_KEY to publish locations from the AI planner.");
+  }
+
+  const { trip } = await loadOwnedTrip(slug, userId);
+
+  const { object } = await generateObject({
+    model: plannerModel(),
+    schema: z.object({
+      locations: z
+        .array(
+          z.object({
+            title: z.string(),
+            summary: z.string().optional(),
+          }),
+        )
+        .min(1)
+        .max(8),
+    }),
+    prompt: `Extract distinct trip destination or area options from this family reunion planning message. Return 2–6 clear choices families could vote on in a survey. Use concise titles (e.g. "Bergen & fjords", "Lofoten islands").\n\nMessage:\n${text}`,
+  });
+
+  const existing = normalizeLocationOptions(trip.locationOptions ?? []);
+  const titles = new Set(existing.map((l) => l.title.toLowerCase()));
+  const merged = [...existing];
+
+  for (const loc of object.locations) {
+    const title = loc.title.trim();
+    if (!title || titles.has(title.toLowerCase())) continue;
+    titles.add(title.toLowerCase());
+    merged.push({
+      id: crypto.randomUUID(),
+      title,
+      summary: loc.summary?.trim() || undefined,
+    });
+  }
+
+  await updateTripById(trip.id, { locationOptions: merged });
+
+  revalidatePath(`/t/${slug}`);
+  return { added: merged.length - existing.length, total: merged.length };
+}
+
+export async function updateTripPlanContextAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const locationId = String(formData.get("selected_location_id") ?? "").trim() || null;
+  const weekendFriday = String(formData.get("selected_weekend_friday") ?? "").trim() || null;
+  const headcountRaw = String(formData.get("plan_headcount") ?? "").trim();
+  const planHeadcount = headcountRaw
+    ? Math.max(1, Number.parseInt(headcountRaw, 10) || 1)
+    : null;
+
+  const { trip } = await loadOwnedTrip(slug, userId);
+  const locations = normalizeLocationOptions(trip.locationOptions ?? []);
+  const weekends = filterValidFridays(trip.proposedDateSlots ?? []);
+
+  if (locationId && !locations.some((l) => l.id === locationId)) {
+    throw new Error("Invalid location.");
+  }
+  if (weekendFriday && !isValidFridayIso(weekendFriday)) {
+    throw new Error("Invalid weekend.");
+  }
+  if (weekendFriday && weekends.length > 0 && !weekends.includes(weekendFriday)) {
+    throw new Error("Weekend is not on your survey list.");
+  }
+
+  await updateTripById(trip.id, {
+    selectedLocationId: locationId,
+    selectedWeekendFriday: weekendFriday,
+    planHeadcount,
+  });
+
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function generateItineraryAction(slug: string) {
+  const userId = await requireSessionUserId();
+  if (!hasAnthropicApiKey()) {
+    throw new Error("Add ANTHROPIC_API_KEY to generate an itinerary.");
+  }
+
+  const { trip } = await loadOwnedTrip(slug, userId);
+  const locationId = trip.selectedLocationId;
+  const weekendFriday = trip.selectedWeekendFriday;
+  const headcount = trip.planHeadcount ?? 1;
+
+  if (!locationId || !weekendFriday) {
+    throw new Error("Select a location and weekend before generating an itinerary.");
+  }
+
+  const locations = normalizeLocationOptions(trip.locationOptions ?? []);
+  const location = findLocationById(locations, locationId);
+  if (!location) throw new Error("Selected location not found.");
+
+  const survey = await getSurveyByTripId(trip.id);
+  const responses = survey ? await listSurveyResponsesForChat(survey.id) : [];
+
+  const notes = responses
+    .map((r) => r.notes)
+    .filter(Boolean)
+    .join("; ");
+
+  const { object } = await generateObject({
+    model: plannerModel(),
+    schema: itineraryGenerationSchema,
+    prompt: `Create a Fri–Sun family reunion itinerary for ${headcount} people.
+Location: ${location.title}${location.summary ? ` — ${location.summary}` : ""}
+Weekend: ${weekendFriday} (Friday through Sunday)
+Trip: ${trip.name}
+${trip.destinationNotes ? `Notes: ${trip.destinationNotes}` : ""}
+${trip.targetBudget ? `Budget: ${trip.targetBudget}` : ""}
+${notes ? `Family notes from survey: ${notes}` : ""}
+
+Rules:
+- Exactly 3 days: friday, saturday, sunday keys
+- Realistic pacing for a multi-generational group; include downtime
+- Mark lodging and restaurants that need reservations as status "to_book"
+- Include specific activity ideas with approximate times (e.g. "10:00")
+- Use type: activity | meal | lodging | travel
+- No invented live prices; say "check availability" in notes when needed`,
+  });
+
+  const itinerary = itineraryFromGenerated(object, weekendFriday);
+
+  await updateTripById(trip.id, { itinerary });
+
+  revalidatePath(`/t/${slug}`);
+  return { ok: true };
+}
+
+export async function updateItineraryBlockStatusAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const dayKey = String(formData.get("day_key") ?? "").trim() as DayKey;
+  const blockId = String(formData.get("block_id") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim() as BlockStatus;
+
+  if (!slug || !dayKey || !blockId) throw new Error("Missing fields.");
+
+  const { trip } = await loadOwnedTrip(slug, userId);
+  const itinerary = normalizeItinerary(
+    trip.itinerary,
+    trip.selectedWeekendFriday,
+  );
+
+  let found = false;
+  for (const day of itinerary.days) {
+    if (day.key !== dayKey) continue;
+    for (const block of day.blocks) {
+      if (block.id === blockId) {
+        block.status = status;
+        found = true;
+        break;
+      }
+    }
+  }
+  if (!found) throw new Error("Block not found.");
+
+  await updateTripById(trip.id, { itinerary });
+
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function refineItineraryDayAction(
+  slug: string,
+  dayKey: DayKey,
+  instruction: string,
+) {
+  const userId = await requireSessionUserId();
+  const text = instruction.trim();
+  if (!text) throw new Error("Add instructions for the AI.");
+
+  if (!hasAnthropicApiKey()) {
+    throw new Error("Add ANTHROPIC_API_KEY to refine the itinerary.");
+  }
+
+  const { trip } = await loadOwnedTrip(slug, userId);
+  const itinerary = normalizeItinerary(
+    trip.itinerary,
+    trip.selectedWeekendFriday,
+  );
+  const day = itinerary.days.find((d) => d.key === dayKey);
+  if (!day) throw new Error("Day not found.");
+
+  const locations = normalizeLocationOptions(trip.locationOptions ?? []);
+  const location = trip.selectedLocationId
+    ? findLocationById(locations, trip.selectedLocationId)
+    : null;
+
+  const dayOnlySchema = itineraryDaySchema;
+
+  const { object } = await generateObject({
+    model: plannerModel(),
+    schema: dayOnlySchema,
+    prompt: `Revise ONLY this day of a family reunion itinerary.
+Location: ${location?.title ?? "TBD"}
+Headcount: ${trip.planHeadcount ?? "unknown"}
+Day: ${day.label} (${dayKey})
+Current plan:
+${day.blocks.map((b) => `- ${b.time ?? ""} ${b.title} [${b.type}]`).join("\n") || "(empty)"}
+
+Instruction: ${text}
+
+Return the full updated day with realistic times and mark reservations as to_book where needed.`,
+  });
+
+  day.label = object.label || day.label;
+  day.blocks = object.blocks.map((b) => ({
+    id: crypto.randomUUID(),
+    time: b.time?.trim() || undefined,
+    title: b.title.trim(),
+    type: b.type,
+    notes: b.notes?.trim() || undefined,
+    bookingUrl: b.bookingUrl?.trim() || undefined,
+    status: b.status,
+  }));
+
+  await updateTripById(trip.id, { itinerary });
+
+  revalidatePath(`/t/${slug}`);
+  return { ok: true };
+}
+
+export async function publishItineraryAction(slug: string) {
+  const userId = await requireSessionUserId();
+  const { trip } = await loadOwnedTrip(slug, userId);
+
+  const itinerary = normalizeItinerary(
+    trip.itinerary,
+    trip.selectedWeekendFriday,
+  );
+  if (!itineraryHasContent(itinerary)) {
+    throw new Error("Generate an itinerary with at least one activity before publishing.");
+  }
+
+  const locations = normalizeLocationOptions(trip.locationOptions ?? []);
+  const location = trip.selectedLocationId
+    ? findLocationById(locations, trip.selectedLocationId)
+    : null;
+
+  const published: PublishedItinerary = {
+    ...itinerary,
+    locationTitle: location?.title,
+    weekendLabel: trip.selectedWeekendFriday
+      ? formatWeekendLabel(trip.selectedWeekendFriday)
+      : undefined,
+    headcount: trip.planHeadcount ?? undefined,
+    publishedAt: new Date().toISOString(),
+  };
+
+  await updateTripById(trip.id, { publishedItinerary: published });
+
+  revalidatePath(`/t/${slug}`);
+  revalidatePath(`/o/${trip.shareOptionsToken}`);
+  return { ok: true };
+}
+
+export async function unpublishItineraryAction(slug: string) {
+  const userId = await requireSessionUserId();
+  const { trip } = await loadOwnedTrip(slug, userId);
+
+  await updateTripById(trip.id, { publishedItinerary: null });
+
+  revalidatePath(`/t/${slug}`);
+  revalidatePath(`/o/${trip.shareOptionsToken}`);
+  return { ok: true };
+}
+
+export async function submitPlanConfirmationAction(formData: FormData) {
+  const token = String(formData.get("token") ?? "").trim();
+  const respondentName = String(formData.get("name") ?? "").trim();
+  const respondentEmail = String(formData.get("email") ?? "").trim() || null;
+  const status = String(formData.get("status") ?? "").trim();
+
+  if (!token || !respondentName) {
+    throw new Error("Please add your name.");
+  }
+  if (status !== "confirmed" && status !== "declined") {
+    throw new Error("Please choose Yes or No.");
+  }
+
+  const trip = await getTripByShareToken(token);
+  if (!trip) throw new Error("This link is not valid anymore.");
+
+  const weekendFriday = trip.selectedWeekendFriday;
+  const locationId = trip.selectedLocationId;
+  if (!weekendFriday || !locationId) {
+    throw new Error(
+      "The organizers have not locked the final date and location yet—check back soon.",
+    );
+  }
+
+  let adultCount = 0;
+  let kidCount = 0;
+  if (status === "confirmed") {
+    adultCount = Math.max(
+      1,
+      Number.parseInt(String(formData.get("adult_count") ?? "1"), 10) || 1,
+    );
+    kidCount = Math.max(
+      0,
+      Number.parseInt(String(formData.get("kid_count") ?? "0"), 10) || 0,
+    );
+  }
+
+  const existing = await listTripConfirmations(trip.id);
+
+  const match = existing.find((row) => {
+    if (respondentEmail && row.respondentEmail) {
+      return row.respondentEmail.toLowerCase() === respondentEmail.toLowerCase();
+    }
+    return row.respondentName.toLowerCase() === respondentName.toLowerCase();
+  });
+
+  await upsertTripConfirmation(trip.id, match?.id ?? null, {
+    respondentName,
+    respondentEmail,
+    status: status as "confirmed" | "declined",
+    adultCount,
+    kidCount,
+    weekendFriday,
+    locationId,
+  });
+
+  revalidatePath(`/o/${token}`);
+  revalidatePath(`/t/${trip.slug}`);
+  redirect(`/o/${token}?confirmed=1`);
 }

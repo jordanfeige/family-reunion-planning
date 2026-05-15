@@ -1,57 +1,75 @@
-import { asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
-import { getDb } from "@/db";
-import { tripOptions, trips } from "@/db/schema";
+import { PlanConfirmationForm } from "@/components/PlanConfirmationForm";
+import { PublicItineraryView } from "@/components/PublicItineraryView";
+import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
+import { itineraryHasContent, normalizeItinerary, type PublishedItinerary } from "@/lib/itinerary";
+import { APP_NAME } from "@/lib/brand";
+import { getTripByShareToken, listTripOptions } from "@/lib/supabase/queries";
+import { formatWeekendLabel } from "@/lib/weekends";
 
 export default async function PublicOptionsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ confirmed?: string }>;
 }) {
   const { token } = await params;
-  const db = getDb();
-
-  const [trip] = await db
-    .select()
-    .from(trips)
-    .where(eq(trips.shareOptionsToken, token))
-    .limit(1);
-
+  const { confirmed } = await searchParams;
+  const trip = await getTripByShareToken(token);
   if (!trip) notFound();
 
-  const options = await db
-    .select()
-    .from(tripOptions)
-    .where(eq(tripOptions.tripId, trip.id))
-    .orderBy(asc(tripOptions.sortOrder), asc(tripOptions.createdAt));
+  const options = await listTripOptions(trip.id);
+
+  const publishedRaw = trip.publishedItinerary as PublishedItinerary | null;
+  const published = publishedRaw
+    ? ({ ...normalizeItinerary(publishedRaw), ...publishedRaw } as PublishedItinerary)
+    : null;
+  const showPublished = published && itineraryHasContent(published);
+
+  const locationOptions = normalizeLocationOptions(trip.locationOptions ?? []);
+  const lockedLocation = trip.selectedLocationId
+    ? findLocationById(locationOptions, trip.selectedLocationId)
+    : null;
+  const weekendLabel = trip.selectedWeekendFriday
+    ? formatWeekendLabel(trip.selectedWeekendFriday)
+    : null;
+  const canConfirm = Boolean(trip.selectedLocationId && trip.selectedWeekendFriday);
 
   return (
-    <div className="shell" style={{ padding: "2rem 1.25rem 3rem", maxWidth: "800px" }}>
+    <div className="shell page-public" style={{ maxWidth: "800px" }}>
       <header style={{ marginBottom: "1.5rem" }}>
-        <p className="pill">Shared trip deck · read only</p>
+        <p className="pill">{APP_NAME} · Shared trip plan</p>
         <h1 style={{ color: "var(--color-fjord)", margin: "0.35rem 0" }}>{trip.name}</h1>
         {trip.tagline ? <p className="muted">{trip.tagline}</p> : null}
         <p className="muted">
-          The Feige crew is comparing a few vibes—here is what the planners saved
-          for you. Reply in the family thread with your favorite letter.
+          {showPublished
+            ? "Browse the weekend plan below, then confirm if your crew is in."
+            : "Here is what the planners saved for you to compare."}
         </p>
       </header>
 
-      {options.length === 0 ? (
+      {confirmed ? (
+        <div className="success-banner" style={{ marginBottom: "1rem" }}>
+          Thanks! Your RSVP is saved—you can update it anytime on this page.
+        </div>
+      ) : null}
+
+      {showPublished ? (
+        <PublicItineraryView published={published} />
+      ) : options.length === 0 ? (
         <div className="card">
           <p className="muted">
-            No published scenarios yet. Poke the organizer—they might still be
-            sipping coffee and debating fjord vs forest.
+            No published plan yet. The organizer may still be finalizing dates and
+            activities—check back soon.
           </p>
         </div>
       ) : (
         <div className="stack">
           {options.map((opt, idx) => (
             <article key={opt.id} className="card">
-              <p className="pill">
-                Option {String.fromCharCode(65 + idx)}
-              </p>
+              <p className="pill">Option {String.fromCharCode(65 + idx)}</p>
               <h2 style={{ marginTop: "0.5rem" }}>{opt.title}</h2>
               {opt.summary ? <p className="muted">{opt.summary}</p> : null}
               <pre
@@ -68,6 +86,43 @@ export default async function PublicOptionsPage({
           ))}
         </div>
       )}
+
+      <PlanConfirmationForm
+        shareToken={token}
+        weekendLabel={weekendLabel ?? "TBD"}
+        locationTitle={lockedLocation?.title ?? "TBD"}
+        canConfirm={canConfirm}
+      />
+
+      {showPublished && options.length > 0 ? (
+        <>
+          <div className="divider" style={{ margin: "2rem 0 1.25rem" }} />
+          <h2 style={{ color: "var(--color-fjord)" }}>Other saved scenarios</h2>
+          <p className="muted" style={{ marginBottom: "1rem" }}>
+            Earlier comparison options from the planners.
+          </p>
+          <div className="stack">
+            {options.map((opt, idx) => (
+              <article key={opt.id} className="card">
+                <p className="pill">Option {String.fromCharCode(65 + idx)}</p>
+                <h3 style={{ marginTop: "0.5rem" }}>{opt.title}</h3>
+                {opt.summary ? <p className="muted">{opt.summary}</p> : null}
+                <pre
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    fontFamily: "inherit",
+                    marginTop: "0.75rem",
+                    lineHeight: 1.55,
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  {opt.contentMarkdown}
+                </pre>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

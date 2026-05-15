@@ -1,11 +1,10 @@
-import { desc, eq } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { createTripAction } from "@/app/actions/trips";
-import { getDb } from "@/db";
-import { trips } from "@/db/schema";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
+import { listTripsForOwner } from "@/lib/supabase/queries";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -13,26 +12,18 @@ export default async function DashboardPage() {
     redirect("/login?callbackUrl=/dashboard");
   }
 
-  const db = getDb();
-  const list = await db
-    .select({
-      id: trips.id,
-      name: trips.name,
-      slug: trips.slug,
-      tagline: trips.tagline,
-      createdAt: trips.createdAt,
-    })
-    .from(trips)
-    .where(eq(trips.ownerId, session.user.id))
-    .orderBy(desc(trips.createdAt));
+  const list = await listTripsForOwner(session.user.id);
 
   return (
     <div className="shell" style={{ padding: "1.5rem 1.25rem 3rem" }}>
       <header style={{ marginBottom: "2rem" }}>
-        <p className="pill">Dashboard · Planlegg</p>
+        <p className="pill">{APP_NAME}</p>
         <h1 style={{ color: "var(--color-fjord)", margin: "0.5rem 0 0" }}>
-          Your gatherings
+          Your trips
         </h1>
+        <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.95rem" }}>
+          {APP_TAGLINE}
+        </p>
         <p className="muted" style={{ maxWidth: "40rem" }}>
           Each trip gets its own secret link. Share surveys and option decks
           publicly—your organizer view stays behind this magic-link login.
@@ -49,14 +40,14 @@ export default async function DashboardPage() {
           <form action={createTripAction} className="stack" style={{ marginTop: "1rem" }}>
             <div className="field">
               <label htmlFor="name">Trip name *</label>
-              <input id="name" name="name" required placeholder="Feige fjord weekend" />
+              <input id="name" name="name" required placeholder="Summer lake weekend" />
             </div>
             <div className="field">
               <label htmlFor="tagline">Tagline (optional)</label>
               <input
                 id="tagline"
                 name="tagline"
-                placeholder="Salt air, silly games, serious smørrebrød"
+                placeholder="Salt air, silly games, serious open sandwiches"
               />
             </div>
             <div className="field">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { loginWithMagicLinkAction } from "@/app/actions/login";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 
 export default async function LoginPage({
   searchParams,
@@ -12,10 +13,13 @@ export default async function LoginPage({
   return (
     <div className="shell" style={{ maxWidth: "480px", padding: "2rem 1.25rem" }}>
       <div className="card">
-        <h1 style={{ marginTop: 0 }}>Magic link</h1>
+        <p className="pill">{APP_NAME}</p>
+        <h1 style={{ marginTop: "0.35rem" }}>Magic link</h1>
+        <p className="muted" style={{ margin: "0.35rem 0 0.75rem", fontSize: "0.9rem" }}>
+          {APP_TAGLINE}
+        </p>
         <p className="muted">
-          Velkommen tilbake. We will email you a one-time link—no passwords to
-          forget on the trail.
+          We will email you a one-time link—no passwords to forget.
         </p>
         <form action={loginWithMagicLinkAction} className="stack" style={{ marginTop: "1rem" }}>
           <input type="hidden" name="callbackUrl" value={callbackUrl ?? "/dashboard"} />

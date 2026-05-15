@@ -4,6 +4,7 @@ import { Fraunces, Outfit } from "next/font/google";
 import { auth } from "@/auth";
 import { SiteChrome } from "@/components/SiteChrome";
 import { appOrigin } from "@/lib/appOrigin";
+import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE } from "@/lib/brand";
 
 import "./globals.css";
 
@@ -19,12 +20,16 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: {
-    default: "Feige Gatherings — Family reunion magic",
-    template: "%s · Feige Gatherings",
+    default: `${APP_NAME} — ${APP_TAGLINE}`,
+    template: `%s · ${APP_NAME}`,
   },
-  description:
-    "Plan Feige family reunions with surveys, AI trip ideas, shareable options, and a living gallery.",
+  description: APP_DESCRIPTION,
   metadataBase: new URL(appOrigin()),
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default async function RootLayout({

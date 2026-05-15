@@ -14,7 +14,7 @@ import {
 } from "@/db/schema";
 
 const emailFrom =
-  process.env.EMAIL_FROM ?? "Feige Gatherings <onboarding@resend.dev>";
+  process.env.EMAIL_FROM ?? "WandrAI <onboarding@resend.dev>";
 
 function buildProviders(): NextAuthConfig["providers"] {
   const list: NextAuthConfig["providers"] = [];
@@ -36,7 +36,7 @@ function buildProviders(): NextAuthConfig["providers"] {
         from: emailFrom,
         async sendVerificationRequest({ identifier, url }) {
           console.log(
-            `\n━━━ Feige Gatherings · magic link ━━━\nTo: ${identifier}\n${url}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
+            `\n━━━ WandrAI · magic link ━━━\nTo: ${identifier}\n${url}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`,
           );
         },
       }),

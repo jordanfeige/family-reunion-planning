@@ -10,9 +10,11 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.63",
+    "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/react": "^3.0.184",
     "@auth/drizzle-adapter": "^1.11.2",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.105.4",
     "@vercel/blob": "^2.3.3",
     "ai": "^6.0.182",
     "drizzle-orm": "^0.45.2",

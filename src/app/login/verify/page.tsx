@@ -6,7 +6,7 @@ export default function VerifyRequestPage() {
       <div className="card">
         <h1 style={{ marginTop: 0 }}>Check your inbox</h1>
         <p className="muted">
-          We sent a Feige Gatherings magic link. Tap it on this device to hop
+          We sent a WandrAI magic link. Tap it on this device to hop
           into your dashboard. If you do not see it, peek in promotions or spam.
         </p>
         <div className="success-banner" style={{ marginTop: "1rem" }}>

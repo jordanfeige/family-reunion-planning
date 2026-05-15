@@ -12,7 +12,7 @@ function createClient() {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      "DATABASE_URL is not set. Add a Postgres URL (e.g. Neon) to .env.local — see .env.example.",
+      "DATABASE_URL is not set. Add your Supabase Postgres URL to .env.local — see .env.example.",
     );
   }
   const client = postgres(url, { prepare: false, max: 10 });

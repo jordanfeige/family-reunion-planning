@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { auth } from "@/auth";
+import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 
 export default async function HomePage() {
   const session = await auth();
@@ -8,7 +9,7 @@ export default async function HomePage() {
   return (
     <div className="shell" style={{ paddingBottom: "3rem" }}>
       <section style={{ padding: "2.5rem 0 1rem" }}>
-        <p className="pill">Hei, Feige-familien</p>
+        <p className="pill">{APP_NAME}</p>
         <h1
           style={{
             fontSize: "clamp(2.2rem, 5vw, 3.2rem)",
@@ -17,14 +18,12 @@ export default async function HomePage() {
             color: "var(--color-fjord)",
           }}
         >
-          Gatherings that feel like{" "}
-          <span style={{ color: "var(--color-berry)" }}>Norwegian summer</span>
-          —bright, breezy, unforgettable.
+          {APP_TAGLINE}
         </h1>
         <p className="muted" style={{ maxWidth: "36rem", fontSize: "1.05rem" }}>
-          One link for your dashboard: send date surveys, riff with an AI
-          co-planner on food and fun, save trip scenarios to share, and stash
-          photos when the hugs actually happen.
+          One place to plan reunions and family trips: send date surveys, co-plan
+          with AI, share the itinerary, and collect final RSVPs—without the
+          spreadsheet chaos.
         </p>
         <div className="row" style={{ marginTop: "1.75rem" }}>
           {session?.user ? (
@@ -47,29 +46,28 @@ export default async function HomePage() {
           <h2>Date pulse surveys</h2>
           <p className="muted">
             Ship a friendly RSVP link. Loved ones tick the windows that work and
-            tell you how many seats they need—no spreadsheets, no drama.
+            tell you how many adults and kids—no spreadsheets, no drama.
           </p>
         </div>
         <div className="card">
           <h2>AI trip co-pilot</h2>
           <p className="muted">
-            Chat through destination, budget, bites, hikes, and reservations.
-            Get a structured breakdown you can save as shareable “trip
-            options” for the group chat.
+            Chat through destinations, budget, meals, and activities. Get a
+            structured plan you can publish for the whole crew.
           </p>
         </div>
         <div className="card">
           <h2>Showcase & share</h2>
           <p className="muted">
-            Curate a few scenarios—from cabin cozy to city sparkle—and publish a
-            read-only link so cousins can compare before anyone books flights.
+            Lock your weekend, publish the day-by-day plan, and let family
+            confirm yes or no on the same link.
           </p>
         </div>
         <div className="card">
           <h2>Memory lane gallery</h2>
           <p className="muted">
-            After the reunion, drop in photos or short clips so the youngest
-            Feiges can scroll the story for years to come.
+            After the trip, drop in photos or short clips so everyone can relive
+            the best moments.
           </p>
         </div>
       </div>

@@ -103,6 +103,54 @@ export const trips = pgTable("trip", {
     .$type<string[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
+  locationOptions: jsonb("location_options")
+    .$type<{ id: string; title: string; summary?: string }[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  selectedLocationId: text("selected_location_id"),
+  selectedWeekendFriday: text("selected_weekend_friday"),
+  planHeadcount: integer("plan_headcount"),
+  itinerary: jsonb("itinerary")
+    .$type<{
+      days: {
+        key: string;
+        label: string;
+        dateIso?: string;
+        blocks: {
+          id: string;
+          time?: string;
+          title: string;
+          type: string;
+          notes?: string;
+          bookingUrl?: string;
+          status: string;
+        }[];
+      }[];
+      generatedAt?: string;
+    }>()
+    .notNull()
+    .default(sql`'{"days":[]}'::jsonb`),
+  publishedItinerary: jsonb("published_itinerary").$type<{
+    days: {
+      key: string;
+      label: string;
+      dateIso?: string;
+      blocks: {
+        id: string;
+        time?: string;
+        title: string;
+        type: string;
+        notes?: string;
+        bookingUrl?: string;
+        status: string;
+      }[];
+    }[];
+    generatedAt?: string;
+    locationTitle?: string;
+    weekendLabel?: string;
+    headcount?: number;
+    publishedAt?: string;
+  } | null>(),
   shareOptionsToken: text("share_options_token").notNull().unique(),
   ownerId: text("owner_id")
     .notNull()
@@ -137,9 +185,34 @@ export const surveyResponses = pgTable("survey_response", {
     .$type<string[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
+  selectedLocations: jsonb("selected_locations")
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  adultCount: integer("adult_count").notNull().default(1),
+  kidCount: integer("kid_count").notNull().default(0),
+  /** @deprecated Use adultCount + kidCount; kept in sync on insert for legacy reads */
   attendeeCount: integer("attendee_count").notNull().default(1),
   notes: text("notes"),
   submittedAt: timestamp("submitted_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const tripConfirmations = pgTable("trip_confirmation", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tripId: text("trip_id")
+    .notNull()
+    .references(() => trips.id, { onDelete: "cascade" }),
+  respondentName: text("respondent_name").notNull(),
+  respondentEmail: text("respondent_email"),
+  status: text("status").notNull().$type<"confirmed" | "declined">(),
+  adultCount: integer("adult_count").notNull().default(0),
+  kidCount: integer("kid_count").notNull().default(0),
+  weekendFriday: text("weekend_friday").notNull(),
+  locationId: text("location_id").notNull(),
+  submittedAt: timestamp("submitted_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 export const tripOptions = pgTable("trip_option", {
