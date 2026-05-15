@@ -9,6 +9,11 @@ import {
 import { formatItineraryForPrompt, normalizeItinerary } from "@/lib/itinerary";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
 import {
+  findVenueById,
+  formatVenuesForPrompt,
+  normalizeVenueOptions,
+} from "@/lib/venues";
+import {
   getTripForOrganizer,
   getSurveyByTripId,
   listSurveyResponsesForChat,
@@ -48,7 +53,12 @@ export async function POST(
     mode?: string;
     focusDay?: string;
   };
-  const mode = body.mode === "itinerary" ? "itinerary" : "locations";
+  const mode =
+    body.mode === "itinerary"
+      ? "itinerary"
+      : body.mode === "venues"
+        ? "venues"
+        : "locations";
   const focusDay = body.focusDay;
 
   if (mode === "itinerary") {
@@ -57,6 +67,18 @@ export async function POST(
       return new Response(
         JSON.stringify({
           error: "Lock a location and weekend in Blueprint before using itinerary chat.",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  }
+
+  if (mode === "venues") {
+    const { trip: t } = access;
+    if (!t.selectedLocationId) {
+      return new Response(
+        JSON.stringify({
+          error: "Lock a location in Blueprint before planning where to stay and eat.",
         }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
@@ -83,6 +105,10 @@ export async function POST(
   const selectedLocation = trip.selectedLocationId
     ? findLocationById(locationOptions, trip.selectedLocationId)
     : null;
+  const venueOptions = normalizeVenueOptions(trip.venueOptions ?? []);
+  const selectedVenue = trip.selectedVenueId
+    ? findVenueById(venueOptions, trip.selectedVenueId)
+    : null;
   const itinerary = normalizeItinerary(trip.itinerary, trip.selectedWeekendFriday);
   const itineraryText = formatItineraryForPrompt(itinerary);
 
@@ -106,6 +132,12 @@ export async function POST(
       ? `Locked plan weekend: ${formatWeekendLabel(trip.selectedWeekendFriday)}`
       : null,
     trip.planHeadcount ? `Planning headcount: ${trip.planHeadcount}` : null,
+    mode !== "locations" && venueOptions.length
+      ? `Organizer venue shortlist:\n${formatVenuesForPrompt(venueOptions)}`
+      : null,
+    mode !== "locations" && selectedVenue
+      ? `Base camp (primary lodging): ${selectedVenue.title}${selectedVenue.summary ? ` — ${selectedVenue.summary}` : ""}`
+      : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -139,7 +171,23 @@ ${availabilitySummary}
 Survey location preferences:
 ${locationSummary}`;
 
-  const system = mode === "itinerary" ? itinerarySystem : locationsSystem;
+  const venuesSystem = `You are WandrAI, helping organizers and co-planners shortlist real places within their locked reunion location.
+This is private planner work—not a family survey. Suggest specific places to STAY (resorts, cabin clusters, campgrounds, rentals), EAT (group-friendly restaurants), and AREAS (neighborhoods or hubs to base near).
+For each suggestion use category stay, eat, or area in your prose with clear **bold** names.
+Compare options for a multi-generational group: sleeping capacity, meeting space, kitchen/group dining, drive time, accessibility, and booking friction.
+Format in markdown with ## sections (e.g. "## Where to stay", "## Where to eat"). End with "## Shortlist" bullets.
+Never invent live prices or fake booking links—say "verify on the property site" unless the user supplied a URL.
+Do not re-open the regional destination debate—the location is already locked.
+
+Current trip context:
+${contextBits}`;
+
+  const system =
+    mode === "itinerary"
+      ? itinerarySystem
+      : mode === "venues"
+        ? venuesSystem
+        : locationsSystem;
 
   const result = streamText({
     model: plannerModel(),

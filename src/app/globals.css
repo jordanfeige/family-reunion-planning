@@ -2047,6 +2047,194 @@ code {
   white-space: nowrap;
 }
 
+.trip-venue-section {
+  gap: 1rem;
+}
+
+.venue-category-pill {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-slate);
+  margin-bottom: 0.2rem;
+}
+
+.venue-options-group-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-fjord);
+}
+
+.venue-options-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.venue-option-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(28, 61, 90, 0.1);
+  background: #fff;
+}
+
+.venue-option-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.venue-base-camp-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1a5c4a;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(94, 234, 212, 0.35);
+}
+
+.venue-option-summary {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.venue-option-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.venue-option-links a {
+  color: var(--color-fjord);
+}
+
+.venue-option-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: flex-start;
+}
+
+.venue-link-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.link-preview-card {
+  display: block;
+  margin-top: 0.65rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(28, 61, 90, 0.12);
+  overflow: hidden;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s ease;
+}
+
+.link-preview-card:hover {
+  box-shadow: var(--shadow-card);
+}
+
+.link-preview-card--compact .link-preview-body {
+  padding: 0.55rem 0.75rem;
+}
+
+.link-preview-image {
+  height: 140px;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(28, 61, 90, 0.06);
+}
+
+.link-preview-body {
+  padding: 0.75rem 1rem;
+}
+
+.link-preview-site {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-slate);
+}
+
+.link-preview-title {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-fjord);
+}
+
+.link-preview-desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.link-preview-cta {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-fjord);
+}
+
+.public-venues-showcase {
+  gap: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.public-venue-hero {
+  padding: 1rem;
+  background: rgba(94, 234, 212, 0.1);
+}
+
+.public-venue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.public-venue-card {
+  border: 1px solid rgba(28, 61, 90, 0.1);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+  background: #fff;
+}
+
+.public-venue-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .trip-collaborators-panel .btn-primary {
   font-size: 0.88rem;
   padding: 0.5rem 1rem;

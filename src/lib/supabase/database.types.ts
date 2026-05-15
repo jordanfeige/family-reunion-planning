@@ -27,6 +27,8 @@ export type Database = {
           location_options: Json;
           selected_location_id: string | null;
           selected_weekend_friday: string | null;
+          venue_options: Json;
+          selected_venue_id: string | null;
           plan_headcount: number | null;
           itinerary: Json;
           published_itinerary: Json | null;
@@ -48,6 +50,8 @@ export type Database = {
           location_options?: Json;
           selected_location_id?: string | null;
           selected_weekend_friday?: string | null;
+          venue_options?: Json;
+          selected_venue_id?: string | null;
           plan_headcount?: number | null;
           itinerary?: Json;
           published_itinerary?: Json | null;

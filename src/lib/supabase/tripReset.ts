@@ -25,6 +25,8 @@ export async function resetTripPlanning(tripId: string, surveyId: string | null)
     locationOptions: [],
     selectedLocationId: null,
     selectedWeekendFriday: null,
+    venueOptions: [],
+    selectedVenueId: null,
     planHeadcount: null,
     itinerary: emptyItinerary,
     publishedItinerary: null,

@@ -110,6 +110,20 @@ export const trips = pgTable("trip", {
     .default(sql`'[]'::jsonb`),
   selectedLocationId: text("selected_location_id"),
   selectedWeekendFriday: text("selected_weekend_friday"),
+  venueOptions: jsonb("venue_options")
+    .$type<
+      {
+        id: string;
+        title: string;
+        summary?: string;
+        category: string;
+        bookingUrl?: string;
+        mapsUrl?: string;
+      }[]
+    >()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  selectedVenueId: text("selected_venue_id"),
   planHeadcount: integer("plan_headcount"),
   itinerary: jsonb("itinerary")
     .$type<{

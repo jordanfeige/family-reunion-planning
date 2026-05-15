@@ -1,4 +1,5 @@
 import type { LocationOption } from "@/lib/locations";
+import { normalizeVenueOptions, type VenueOption } from "@/lib/venues";
 import type { PublishedItinerary, TripItinerary } from "@/lib/itinerary";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -22,6 +23,8 @@ export type Trip = {
   locationOptions: LocationOption[];
   selectedLocationId: string | null;
   selectedWeekendFriday: string | null;
+  venueOptions: VenueOption[];
+  selectedVenueId: string | null;
   planHeadcount: number | null;
   itinerary: TripItinerary;
   publishedItinerary: PublishedItinerary | null;
@@ -106,6 +109,8 @@ export function mapTrip(row: TripRow): Trip {
     locationOptions: (row.location_options ?? []) as LocationOption[],
     selectedLocationId: row.selected_location_id,
     selectedWeekendFriday: row.selected_weekend_friday,
+    venueOptions: normalizeVenueOptions(row.venue_options),
+    selectedVenueId: row.selected_venue_id,
     planHeadcount: row.plan_headcount,
     itinerary: (row.itinerary ?? { days: [] }) as TripItinerary,
     publishedItinerary: row.published_itinerary as PublishedItinerary | null,
@@ -196,6 +201,8 @@ export function tripToRow(
     location_options: trip.locationOptions,
     selected_location_id: trip.selectedLocationId,
     selected_weekend_friday: trip.selectedWeekendFriday,
+    venue_options: trip.venueOptions,
+    selected_venue_id: trip.selectedVenueId,
     plan_headcount: trip.planHeadcount,
     itinerary: trip.itinerary,
     published_itinerary: trip.publishedItinerary,

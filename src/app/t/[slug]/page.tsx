@@ -21,6 +21,7 @@ import { TripHubMenu } from "@/components/TripHubMenu";
 import { TripHubWizard } from "@/components/TripHubWizard";
 import { TripOwnerManagePanel } from "@/components/TripOwnerManagePanel";
 import { TripItineraryPanel } from "@/components/TripItineraryPanel";
+import { TripVenueSection } from "@/components/TripVenueSection";
 import { TripPlannerChat } from "@/components/TripPlannerChat";
 import { WeekendDatePicker } from "@/components/WeekendDatePicker";
 import {
@@ -39,6 +40,7 @@ import {
 } from "@/lib/supabase/collaborators";
 import { appOrigin } from "@/lib/appOrigin";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
+import { normalizeVenueOptions } from "@/lib/venues";
 import { itineraryHasContent, normalizeItinerary } from "@/lib/itinerary";
 import { partyAdults, partyKids, partyTotal } from "@/lib/partyCount";
 import { filterValidFridays, formatWeekendLabel } from "@/lib/weekends";
@@ -79,6 +81,7 @@ export default async function TripHubPage({
 
   const weekendSlots = filterValidFridays(trip.proposedDateSlots ?? []);
   const locationOptions = normalizeLocationOptions(trip.locationOptions ?? []);
+  const venueOptions = normalizeVenueOptions(trip.venueOptions ?? []);
   const totalAttendees = responses.reduce((sum, r) => sum + partyTotal(r), 0);
   const lockedLocationTitle = trip.selectedLocationId
     ? findLocationById(locationOptions, trip.selectedLocationId)?.title ?? null
@@ -293,6 +296,15 @@ export default async function TripHubPage({
           selectedWeekendFriday={trip.selectedWeekendFriday}
           planHeadcount={trip.planHeadcount}
         />
+        <TripVenueSection
+          slug={trip.slug}
+          lockedLocationTitle={lockedLocationTitle}
+          headcount={trip.planHeadcount}
+          venues={venueOptions}
+          selectedVenueId={trip.selectedVenueId}
+          locationLocked={Boolean(trip.selectedLocationId)}
+        />
+        <div className="divider" />
         <TripItineraryPanel
           slug={trip.slug}
           tripName={trip.name}

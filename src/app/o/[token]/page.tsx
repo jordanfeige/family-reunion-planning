@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 
 import { PlanConfirmationForm } from "@/components/PlanConfirmationForm";
 import { PublicItineraryView } from "@/components/PublicItineraryView";
+import { PublicVenuesShowcase } from "@/components/PublicVenuesShowcase";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
+import { normalizeVenueOptions } from "@/lib/venues";
 import { itineraryHasContent, normalizeItinerary, type PublishedItinerary } from "@/lib/itinerary";
 import { APP_NAME } from "@/lib/brand";
 import { getTripByShareToken, listTripOptions } from "@/lib/supabase/queries";
@@ -36,6 +38,7 @@ export default async function PublicOptionsPage({
     ? formatWeekendLabel(trip.selectedWeekendFriday)
     : null;
   const canConfirm = Boolean(trip.selectedLocationId && trip.selectedWeekendFriday);
+  const venueOptions = normalizeVenueOptions(trip.venueOptions ?? []);
 
   return (
     <div className="shell page-public" style={{ maxWidth: "800px" }}>
@@ -54,6 +57,18 @@ export default async function PublicOptionsPage({
         <div className="success-banner" style={{ marginBottom: "1rem" }}>
           Thanks! Your RSVP is saved—you can update it anytime on this page.
         </div>
+      ) : null}
+
+      {venueOptions.length > 0 ? (
+        <PublicVenuesShowcase
+          venues={venueOptions}
+          selectedVenueId={trip.selectedVenueId}
+          locationTitle={lockedLocation?.title ?? null}
+        />
+      ) : null}
+
+      {venueOptions.length > 0 && (showPublished || options.length > 0) ? (
+        <div className="divider" style={{ margin: "1.5rem 0" }} />
       ) : null}
 
       {showPublished ? (

@@ -18,6 +18,18 @@ import {
   type LocationSuggestion,
 } from "@/lib/locationSuggestions";
 import {
+  findVenueById,
+  normalizeVenueCategory,
+  normalizeVenueOptions,
+  type VenueOption,
+} from "@/lib/venues";
+import { venueSuggestionsSchema, type VenueSuggestion } from "@/lib/venueSuggestions";
+import { enrichVenueOption } from "@/lib/venueEnrichment";
+import {
+  normalizeVenueBookingStatus,
+  type VenueBookingStatus,
+} from "@/lib/venues";
+import {
   itineraryDaySchema,
   itineraryFromGenerated,
   itineraryGenerationSchema,
@@ -448,6 +460,278 @@ export async function publishLocationsFromChatAction(
   return { added, total: merged.length };
 }
 
+function lockedLocationTitleForTrip(
+  trip: { selectedLocationId: string | null; locationOptions: LocationOption[] },
+): string {
+  if (!trip.selectedLocationId) return "";
+  return (
+    findLocationById(trip.locationOptions ?? [], trip.selectedLocationId)?.title ?? ""
+  );
+}
+
+async function appendEnrichedVenues(
+  trip: {
+    id: string;
+    selectedLocationId: string | null;
+    locationOptions: LocationOption[];
+    venueOptions: VenueOption[];
+    shareOptionsToken: string;
+  },
+  suggestions: VenueSuggestion[],
+): Promise<{ merged: VenueOption[]; added: number }> {
+  const locationTitle = lockedLocationTitleForTrip(trip);
+  const existing = normalizeVenueOptions(trip.venueOptions ?? []);
+  const seen = new Set(
+    existing.map((v) => `${v.category}:${v.title.trim().toLowerCase()}`),
+  );
+  const merged = [...existing];
+  let added = 0;
+
+  for (const suggestion of suggestions) {
+    const title = suggestion.title.trim();
+    if (!title) continue;
+    const category = normalizeVenueCategory(suggestion.category);
+    const key = `${category}:${title.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(await enrichVenueOption(suggestion, locationTitle));
+    added += 1;
+  }
+
+  return { merged, added };
+}
+
+function revalidateTripPaths(slug: string, shareToken: string) {
+  revalidatePath(`/t/${slug}`);
+  revalidatePath(`/o/${shareToken}`);
+}
+
+async function extractVenuesFromAssistantText(text: string): Promise<VenueSuggestion[]> {
+  if (!hasAnthropicApiKey()) {
+    throw new Error("Add ANTHROPIC_API_KEY to use WandrAI venue planning.");
+  }
+
+  const { object } = await generateObject({
+    model: plannerModel(),
+    schema: venueSuggestionsSchema,
+    prompt: `Extract specific places from this family reunion planning message for an organizer shortlist (not a public survey).
+Return 2–8 entries with category:
+- stay: hotels, resorts, cabin rentals, campgrounds, lodges, VRBO-style properties
+- eat: restaurants, group dining, caterers, food halls worth a reunion meal
+- area: neighborhoods, parks, or pockets to stay near / gather in
+
+Use concise titles. Summaries should note capacity fit, vibe, and one caution. Only include bookingUrl or mapsUrl if clearly stated in the message—do not invent URLs.
+
+Message:
+${text}`,
+  });
+
+  return object.venues
+    .map((v) => ({
+      title: v.title.trim(),
+      summary: v.summary?.trim() || undefined,
+      category: normalizeVenueCategory(v.category),
+      bookingUrl: v.bookingUrl?.trim() || undefined,
+      mapsUrl: v.mapsUrl?.trim() || undefined,
+    }))
+    .filter((v) => v.title.length > 0);
+}
+
+export async function extractVenueSuggestionsAction(
+  slug: string,
+  assistantText: string,
+): Promise<VenueSuggestion[]> {
+  const userId = await requireSessionUserId();
+  const text = assistantText.trim();
+  if (!text) throw new Error("No AI message to extract from.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  if (!trip.selectedLocationId) {
+    throw new Error("Lock a location in Blueprint before planning venues.");
+  }
+
+  return extractVenuesFromAssistantText(text);
+}
+
+export async function addVenueSuggestionAction(
+  slug: string,
+  title: string,
+  category: string,
+  summary?: string,
+  bookingUrl?: string,
+  mapsUrl?: string,
+) {
+  const userId = await requireSessionUserId();
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) throw new Error("Venue title is required.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  if (!trip.selectedLocationId) {
+    throw new Error("Lock a location in Blueprint before adding venues.");
+  }
+
+  const { merged, added } = await appendEnrichedVenues(trip, [
+    {
+      title: trimmedTitle,
+      category: normalizeVenueCategory(category),
+      summary: summary?.trim() || undefined,
+      bookingUrl: bookingUrl?.trim() || undefined,
+      mapsUrl: mapsUrl?.trim() || undefined,
+    },
+  ]);
+
+  await updateTripById(trip.id, { venueOptions: merged });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+  return { added: added > 0, total: merged.length };
+}
+
+export async function publishVenuesFromChatAction(slug: string, assistantText: string) {
+  const userId = await requireSessionUserId();
+  const text = assistantText.trim();
+  if (!text) throw new Error("No AI message to extract from.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  if (!trip.selectedLocationId) {
+    throw new Error("Lock a location in Blueprint before adding venues.");
+  }
+
+  const suggestions = await extractVenuesFromAssistantText(text);
+  const { merged, added } = await appendEnrichedVenues(trip, suggestions);
+
+  await updateTripById(trip.id, { venueOptions: merged });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+  return { added, total: merged.length };
+}
+
+export async function addVenueOptionAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const title = String(formData.get("title") ?? "").trim();
+  const category = String(formData.get("category") ?? "stay").trim();
+  const summary = String(formData.get("summary") ?? "").trim() || undefined;
+  const bookingUrl = String(formData.get("booking_url") ?? "").trim() || undefined;
+  const mapsUrl = String(formData.get("maps_url") ?? "").trim() || undefined;
+  if (!slug || !title) throw new Error("Venue title is required.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  if (!trip.selectedLocationId) {
+    throw new Error("Lock a location in Blueprint before adding venues.");
+  }
+
+  const { merged } = await appendEnrichedVenues(trip, [
+    {
+      title,
+      category: normalizeVenueCategory(category),
+      summary,
+      bookingUrl,
+      mapsUrl,
+    },
+  ]);
+
+  await updateTripById(trip.id, { venueOptions: merged });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+}
+
+export async function updateVenueDetailsAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const venueId = String(formData.get("venue_id") ?? "").trim();
+  if (!slug || !venueId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const venues = normalizeVenueOptions(trip.venueOptions ?? []);
+  const index = venues.findIndex((v) => v.id === venueId);
+  if (index < 0) throw new Error("Venue not found.");
+
+  const bookingStatus = normalizeVenueBookingStatus(
+    String(formData.get("booking_status") ?? "idea"),
+  ) as VenueBookingStatus;
+  const plannerNotes = String(formData.get("planner_notes") ?? "").trim() || undefined;
+  const bookingUrl = String(formData.get("booking_url") ?? "").trim() || undefined;
+  const mapsUrl = String(formData.get("maps_url") ?? "").trim() || undefined;
+  const websiteUrl = String(formData.get("website_url") ?? "").trim() || undefined;
+
+  const next = [...venues];
+  next[index] = {
+    ...venues[index],
+    bookingStatus,
+    plannerNotes,
+    bookingUrl,
+    mapsUrl,
+    websiteUrl,
+  };
+
+  await updateTripById(trip.id, { venueOptions: next });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+  redirect(`/t/${slug}/venues/${venueId}`);
+}
+
+export async function refreshVenueLinksAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const venueId = String(formData.get("venue_id") ?? "").trim();
+  if (!slug || !venueId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  if (!trip.selectedLocationId) throw new Error("Lock a location first.");
+
+  const venues = normalizeVenueOptions(trip.venueOptions ?? []);
+  const venue = findVenueById(venues, venueId);
+  if (!venue) throw new Error("Venue not found.");
+
+  const locationTitle = lockedLocationTitleForTrip(trip);
+  const enriched = await enrichVenueOption(venue, locationTitle);
+  const next = venues.map((v) => (v.id === venueId ? { ...enriched, id: venueId } : v));
+
+  await updateTripById(trip.id, { venueOptions: next });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+  redirect(`/t/${slug}/venues/${venueId}`);
+}
+
+export async function deleteVenueOptionAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const venueId = String(formData.get("venue_id") ?? "").trim();
+  if (!slug || !venueId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const existing = normalizeVenueOptions(trip.venueOptions ?? []);
+  const next = existing.filter((v) => v.id !== venueId);
+  const selectedVenueId =
+    trip.selectedVenueId === venueId ? null : trip.selectedVenueId;
+
+  await updateTripById(trip.id, { venueOptions: next, selectedVenueId });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+}
+
+export async function setPrimaryVenueAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const venueId = String(formData.get("venue_id") ?? "").trim();
+  if (!slug || !venueId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const venues = normalizeVenueOptions(trip.venueOptions ?? []);
+  const venue = findVenueById(venues, venueId);
+  if (!venue) throw new Error("Venue not found.");
+  if (venue.category !== "stay") {
+    throw new Error("Only lodging (Stay) options can be set as base camp.");
+  }
+
+  await updateTripById(trip.id, { selectedVenueId: venueId });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+}
+
+export async function clearPrimaryVenueAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  await updateTripById(trip.id, { selectedVenueId: null });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+}
+
 export async function updateTripPlanContextAction(formData: FormData) {
   const userId = await requireSessionUserId();
   const slug = String(formData.get("slug") ?? "").trim();
@@ -502,6 +786,13 @@ export async function generateItineraryAction(slug: string) {
   const location = findLocationById(locations, locationId);
   if (!location) throw new Error("Selected location not found.");
 
+  const venues = normalizeVenueOptions(trip.venueOptions ?? []);
+  const baseCamp = trip.selectedVenueId
+    ? findVenueById(venues, trip.selectedVenueId)
+    : null;
+  const stayShortlist = venues.filter((v) => v.category === "stay");
+  const eatShortlist = venues.filter((v) => v.category === "eat");
+
   const survey = await getSurveyByTripId(trip.id);
   const responses = survey ? await listSurveyResponsesForChat(survey.id) : [];
 
@@ -520,6 +811,9 @@ Trip: ${trip.name}
 ${trip.destinationNotes ? `Notes: ${trip.destinationNotes}` : ""}
 ${trip.targetBudget ? `Budget: ${trip.targetBudget}` : ""}
 ${notes ? `Family notes from survey: ${notes}` : ""}
+${baseCamp ? `Base camp (lodging): ${baseCamp.title}${baseCamp.summary ? ` — ${baseCamp.summary}` : ""}` : ""}
+${stayShortlist.length ? `Lodging shortlist: ${stayShortlist.map((v) => v.title).join("; ")}` : ""}
+${eatShortlist.length ? `Dining shortlist: ${eatShortlist.map((v) => v.title).join("; ")}` : ""}
 
 Rules:
 - Exactly 3 days: friday, saturday, sunday keys

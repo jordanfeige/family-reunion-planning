@@ -69,7 +69,7 @@ export function TripHubWizard({
       shortLabel: "Plan",
       icon: "blueprint",
       description:
-        "Lock the winning location and weekend, build your Fri–Sun itinerary, and publish.",
+        "Lock location and weekend, shortlist where to stay and eat, build your Fri–Sun itinerary, and publish.",
       complete: completion.blueprint,
       content: blueprint,
     },

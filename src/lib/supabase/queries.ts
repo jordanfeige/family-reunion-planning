@@ -23,6 +23,7 @@ type TripOptionRow = Database["public"]["Tables"]["trip_option"]["Row"];
 type GalleryItemRow = Database["public"]["Tables"]["gallery_item"]["Row"];
 
 import type { LocationOption } from "@/lib/locations";
+import type { VenueOption } from "@/lib/venues";
 import type { PublishedItinerary, TripItinerary } from "@/lib/itinerary";
 
 function supabase() {
@@ -177,6 +178,8 @@ export async function updateTripById(
     locationOptions?: LocationOption[];
     selectedLocationId?: string | null;
     selectedWeekendFriday?: string | null;
+    venueOptions?: VenueOption[];
+    selectedVenueId?: string | null;
     planHeadcount?: number | null;
     itinerary?: TripItinerary;
     publishedItinerary?: PublishedItinerary | null;
@@ -199,6 +202,8 @@ export async function updateTripById(
       location_options: patch.locationOptions,
       selected_location_id: patch.selectedLocationId,
       selected_weekend_friday: patch.selectedWeekendFriday,
+      venue_options: patch.venueOptions,
+      selected_venue_id: patch.selectedVenueId,
       plan_headcount: patch.planHeadcount,
       itinerary: patch.itinerary,
       published_itinerary: patch.publishedItinerary,
