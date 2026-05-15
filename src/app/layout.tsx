@@ -1,30 +1,44 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Outfit } from "next/font/google";
+
+import { auth } from "@/auth";
+import { SiteChrome } from "@/components/SiteChrome";
+import { appOrigin } from "@/lib/appOrigin";
+
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Family Reunion Planning",
-  description: "Plan and coordinate your family reunion.",
+  title: {
+    default: "Feige Gatherings — Family reunion magic",
+    template: "%s · Feige Gatherings",
+  },
+  description:
+    "Plan Feige family reunions with surveys, AI trip ideas, shareable options, and a living gallery.",
+  metadataBase: new URL(appOrigin()),
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={`${outfit.variable} ${fraunces.variable}`}>
+      <body>
+        <SiteChrome session={session}>{children}</SiteChrome>
+      </body>
     </html>
   );
 }

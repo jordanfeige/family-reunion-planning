@@ -1,66 +1,78 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
 
-export default function Home() {
+import { auth } from "@/auth";
+
+export default async function HomePage() {
+  const session = await auth();
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="shell" style={{ paddingBottom: "3rem" }}>
+      <section style={{ padding: "2.5rem 0 1rem" }}>
+        <p className="pill">Hei, Feige-familien</p>
+        <h1
+          style={{
+            fontSize: "clamp(2.2rem, 5vw, 3.2rem)",
+            lineHeight: 1.1,
+            margin: "1rem 0",
+            color: "var(--color-fjord)",
+          }}
+        >
+          Gatherings that feel like{" "}
+          <span style={{ color: "var(--color-berry)" }}>Norwegian summer</span>
+          —bright, breezy, unforgettable.
+        </h1>
+        <p className="muted" style={{ maxWidth: "36rem", fontSize: "1.05rem" }}>
+          One link for your dashboard: send date surveys, riff with an AI
+          co-planner on food and fun, save trip scenarios to share, and stash
+          photos when the hugs actually happen.
+        </p>
+        <div className="row" style={{ marginTop: "1.75rem" }}>
+          {session?.user ? (
+            <Link className="btn btn-primary" href="/dashboard">
+              Go to your dashboard
+            </Link>
+          ) : (
+            <Link className="btn btn-primary" href="/login">
+              Start with a magic link
+            </Link>
+          )}
+          <Link className="btn btn-secondary" href="/login">
+            How sign-in works
+          </Link>
+        </div>
+      </section>
+
+      <div className="grid-2" style={{ marginTop: "2.5rem" }}>
+        <div className="card section-anchor" id="survey">
+          <h2>Date pulse surveys</h2>
+          <p className="muted">
+            Ship a friendly RSVP link. Loved ones tick the windows that work and
+            tell you how many seats they need—no spreadsheets, no drama.
           </p>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="card">
+          <h2>AI trip co-pilot</h2>
+          <p className="muted">
+            Chat through destination, budget, bites, hikes, and reservations.
+            Get a structured breakdown you can save as shareable “trip
+            options” for the group chat.
+          </p>
         </div>
-      </main>
+        <div className="card">
+          <h2>Showcase & share</h2>
+          <p className="muted">
+            Curate a few scenarios—from cabin cozy to city sparkle—and publish a
+            read-only link so cousins can compare before anyone books flights.
+          </p>
+        </div>
+        <div className="card">
+          <h2>Memory lane gallery</h2>
+          <p className="muted">
+            After the reunion, drop in photos or short clips so the youngest
+            Feiges can scroll the story for years to come.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
