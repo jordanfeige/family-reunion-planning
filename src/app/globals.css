@@ -2239,6 +2239,213 @@ code {
   gap: 1.25rem;
 }
 
+.ballot-vote-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ballot-vote-card-title {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--color-fjord);
+  line-height: 1.25;
+}
+
+.ballot-vote-summary {
+  margin: 0 0 0.5rem;
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
+.ballot-vote-tally-line {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+}
+
+.ballot-vote-details {
+  margin: 0.35rem 0 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(28, 61, 90, 0.1);
+  background: rgba(248, 250, 252, 0.6);
+}
+
+.ballot-vote-details-summary {
+  cursor: pointer;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-slate);
+  list-style: none;
+}
+
+.ballot-vote-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.ballot-vote-details[open] .ballot-vote-details-summary {
+  border-bottom: 1px solid rgba(28, 61, 90, 0.08);
+}
+
+.ballot-vote-details-body {
+  padding: 0.5rem 0.65rem 0.65rem;
+}
+
+.ballot-step-shell {
+  padding: 1rem;
+}
+
+.ballot-step-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.ballot-step-dot {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid rgba(28, 61, 90, 0.15);
+  border-radius: var(--radius-md);
+  padding: 0.45rem 0.4rem;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: center;
+}
+
+.ballot-step-dot.is-current {
+  border-color: var(--color-fjord);
+  background: rgba(42, 85, 128, 0.08);
+  box-shadow: 0 0 0 1px rgba(42, 85, 128, 0.12);
+}
+
+.ballot-step-dot.is-done {
+  border-color: rgba(47, 133, 90, 0.35);
+}
+
+.ballot-step-dot-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-slate);
+  line-height: 1.2;
+}
+
+.ballot-step-dot.is-current .ballot-step-dot-label {
+  color: var(--color-fjord);
+}
+
+.ballot-step-dot-count {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-slate);
+  opacity: 0.85;
+}
+
+.ballot-step-caption {
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.ballot-step-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(28, 61, 90, 0.08);
+}
+
+.ballot-step-nav-end {
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.planner-venue-shell {
+  margin-bottom: 0.5rem;
+}
+
+.planner-ballot-results-shell {
+  padding: 1rem;
+}
+
+.venue-option-card--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.venue-option-price {
+  margin: 0.25rem 0 0;
+}
+
+.venue-option-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+}
+
+.venue-option-actions--stacked {
+  flex-direction: column;
+  width: 100%;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(28, 61, 90, 0.08);
+}
+
+.venue-option-actions--stacked form {
+  width: 100%;
+}
+
+.venue-option-actions--stacked .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.ballot-results-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ballot-results-link {
+  font-weight: 600;
+  color: var(--color-fjord);
+  text-decoration: none;
+}
+
+.ballot-results-link:hover {
+  text-decoration: underline;
+}
+
+.ballot-results-price {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-fjord);
+}
+
+.ballot-results-score-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(28, 61, 90, 0.08);
+}
+
+.ballot-results-counts {
+  font-size: 0.82rem;
+}
+
 .ballot-vote-section-title {
   margin: 0 0 0.65rem;
   font-size: 1.1rem;
@@ -2303,13 +2510,17 @@ code {
 
 .ballot-results-row {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: var(--radius-sm);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(28, 61, 90, 0.1);
   background: #fff;
+}
+
+.ballot-results-row-main {
+  width: 100%;
 }
 
 .ballot-results-score {
@@ -2318,8 +2529,7 @@ code {
 }
 
 .ballot-results-net {
-  display: block;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--color-fjord);
 }
