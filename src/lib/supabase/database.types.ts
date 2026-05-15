@@ -29,6 +29,9 @@ export type Database = {
           selected_weekend_friday: string | null;
           venue_options: Json;
           selected_venue_id: string | null;
+          ballot_status: string;
+          ballot_opened_at: string | null;
+          ballot_closed_at: string | null;
           plan_headcount: number | null;
           itinerary: Json;
           published_itinerary: Json | null;
@@ -52,6 +55,9 @@ export type Database = {
           selected_weekend_friday?: string | null;
           venue_options?: Json;
           selected_venue_id?: string | null;
+          ballot_status?: string;
+          ballot_opened_at?: string | null;
+          ballot_closed_at?: string | null;
           plan_headcount?: number | null;
           itinerary?: Json;
           published_itinerary?: Json | null;
@@ -61,6 +67,31 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["trip"]["Insert"]>;
+      };
+      trip_ballot_vote: {
+        Row: {
+          id: string;
+          trip_id: string;
+          option_id: string;
+          vote: string;
+          survey_response_id: string | null;
+          voter_name: string | null;
+          voter_email: string | null;
+          voter_key: string;
+          voted_at: string;
+        };
+        Insert: {
+          id?: string;
+          trip_id: string;
+          option_id: string;
+          vote: string;
+          survey_response_id?: string | null;
+          voter_name?: string | null;
+          voter_email?: string | null;
+          voter_key: string;
+          voted_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["trip_ballot_vote"]["Insert"]>;
       };
       survey: {
         Row: {

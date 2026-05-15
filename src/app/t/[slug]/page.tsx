@@ -21,7 +21,12 @@ import { TripHubMenu } from "@/components/TripHubMenu";
 import { TripHubWizard } from "@/components/TripHubWizard";
 import { TripOwnerManagePanel } from "@/components/TripOwnerManagePanel";
 import { TripItineraryPanel } from "@/components/TripItineraryPanel";
+import { TripBallotControls } from "@/components/TripBallotControls";
+import { TripBallotResults } from "@/components/TripBallotResults";
 import { TripVenueSection } from "@/components/TripVenueSection";
+import { tallyBallotVotes, countDistinctVoters } from "@/lib/ballotResults";
+import { listBallotVotesForTrip } from "@/lib/supabase/ballotVotes";
+import { ballotOptionsForVoting } from "@/lib/venues";
 import { TripPlannerChat } from "@/components/TripPlannerChat";
 import { WeekendDatePicker } from "@/components/WeekendDatePicker";
 import {
@@ -82,6 +87,13 @@ export default async function TripHubPage({
   const weekendSlots = filterValidFridays(trip.proposedDateSlots ?? []);
   const locationOptions = normalizeLocationOptions(trip.locationOptions ?? []);
   const venueOptions = normalizeVenueOptions(trip.venueOptions ?? []);
+  const ballotVoteRecords = await listBallotVotesForTrip(trip.id);
+  const ballotTallies = tallyBallotVotes(
+    ballotVoteRecords.map((v) => ({ optionId: v.optionId, vote: v.vote })),
+  );
+  const ballotVoterCount = countDistinctVoters(ballotVoteRecords);
+  const ballotOptionCount = ballotOptionsForVoting(venueOptions).length;
+  const voteUrl = survey ? `${origin}/r/${survey.publicToken}/vote` : "";
   const totalAttendees = responses.reduce((sum, r) => sum + partyTotal(r), 0);
   const lockedLocationTitle = trip.selectedLocationId
     ? findLocationById(locationOptions, trip.selectedLocationId)?.title ?? null
@@ -137,6 +149,10 @@ export default async function TripHubPage({
           basics: weekendSlots.length > 0,
           locations: locationOptions.length > 0,
           survey: responses.length > 0,
+          ballot:
+            trip.ballotStatus !== "draft" &&
+            ballotOptionCount > 0 &&
+            Boolean(trip.selectedLocationId),
           blueprint: Boolean(
             trip.selectedLocationId &&
               trip.selectedWeekendFriday &&
@@ -280,9 +296,46 @@ export default async function TripHubPage({
           <div className="divider" />
           <h3 style={{ marginTop: 0, color: "var(--color-fjord)" }}>Availability snapshot</h3>
           <p className="muted" style={{ margin: "0 0 0.75rem" }}>
-            Live rollup from RSVPs—use when locking a weekend in the blueprint step.
+            Live rollup from RSVPs—use when locking a weekend in the group vote step.
           </p>
           <AvailabilitySnapshot proposedSlots={weekendSlots} responses={responses} />
+        </div>
+        }
+        ballot={
+        <div className="stack">
+          <TripDecisionBar
+            slug={trip.slug}
+            locations={locationOptions}
+            weekendSlots={weekendSlots}
+            responses={responses}
+            selectedLocationId={trip.selectedLocationId}
+            selectedWeekendFriday={trip.selectedWeekendFriday}
+            planHeadcount={trip.planHeadcount}
+          />
+          <TripBallotControls
+            slug={trip.slug}
+            ballotStatus={trip.ballotStatus}
+            voteUrl={voteUrl}
+            optionCount={ballotOptionCount}
+            locationLocked={Boolean(trip.selectedLocationId)}
+          />
+          <TripVenueSection
+            slug={trip.slug}
+            lockedLocationTitle={lockedLocationTitle}
+            headcount={trip.planHeadcount}
+            venues={venueOptions}
+            selectedVenueId={trip.selectedVenueId}
+            locationLocked={Boolean(trip.selectedLocationId)}
+          />
+          {trip.ballotStatus !== "draft" && ballotOptionCount > 0 ? (
+            <TripBallotResults
+              slug={trip.slug}
+              venues={venueOptions}
+              tallies={ballotTallies}
+              voterCount={ballotVoterCount}
+              selectedVenueId={trip.selectedVenueId}
+            />
+          ) : null}
         </div>
         }
         blueprint={
@@ -295,14 +348,6 @@ export default async function TripHubPage({
           selectedLocationId={trip.selectedLocationId}
           selectedWeekendFriday={trip.selectedWeekendFriday}
           planHeadcount={trip.planHeadcount}
-        />
-        <TripVenueSection
-          slug={trip.slug}
-          lockedLocationTitle={lockedLocationTitle}
-          headcount={trip.planHeadcount}
-          venues={venueOptions}
-          selectedVenueId={trip.selectedVenueId}
-          locationLocked={Boolean(trip.selectedLocationId)}
         />
         <div className="divider" />
         <TripItineraryPanel

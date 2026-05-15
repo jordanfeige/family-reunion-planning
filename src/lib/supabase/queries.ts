@@ -180,6 +180,9 @@ export async function updateTripById(
     selectedWeekendFriday?: string | null;
     venueOptions?: VenueOption[];
     selectedVenueId?: string | null;
+    ballotStatus?: string;
+    ballotOpenedAt?: Date | null;
+    ballotClosedAt?: Date | null;
     planHeadcount?: number | null;
     itinerary?: TripItinerary;
     publishedItinerary?: PublishedItinerary | null;
@@ -204,6 +207,15 @@ export async function updateTripById(
       selected_weekend_friday: patch.selectedWeekendFriday,
       venue_options: patch.venueOptions,
       selected_venue_id: patch.selectedVenueId,
+      ballot_status: patch.ballotStatus,
+      ballot_opened_at:
+        patch.ballotOpenedAt !== undefined
+          ? patch.ballotOpenedAt?.toISOString() ?? null
+          : undefined,
+      ballot_closed_at:
+        patch.ballotClosedAt !== undefined
+          ? patch.ballotClosedAt?.toISOString() ?? null
+          : undefined,
       plan_headcount: patch.planHeadcount,
       itinerary: patch.itinerary,
       published_itinerary: patch.publishedItinerary,

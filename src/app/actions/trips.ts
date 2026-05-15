@@ -24,7 +24,10 @@ import {
   type VenueOption,
 } from "@/lib/venues";
 import { venueSuggestionsSchema, type VenueSuggestion } from "@/lib/venueSuggestions";
+import { resolveVoterKey } from "@/lib/ballotVoter";
+import { normalizePriceType, normalizePriceUnit } from "@/lib/venuePrices";
 import { enrichVenueOption } from "@/lib/venueEnrichment";
+import { findSurveyResponseByEmail } from "@/lib/supabase/ballotVotes";
 import {
   normalizeVenueBookingStatus,
   type VenueBookingStatus,
@@ -516,11 +519,13 @@ async function extractVenuesFromAssistantText(text: string): Promise<VenueSugges
     schema: venueSuggestionsSchema,
     prompt: `Extract specific places from this family reunion planning message for an organizer shortlist (not a public survey).
 Return 2–8 entries with category:
-- stay: hotels, resorts, cabin rentals, campgrounds, lodges, VRBO-style properties
-- eat: restaurants, group dining, caterers, food halls worth a reunion meal
-- area: neighborhoods, parks, or pockets to stay near / gather in
+- stay: hotels, resorts, cabin rentals, campgrounds, lodges
+- eat: restaurants, group dining, caterers
+- do: activities, excursions, rentals, attractions
 
-Use concise titles. Summaries should note capacity fit, vibe, and one caution. Only include bookingUrl or mapsUrl if clearly stated in the message—do not invent URLs.
+Use concise titles. Summaries should note capacity fit, vibe, and one caution.
+Include priceType (exact, range, estimate, free, or unknown), priceMin/priceMax when you can estimate, priceUnit (per_night for stay, per_person for eat/do), and optional priceNotes.
+Only include bookingUrl or mapsUrl if clearly stated—do not invent URLs.
 
 Message:
 ${text}`,
@@ -533,6 +538,11 @@ ${text}`,
       category: normalizeVenueCategory(v.category),
       bookingUrl: v.bookingUrl?.trim() || undefined,
       mapsUrl: v.mapsUrl?.trim() || undefined,
+      priceType: v.priceType,
+      priceMin: v.priceMin,
+      priceMax: v.priceMax,
+      priceUnit: v.priceUnit,
+      priceNotes: v.priceNotes?.trim() || undefined,
     }))
     .filter((v) => v.title.length > 0);
 }
@@ -650,6 +660,9 @@ export async function updateVenueDetailsAction(formData: FormData) {
   const bookingUrl = String(formData.get("booking_url") ?? "").trim() || undefined;
   const mapsUrl = String(formData.get("maps_url") ?? "").trim() || undefined;
   const websiteUrl = String(formData.get("website_url") ?? "").trim() || undefined;
+  const category = venues[index].category;
+  const priceMinRaw = String(formData.get("price_min") ?? "").trim();
+  const priceMaxRaw = String(formData.get("price_max") ?? "").trim();
 
   const next = [...venues];
   next[index] = {
@@ -659,6 +672,11 @@ export async function updateVenueDetailsAction(formData: FormData) {
     bookingUrl,
     mapsUrl,
     websiteUrl,
+    priceType: normalizePriceType(formData.get("price_type")),
+    priceMin: priceMinRaw ? Number.parseFloat(priceMinRaw) : undefined,
+    priceMax: priceMaxRaw ? Number.parseFloat(priceMaxRaw) : undefined,
+    priceUnit: normalizePriceUnit(formData.get("price_unit"), category),
+    priceNotes: String(formData.get("price_notes") ?? "").trim() || undefined,
   };
 
   await updateTripById(trip.id, { venueOptions: next });
@@ -730,6 +748,140 @@ export async function clearPrimaryVenueAction(formData: FormData) {
   const { trip } = await loadTripForOrganizer(slug, userId);
   await updateTripById(trip.id, { selectedVenueId: null });
   revalidateTripPaths(slug, trip.shareOptionsToken);
+}
+
+export async function publishBallotAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  if (!trip.selectedLocationId) {
+    throw new Error("Lock a location before opening the group vote.");
+  }
+  const options = normalizeVenueOptions(trip.venueOptions ?? []);
+  if (options.filter((o) => (o.bookingStatus ?? "idea") !== "passed").length === 0) {
+    throw new Error("Add at least one stay, eat, or do option before publishing.");
+  }
+
+  const now = new Date();
+  await updateTripById(trip.id, {
+    ballotStatus: "open",
+    ballotOpenedAt: trip.ballotOpenedAt ?? now,
+    ballotClosedAt: null,
+  });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+  const survey = await getSurveyByTripId(trip.id);
+  if (survey) {
+    revalidatePath(`/r/${survey.publicToken}`);
+    revalidatePath(`/r/${survey.publicToken}/vote`);
+  }
+}
+
+export async function closeBallotAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  await updateTripById(trip.id, {
+    ballotStatus: "closed",
+    ballotClosedAt: new Date(),
+  });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+}
+
+export async function reopenBallotAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  await updateTripById(trip.id, {
+    ballotStatus: "open",
+    ballotClosedAt: null,
+  });
+  revalidateTripPaths(slug, trip.shareOptionsToken);
+}
+
+export async function submitBallotVotesAction(formData: FormData) {
+  const token = String(formData.get("survey_token") ?? "").trim();
+  const voterName = String(formData.get("voter_name") ?? "").trim();
+  const voterEmail = String(formData.get("voter_email") ?? "").trim() || null;
+  const guestId = String(formData.get("guest_id") ?? "").trim() || null;
+  const votesRaw = String(formData.get("votes_json") ?? "").trim();
+
+  if (!token) throw new Error("Missing survey.");
+  if (!voterName) throw new Error("Please enter your name.");
+
+  const data = await getSurveyAndTripByPublicToken(token);
+  if (!data) throw new Error("Survey not found.");
+  const { survey, trip } = data;
+
+  if (trip.ballotStatus !== "open") {
+    throw new Error("Voting is not open right now.");
+  }
+
+  let votes: { optionId: string; vote: "up" | "down" }[] = [];
+  if (votesRaw) {
+    try {
+      const parsed = JSON.parse(votesRaw) as unknown;
+      if (Array.isArray(parsed)) {
+        votes = parsed
+          .map((v) => {
+            if (!v || typeof v !== "object") return null;
+            const o = v as Record<string, unknown>;
+            const optionId = String(o.optionId ?? "").trim();
+            const vote = o.vote === "down" ? "down" : o.vote === "up" ? "up" : null;
+            if (!optionId || !vote) return null;
+            return { optionId, vote };
+          })
+          .filter((v): v is { optionId: string; vote: "up" | "down" } => v !== null);
+      }
+    } catch {
+      throw new Error("Invalid vote payload.");
+    }
+  }
+
+  const options = normalizeVenueOptions(trip.venueOptions ?? []);
+  const validIds = new Set(options.map((o) => o.id));
+  votes = votes.filter((v) => validIds.has(v.optionId));
+
+  const matched =
+    voterEmail != null
+      ? await findSurveyResponseByEmail(survey.id, voterEmail)
+      : null;
+
+  const { voterKey, surveyResponseId } = resolveVoterKey({
+    surveyResponseId: matched?.id ?? null,
+    email: voterEmail,
+    guestId: guestId?.trim() || crypto.randomUUID(),
+  });
+
+  const name = matched?.respondentName ?? voterName;
+
+  const { listBallotVotesForVoter, upsertBallotVotes, deleteBallotVotesForVoter } =
+    await import("@/lib/supabase/ballotVotes");
+
+  const existing = await listBallotVotesForVoter(trip.id, voterKey);
+  const newIds = new Set(votes.map((v) => v.optionId));
+  const toClear = existing
+    .map((v) => v.optionId)
+    .filter((id) => !newIds.has(id));
+
+  await deleteBallotVotesForVoter(trip.id, voterKey, toClear);
+  await upsertBallotVotes({
+    tripId: trip.id,
+    voterKey,
+    voterName: name,
+    voterEmail,
+    surveyResponseId,
+    votes,
+  });
+
+  revalidatePath(`/r/${token}/vote`);
+  revalidatePath(`/o/${trip.shareOptionsToken}`);
+  redirect(`/r/${token}/vote?thanks=1`);
 }
 
 export async function updateTripPlanContextAction(formData: FormData) {

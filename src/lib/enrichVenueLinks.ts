@@ -13,7 +13,7 @@ function hasPlacesApiKey(): boolean {
 
 function categoryQueryHint(category: VenueCategory): string {
   if (category === "eat") return "restaurant";
-  if (category === "area") return "";
+  if (category === "do") return "activity attraction";
   return "lodging hotel cabin resort campground";
 }
 

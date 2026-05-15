@@ -38,11 +38,13 @@ export default async function PublicSurveyPage({
     ? formatWeekendLabel(trip.selectedWeekendFriday)
     : null;
   const planUrl = `${appOrigin()}/o/${trip.shareOptionsToken}`;
+  const voteUrl = `${appOrigin()}/r/${token}/vote`;
   const nextSteps = getSurveyNextSteps({
     planReady,
     planPublished,
     lockedLocationTitle: lockedLocation?.title ?? null,
     lockedWeekendLabel,
+    ballotOpen: trip.ballotStatus === "open",
     submitted: Boolean(thanks),
   });
 
@@ -64,11 +66,20 @@ export default async function PublicSurveyPage({
         ) : null}
 
         {thanks ? (
-          <SurveyNextSteps
-            steps={nextSteps}
-            planUrl={planUrl}
-            showPlanLink={planReady}
-          />
+          <>
+            <SurveyNextSteps
+              steps={nextSteps}
+              planUrl={planUrl}
+              showPlanLink={planReady}
+            />
+            {trip.ballotStatus === "open" ? (
+              <p style={{ marginTop: "1rem" }}>
+                <a href={voteUrl} className="btn btn-primary btn-block-sm">
+                  Vote on stays, meals & activities
+                </a>
+              </p>
+            ) : null}
+          </>
         ) : null}
 
         {!thanks ? (

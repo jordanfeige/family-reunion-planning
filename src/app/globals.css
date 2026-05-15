@@ -2235,6 +2235,95 @@ code {
   gap: 0.5rem;
 }
 
+.ballot-vote-form {
+  gap: 1.25rem;
+}
+
+.ballot-vote-section-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.1rem;
+  color: var(--color-fjord);
+}
+
+.ballot-vote-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ballot-vote-card {
+  padding: 1rem;
+}
+
+.ballot-vote-price {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-fjord);
+}
+
+.ballot-vote-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.ballot-thumb {
+  flex: 1;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+  border: 2px solid rgba(28, 61, 90, 0.15);
+  background: #fff;
+  font-size: 1.35rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ballot-thumb--up.is-active {
+  border-color: #2f855a;
+  background: rgba(72, 187, 120, 0.15);
+}
+
+.ballot-thumb--down.is-active {
+  border-color: #c53030;
+  background: rgba(245, 101, 101, 0.12);
+}
+
+.ballot-results-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ballot-results-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(28, 61, 90, 0.1);
+  background: #fff;
+}
+
+.ballot-results-score {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.ballot-results-net {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-fjord);
+}
+
 .trip-collaborators-panel .btn-primary {
   font-size: 0.88rem;
   padding: 0.5rem 1rem;

@@ -6,6 +6,7 @@ export type TripHubCompletion = {
   basics: boolean;
   locations: boolean;
   survey: boolean;
+  ballot: boolean;
   blueprint: boolean;
   confirmations: boolean;
   gallery: boolean;
@@ -18,6 +19,7 @@ export function TripHubWizard({
   basics,
   locations,
   survey,
+  ballot,
   blueprint,
   confirmations,
   gallery,
@@ -28,6 +30,7 @@ export function TripHubWizard({
   basics: React.ReactNode;
   locations: React.ReactNode;
   survey: React.ReactNode;
+  ballot: React.ReactNode;
   blueprint: React.ReactNode;
   confirmations: React.ReactNode;
   gallery: React.ReactNode;
@@ -64,12 +67,22 @@ export function TripHubWizard({
       content: survey,
     },
     {
+      id: "ballot",
+      label: "Group vote",
+      shortLabel: "Vote",
+      icon: "ballot",
+      description:
+        "Lock where you’re going, add stays/meals/activities with AI, then let family thumbs-up or down each option.",
+      complete: completion.ballot,
+      content: ballot,
+    },
+    {
       id: "blueprint",
       label: "Blueprint",
       shortLabel: "Plan",
       icon: "blueprint",
       description:
-        "Lock location and weekend, shortlist where to stay and eat, build your Fri–Sun itinerary, and publish.",
+        "Build your Fri–Sun itinerary from the winning picks and publish the plan.",
       complete: completion.blueprint,
       content: blueprint,
     },

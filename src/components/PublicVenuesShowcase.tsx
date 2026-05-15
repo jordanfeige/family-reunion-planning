@@ -1,7 +1,8 @@
 import { LinkPreviewCard, VenueLinkButtons } from "@/components/LinkPreviewCard";
+import type { OptionVoteTally } from "@/lib/ballotResults";
+import { formatVenuePrice } from "@/lib/venuePrices";
 import {
   primaryVenueUrl,
-  VENUE_BOOKING_STATUS_LABELS,
   VENUE_CATEGORY_LABELS,
   VENUE_CATEGORIES,
   venuesForPublicShowcase,
@@ -13,10 +14,14 @@ export function PublicVenuesShowcase({
   venues,
   selectedVenueId,
   locationTitle,
+  tallies,
+  showVoteResults,
 }: {
   venues: VenueOption[];
   selectedVenueId: string | null;
   locationTitle: string | null;
+  tallies?: Map<string, OptionVoteTally>;
+  showVoteResults?: boolean;
 }) {
   const visible = venuesForPublicShowcase(venues);
   if (visible.length === 0) return null;
@@ -28,7 +33,7 @@ export function PublicVenuesShowcase({
   const grouped: Record<VenueCategory, VenueOption[]> = {
     stay: [],
     eat: [],
-    area: [],
+    do: [],
   };
   for (const v of visible) {
     if (baseCamp && v.id === baseCamp.id) continue;
@@ -39,19 +44,27 @@ export function PublicVenuesShowcase({
     <section className="stack public-venues-showcase" aria-labelledby="public-venues-heading">
       <div>
         <h2 id="public-venues-heading" style={{ color: "var(--color-fjord)", margin: "0 0 0.35rem" }}>
-          Where we&apos;re staying &amp; eating
+          Where we&apos;re staying, eating &amp; what we&apos;re doing
         </h2>
         <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
           {locationTitle
-            ? `Planner picks near ${locationTitle}. Use the links to view details and book on each site.`
-            : "Planner picks for the reunion. Use the links to view details and book on each site."}
+            ? `Options near ${locationTitle}.`
+            : "Trip options from your planners."}
+          {showVoteResults
+            ? " Totals show group 👍 and 👎—individual votes stay private."
+            : " Use the links to view details and book on each site."}
         </p>
       </div>
 
       {baseCamp ? (
         <article className="card public-venue-hero">
           <p className="pill">Home base</p>
-          <PublicVenueCard venue={baseCamp} hero />
+          <PublicVenueCard
+            venue={baseCamp}
+            hero
+            tally={tallies?.get(baseCamp.id)}
+            showVoteResults={showVoteResults}
+          />
         </article>
       ) : null}
 
@@ -64,7 +77,11 @@ export function PublicVenuesShowcase({
             <ul className="public-venue-list">
               {items.map((venue) => (
                 <li key={venue.id}>
-                  <PublicVenueCard venue={venue} />
+                  <PublicVenueCard
+                    venue={venue}
+                    tally={tallies?.get(venue.id)}
+                    showVoteResults={showVoteResults}
+                  />
                 </li>
               ))}
             </ul>
@@ -75,9 +92,18 @@ export function PublicVenuesShowcase({
   );
 }
 
-function PublicVenueCard({ venue, hero }: { venue: VenueOption; hero?: boolean }) {
+function PublicVenueCard({
+  venue,
+  hero,
+  tally,
+  showVoteResults,
+}: {
+  venue: VenueOption;
+  hero?: boolean;
+  tally?: OptionVoteTally;
+  showVoteResults?: boolean;
+}) {
   const primary = primaryVenueUrl(venue);
-  const status = venue.bookingStatus ?? "idea";
 
   return (
     <div className={`public-venue-card${hero ? " public-venue-card--hero" : ""}`}>
@@ -86,18 +112,22 @@ function PublicVenueCard({ venue, hero }: { venue: VenueOption; hero?: boolean }
         {!hero ? (
           <span className="venue-category-pill">{VENUE_CATEGORY_LABELS[venue.category]}</span>
         ) : null}
-        {status === "booked" ? (
-          <span className="venue-base-camp-badge">Booked</span>
-        ) : null}
       </div>
+      <p className="ballot-vote-price" style={{ margin: "0.35rem 0" }}>
+        {formatVenuePrice(venue)}
+      </p>
       {venue.summary ? (
-        <p className="muted" style={{ margin: "0.5rem 0", lineHeight: 1.45 }}>
+        <p className="muted" style={{ margin: "0 0 0.5rem", lineHeight: 1.45 }}>
           {venue.summary}
         </p>
       ) : null}
-      {status !== "idea" && status !== "booked" ? (
-        <p className="muted" style={{ margin: "0 0 0.5rem", fontSize: "0.82rem" }}>
-          Status: {VENUE_BOOKING_STATUS_LABELS[status]}
+      {showVoteResults && tally && (tally.up > 0 || tally.down > 0) ? (
+        <p className="public-vote-tally" style={{ margin: "0 0 0.5rem", fontSize: "0.88rem" }}>
+          Group vote: <strong>👍 {tally.up}</strong>
+          <span className="muted"> · 👎 {tally.down}</span>
+          {tally.net !== 0 ? (
+            <span className="muted"> · net {tally.net >= 0 ? `+${tally.net}` : tally.net}</span>
+          ) : null}
         </p>
       ) : null}
       <VenueLinkButtons venue={venue} />

@@ -4,6 +4,8 @@ import { PlanConfirmationForm } from "@/components/PlanConfirmationForm";
 import { PublicItineraryView } from "@/components/PublicItineraryView";
 import { PublicVenuesShowcase } from "@/components/PublicVenuesShowcase";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
+import { tallyBallotVotes } from "@/lib/ballotResults";
+import { listBallotVotesForTrip } from "@/lib/supabase/ballotVotes";
 import { normalizeVenueOptions } from "@/lib/venues";
 import { itineraryHasContent, normalizeItinerary, type PublishedItinerary } from "@/lib/itinerary";
 import { APP_NAME } from "@/lib/brand";
@@ -39,6 +41,11 @@ export default async function PublicOptionsPage({
     : null;
   const canConfirm = Boolean(trip.selectedLocationId && trip.selectedWeekendFriday);
   const venueOptions = normalizeVenueOptions(trip.venueOptions ?? []);
+  const voteRecords = await listBallotVotesForTrip(trip.id);
+  const ballotTallies = tallyBallotVotes(
+    voteRecords.map((v) => ({ optionId: v.optionId, vote: v.vote })),
+  );
+  const showVoteResults = trip.ballotStatus === "open" || trip.ballotStatus === "closed";
 
   return (
     <div className="shell page-public" style={{ maxWidth: "800px" }}>
@@ -64,6 +71,8 @@ export default async function PublicOptionsPage({
           venues={venueOptions}
           selectedVenueId={trip.selectedVenueId}
           locationTitle={lockedLocation?.title ?? null}
+          tallies={ballotTallies}
+          showVoteResults={showVoteResults}
         />
       ) : null}
 

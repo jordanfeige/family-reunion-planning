@@ -8,12 +8,27 @@ import {
   extractVenueSuggestionsAction,
   publishVenuesFromChatAction,
 } from "@/app/actions/trips";
+import { formatVenuePrice } from "@/lib/venuePrices";
 import {
   isVenueOnShortlist,
   VENUE_CATEGORY_LABELS,
   type VenueOption,
 } from "@/lib/venues";
 import type { VenueSuggestion } from "@/lib/venueSuggestions";
+
+function suggestionToOption(s: VenueSuggestion): VenueOption {
+  return {
+    id: "",
+    title: s.title,
+    summary: s.summary,
+    category: s.category,
+    priceType: s.priceType,
+    priceMin: s.priceMin,
+    priceMax: s.priceMax,
+    priceUnit: s.priceUnit,
+    priceNotes: s.priceNotes,
+  };
+}
 
 type SuggestionState =
   | { status: "idle" }
@@ -166,6 +181,9 @@ export function VenueSuggestionCards({
                   {VENUE_CATEGORY_LABELS[venue.category]}
                 </span>
                 <strong className="location-suggestion-card-title">{venue.title}</strong>
+                <p className="ballot-vote-price" style={{ margin: "0.2rem 0", fontSize: "0.85rem" }}>
+                  {formatVenuePrice(suggestionToOption(venue))}
+                </p>
                 {venue.summary ? (
                   <p className="location-suggestion-card-summary muted">{venue.summary}</p>
                 ) : null}

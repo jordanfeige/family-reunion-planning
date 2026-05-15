@@ -1,4 +1,9 @@
 import { mergeResolvedLinks, resolveVenueLinks } from "@/lib/enrichVenueLinks";
+import {
+  defaultPriceUnitForCategory,
+  normalizePriceType,
+  normalizePriceUnit,
+} from "@/lib/venuePrices";
 import type { VenueSuggestion } from "@/lib/venueSuggestions";
 import {
   normalizeVenueBookingStatus,
@@ -33,6 +38,11 @@ export async function enrichVenueOption(
     category,
     bookingStatus: normalizeVenueBookingStatus(input.bookingStatus),
     plannerNotes: input.plannerNotes?.trim() || undefined,
+    priceType: normalizePriceType(input.priceType),
+    priceMin: input.priceMin,
+    priceMax: input.priceMax,
+    priceUnit: normalizePriceUnit(input.priceUnit, category),
+    priceNotes: input.priceNotes?.trim() || undefined,
     ...links,
   };
 }

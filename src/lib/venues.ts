@@ -1,5 +1,15 @@
-export const VENUE_CATEGORIES = ["stay", "eat", "area"] as const;
+import {
+  normalizePriceType,
+  normalizePriceUnit,
+  type PriceType,
+  type PriceUnit,
+} from "@/lib/venuePrices";
+
+export const VENUE_CATEGORIES = ["stay", "eat", "do"] as const;
 export type VenueCategory = (typeof VENUE_CATEGORIES)[number];
+
+export const BALLOT_STATUSES = ["draft", "open", "closed"] as const;
+export type BallotStatus = (typeof BALLOT_STATUSES)[number];
 
 export const VENUE_BOOKING_STATUSES = [
   "idea",
@@ -21,12 +31,17 @@ export type VenueOption = {
   sourceLabel?: string;
   bookingStatus?: VenueBookingStatus;
   plannerNotes?: string;
+  priceType?: PriceType;
+  priceMin?: number;
+  priceMax?: number;
+  priceUnit?: PriceUnit;
+  priceNotes?: string;
 };
 
 export const VENUE_CATEGORY_LABELS: Record<VenueCategory, string> = {
   stay: "Stay",
   eat: "Eat",
-  area: "Area",
+  do: "Do",
 };
 
 export const VENUE_BOOKING_STATUS_LABELS: Record<VenueBookingStatus, string> = {
@@ -37,10 +52,18 @@ export const VENUE_BOOKING_STATUS_LABELS: Record<VenueBookingStatus, string> = {
   passed: "Not using",
 };
 
+export function normalizeBallotStatus(raw: unknown): BallotStatus {
+  const s = String(raw ?? "").toLowerCase();
+  if (BALLOT_STATUSES.includes(s as BallotStatus)) return s as BallotStatus;
+  return "draft";
+}
+
 export function normalizeVenueCategory(raw: unknown): VenueCategory {
   const s = String(raw ?? "").toLowerCase();
   if (s === "eat" || s === "dining" || s === "meal") return "eat";
-  if (s === "area" || s === "gather" || s === "hub") return "area";
+  if (s === "do" || s === "activity" || s === "activities" || s === "area" || s === "gather") {
+    return "do";
+  }
   return "stay";
 }
 
@@ -50,6 +73,12 @@ export function normalizeVenueBookingStatus(raw: unknown): VenueBookingStatus {
     return s as VenueBookingStatus;
   }
   return "idea";
+}
+
+function parsePriceNumber(raw: unknown): number | undefined {
+  if (raw == null || raw === "") return undefined;
+  const n = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
+  return Number.isFinite(n) ? n : undefined;
 }
 
 export function normalizeVenueOptions(raw: unknown): VenueOption[] {
@@ -67,24 +96,22 @@ export function normalizeVenueOptions(raw: unknown): VenueOption[] {
     if (seen.has(key)) continue;
     seen.add(key);
     const id = String(o.id ?? "").trim() || crypto.randomUUID();
-    const summary = String(o.summary ?? "").trim() || undefined;
-    const bookingUrl = String(o.bookingUrl ?? "").trim() || undefined;
-    const mapsUrl = String(o.mapsUrl ?? "").trim() || undefined;
-    const websiteUrl = String(o.websiteUrl ?? "").trim() || undefined;
-    const sourceLabel = String(o.sourceLabel ?? "").trim() || undefined;
-    const plannerNotes = String(o.plannerNotes ?? "").trim() || undefined;
-    const bookingStatus = normalizeVenueBookingStatus(o.bookingStatus);
     out.push({
       id,
       title,
-      summary,
+      summary: String(o.summary ?? "").trim() || undefined,
       category,
-      bookingUrl,
-      mapsUrl,
-      websiteUrl,
-      sourceLabel,
-      plannerNotes,
-      bookingStatus,
+      bookingUrl: String(o.bookingUrl ?? "").trim() || undefined,
+      mapsUrl: String(o.mapsUrl ?? "").trim() || undefined,
+      websiteUrl: String(o.websiteUrl ?? "").trim() || undefined,
+      sourceLabel: String(o.sourceLabel ?? "").trim() || undefined,
+      plannerNotes: String(o.plannerNotes ?? "").trim() || undefined,
+      bookingStatus: normalizeVenueBookingStatus(o.bookingStatus),
+      priceType: normalizePriceType(o.priceType),
+      priceMin: parsePriceNumber(o.priceMin),
+      priceMax: parsePriceNumber(o.priceMax),
+      priceUnit: normalizePriceUnit(o.priceUnit, category),
+      priceNotes: String(o.priceNotes ?? "").trim() || undefined,
     });
   }
 
@@ -113,7 +140,6 @@ export function isVenueOnShortlist(
   );
 }
 
-/** Best URL for preview / primary outbound link. */
 export function primaryVenueUrl(venue: VenueOption): string | undefined {
   return venue.bookingUrl ?? venue.websiteUrl ?? venue.mapsUrl;
 }
@@ -131,7 +157,10 @@ export function formatVenuesForPrompt(venues: VenueOption[]): string {
     .join("\n");
 }
 
-/** Venues visible on the family plan (hide passed options). */
 export function venuesForPublicShowcase(venues: VenueOption[]): VenueOption[] {
   return venues.filter((v) => (v.bookingStatus ?? "idea") !== "passed");
+}
+
+export function ballotOptionsForVoting(venues: VenueOption[]): VenueOption[] {
+  return venuesForPublicShowcase(venues);
 }

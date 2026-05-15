@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 import {
+  defaultPriceUnitForCategory,
+  normalizePriceType,
+  normalizePriceUnit,
+} from "@/lib/venuePrices";
+import {
   normalizeVenueCategory,
   type VenueCategory,
   type VenueOption,
@@ -14,6 +19,11 @@ export type VenueSuggestion = {
   mapsUrl?: string;
   websiteUrl?: string;
   sourceLabel?: string;
+  priceType?: "exact" | "range" | "estimate" | "free" | "unknown";
+  priceMin?: number;
+  priceMax?: number;
+  priceUnit?: "per_night" | "per_person" | "per_group" | "total_stay";
+  priceNotes?: string;
 };
 
 export const venueSuggestionsSchema = z.object({
@@ -22,9 +32,14 @@ export const venueSuggestionsSchema = z.object({
       z.object({
         title: z.string(),
         summary: z.string().optional(),
-        category: z.enum(["stay", "eat", "area"]),
+        category: z.enum(["stay", "eat", "do"]),
         bookingUrl: z.string().optional(),
         mapsUrl: z.string().optional(),
+        priceType: z.enum(["exact", "range", "estimate", "free", "unknown"]).optional(),
+        priceMin: z.number().optional(),
+        priceMax: z.number().optional(),
+        priceUnit: z.enum(["per_night", "per_person", "per_group", "total_stay"]).optional(),
+        priceNotes: z.string().optional(),
       }),
     )
     .min(1)
@@ -55,6 +70,13 @@ export function mergeVenueSuggestions(
       summary: item.summary?.trim() || undefined,
       bookingUrl: item.bookingUrl?.trim() || undefined,
       mapsUrl: item.mapsUrl?.trim() || undefined,
+      websiteUrl: item.websiteUrl?.trim() || undefined,
+      sourceLabel: item.sourceLabel?.trim() || undefined,
+      priceType: normalizePriceType(item.priceType),
+      priceMin: item.priceMin,
+      priceMax: item.priceMax,
+      priceUnit: normalizePriceUnit(item.priceUnit, category),
+      priceNotes: item.priceNotes?.trim() || undefined,
     });
     added += 1;
   }

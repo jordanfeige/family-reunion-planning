@@ -124,6 +124,9 @@ export const trips = pgTable("trip", {
     .notNull()
     .default(sql`'[]'::jsonb`),
   selectedVenueId: text("selected_venue_id"),
+  ballotStatus: text("ballot_status").notNull().default("draft"),
+  ballotOpenedAt: timestamp("ballot_opened_at", { mode: "date" }),
+  ballotClosedAt: timestamp("ballot_closed_at", { mode: "date" }),
   planHeadcount: integer("plan_headcount"),
   itinerary: jsonb("itinerary")
     .$type<{

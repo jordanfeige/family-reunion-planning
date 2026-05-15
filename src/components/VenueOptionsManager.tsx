@@ -7,6 +7,7 @@ import {
   setPrimaryVenueAction,
 } from "@/app/actions/trips";
 import { VenueLinkButtons } from "@/components/LinkPreviewCard";
+import { formatVenuePrice } from "@/lib/venuePrices";
 import {
   VENUE_BOOKING_STATUS_LABELS,
   VENUE_CATEGORIES,
@@ -27,7 +28,7 @@ export function VenueOptionsManager({
   const grouped: Record<VenueCategory, VenueOption[]> = {
     stay: [],
     eat: [],
-    area: [],
+    do: [],
   };
   for (const v of venues) {
     grouped[v.category].push(v);
@@ -68,6 +69,9 @@ export function VenueOptionsManager({
                         {venue.summary ? (
                           <p className="muted venue-option-summary">{venue.summary}</p>
                         ) : null}
+                        <p className="ballot-vote-price" style={{ margin: "0.2rem 0", fontSize: "0.85rem" }}>
+                          {formatVenuePrice(venue)}
+                        </p>
                         <p className="muted" style={{ margin: "0.25rem 0 0", fontSize: "0.8rem" }}>
                           {VENUE_BOOKING_STATUS_LABELS[venue.bookingStatus ?? "idea"]}
                           {venue.sourceLabel ? ` · via ${venue.sourceLabel}` : null}

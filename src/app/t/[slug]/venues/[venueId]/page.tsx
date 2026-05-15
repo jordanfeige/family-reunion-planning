@@ -13,6 +13,7 @@ import {
   findLocationById,
   normalizeLocationOptions,
 } from "@/lib/locations";
+import { formatVenuePrice, PRICE_TYPES, PRICE_UNITS } from "@/lib/venuePrices";
 import {
   findVenueById,
   normalizeVenueOptions,
@@ -76,8 +77,11 @@ export default async function VenueDetailPage({
       </header>
 
       {venue.summary ? (
-        <p style={{ lineHeight: 1.5, margin: "0 0 1rem" }}>{venue.summary}</p>
+        <p style={{ lineHeight: 1.5, margin: "0 0 0.5rem" }}>{venue.summary}</p>
       ) : null}
+      <p className="ballot-vote-price" style={{ margin: "0 0 1rem" }}>
+        {formatVenuePrice(venue)}
+      </p>
 
       <VenueLinkButtons venue={venue} />
 
@@ -100,6 +104,60 @@ export default async function VenueDetailPage({
           Family sees this place on the shared plan. Booking still happens on the property&apos;s
           site.
         </p>
+
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="price_type">Price type</label>
+            <select id="price_type" name="price_type" defaultValue={venue.priceType ?? "unknown"}>
+              {PRICE_TYPES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="price_unit">Price unit</label>
+            <select id="price_unit" name="price_unit" defaultValue={venue.priceUnit ?? "per_night"}>
+              {PRICE_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="price_min">Price min ($)</label>
+            <input
+              id="price_min"
+              name="price_min"
+              type="number"
+              step="1"
+              defaultValue={venue.priceMin ?? ""}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="price_max">Price max ($)</label>
+            <input
+              id="price_max"
+              name="price_max"
+              type="number"
+              step="1"
+              defaultValue={venue.priceMax ?? ""}
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="price_notes">Price notes</label>
+          <input
+            id="price_notes"
+            name="price_notes"
+            defaultValue={venue.priceNotes ?? ""}
+            placeholder="Cleaning fee, plus tax…"
+          />
+        </div>
 
         <div className="field">
           <label htmlFor="booking_status">Booking status</label>

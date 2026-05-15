@@ -9,6 +9,7 @@ export type SurveyNextStepsInput = {
   planPublished: boolean;
   lockedLocationTitle?: string | null;
   lockedWeekendLabel?: string | null;
+  ballotOpen?: boolean;
   /** After the respondent has submitted the planning survey */
   submitted?: boolean;
 };
@@ -29,6 +30,33 @@ export function getSurveyNextSteps(input: SurveyNextStepsInput): SurveyNextStep[
     input.lockedLocationTitle && input.lockedWeekendLabel
       ? `${input.lockedLocationTitle} · ${input.lockedWeekendLabel}`
       : null;
+
+  if (input.ballotOpen && input.submitted) {
+    const steps: SurveyNextStep[] = [
+      {
+        title: "You shared your preferences",
+        description: "Your locations, weekends, and party size are in.",
+        status: "done",
+      },
+      {
+        title: "Vote on stays, meals & activities",
+        description:
+          "Thumbs up or down on the planner’s shortlist—open the vote link from your organizer.",
+        status: "current",
+      },
+      {
+        title: "Browse the weekend plan",
+        description: "See the group favorites and itinerary when it’s ready.",
+        status: "upcoming",
+      },
+      {
+        title: "Confirm your final RSVP",
+        description: "Say yes or no when plans are firm.",
+        status: "upcoming",
+      },
+    ];
+    return steps;
+  }
 
   if (input.planReady && input.planPublished) {
     const steps: SurveyNextStep[] = [
