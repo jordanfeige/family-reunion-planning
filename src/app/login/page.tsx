@@ -6,9 +6,9 @@ import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, error } = await searchParams;
 
   return (
     <div className="shell" style={{ maxWidth: "480px", padding: "2rem 1.25rem" }}>
@@ -21,6 +21,12 @@ export default async function LoginPage({
         <p className="muted">
           We will email you a one-time link—no passwords to forget.
         </p>
+        {error ? (
+          <p className="error-banner" style={{ marginTop: "0.75rem" }}>
+            {error}
+          </p>
+        ) : null}
+
         <form action={loginWithMagicLinkAction} className="stack" style={{ marginTop: "1rem" }}>
           <input type="hidden" name="callbackUrl" value={callbackUrl ?? "/dashboard"} />
           <div className="field">

@@ -9,9 +9,11 @@ export default function VerifyRequestPage() {
           We sent a WandrAI magic link. Tap it on this device to hop
           into your dashboard. If you do not see it, peek in promotions or spam.
         </p>
-        <div className="success-banner" style={{ marginTop: "1rem" }}>
-          Running locally? The link is also printed in your dev server terminal.
-        </div>
+        {process.env.NODE_ENV !== "production" ? (
+          <div className="success-banner" style={{ marginTop: "1rem" }}>
+            Running locally? The link is also printed in your dev server terminal.
+          </div>
+        ) : null}
         <p style={{ marginTop: "1.25rem" }}>
           <Link href="/login">← Try a different email</Link>
         </p>
