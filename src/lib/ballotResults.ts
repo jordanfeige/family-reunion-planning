@@ -1,4 +1,8 @@
-import type { VenueOption } from "@/lib/venues";
+import {
+  venuesForPublicShowcase,
+  type VenueCategory,
+  type VenueOption,
+} from "@/lib/venues";
 
 export type BallotVoteRow = {
   optionId: string;
@@ -43,6 +47,51 @@ export function sortOptionsByVotes(
     const upB = tallies.get(b.id)?.up ?? 0;
     return upB - upA;
   });
+}
+
+/** Ballot-eligible venues first (vote order), then the rest (e.g. passed), for planner shortlist. */
+export function sortPlannerCategoryVenues(
+  venues: VenueOption[],
+  category: VenueCategory,
+  tallies: Map<string, OptionVoteTally> | undefined,
+): VenueOption[] {
+  const all = venues.filter((v) => v.category === category);
+  if (!tallies) return all;
+  const visible = venuesForPublicShowcase(all);
+  const visibleIds = new Set(visible.map((v) => v.id));
+  const rest = all.filter((v) => !visibleIds.has(v.id));
+  return [...sortOptionsByVotes(visible, tallies), ...sortOptionsByVotes(rest, tallies)];
+}
+
+export function categoryVoteRollup(
+  ballotVisibleOptions: VenueOption[],
+  tallies: Map<string, OptionVoteTally>,
+): {
+  totalUp: number;
+  totalDown: number;
+  leader: { venue: VenueOption; tally: OptionVoteTally } | null;
+} {
+  let totalUp = 0;
+  let totalDown = 0;
+  for (const v of ballotVisibleOptions) {
+    const t = tallies.get(v.id);
+    if (t) {
+      totalUp += t.up;
+      totalDown += t.down;
+    }
+  }
+  const sorted = sortOptionsByVotes(ballotVisibleOptions, tallies);
+  const top = sorted[0];
+  if (!top) {
+    return { totalUp, totalDown, leader: null };
+  }
+  const tally = tallies.get(top.id) ?? {
+    optionId: top.id,
+    up: 0,
+    down: 0,
+    net: 0,
+  };
+  return { totalUp, totalDown, leader: { venue: top, tally } };
 }
 
 export function countDistinctVoters(votes: { voterKey: string }[]): number {

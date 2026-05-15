@@ -22,7 +22,6 @@ import { TripHubWizard } from "@/components/TripHubWizard";
 import { TripOwnerManagePanel } from "@/components/TripOwnerManagePanel";
 import { TripItineraryPanel } from "@/components/TripItineraryPanel";
 import { TripBallotControls } from "@/components/TripBallotControls";
-import { TripBallotResults } from "@/components/TripBallotResults";
 import { TripVenueSection } from "@/components/TripVenueSection";
 import { tallyBallotVotes, countDistinctVoters } from "@/lib/ballotResults";
 import { listBallotVotesForTrip } from "@/lib/supabase/ballotVotes";
@@ -326,16 +325,12 @@ export default async function TripHubPage({
             venues={venueOptions}
             selectedVenueId={trip.selectedVenueId}
             locationLocked={Boolean(trip.selectedLocationId)}
+            plannerVote={
+              trip.ballotStatus !== "draft" && ballotOptionCount > 0
+                ? { tallies: ballotTallies, voterCount: ballotVoterCount }
+                : null
+            }
           />
-          {trip.ballotStatus !== "draft" && ballotOptionCount > 0 ? (
-            <TripBallotResults
-              slug={trip.slug}
-              venues={venueOptions}
-              tallies={ballotTallies}
-              voterCount={ballotVoterCount}
-              selectedVenueId={trip.selectedVenueId}
-            />
-          ) : null}
         </div>
         }
         blueprint={

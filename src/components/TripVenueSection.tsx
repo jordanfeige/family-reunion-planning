@@ -1,5 +1,6 @@
 import { TripVenueChat } from "@/components/TripVenueChat";
 import { VenueOptionsManager } from "@/components/VenueOptionsManager";
+import type { OptionVoteTally } from "@/lib/ballotResults";
 import type { VenueOption } from "@/lib/venues";
 
 export function TripVenueSection({
@@ -9,6 +10,7 @@ export function TripVenueSection({
   venues,
   selectedVenueId,
   locationLocked,
+  plannerVote,
 }: {
   slug: string;
   lockedLocationTitle: string | null;
@@ -16,6 +18,7 @@ export function TripVenueSection({
   venues: VenueOption[];
   selectedVenueId: string | null;
   locationLocked: boolean;
+  plannerVote?: { tallies: Map<string, OptionVoteTally>; voterCount: number } | null;
 }) {
   if (!locationLocked || !lockedLocationTitle) {
     return (
@@ -59,6 +62,7 @@ export function TripVenueSection({
         slug={slug}
         venues={venues}
         selectedVenueId={selectedVenueId}
+        plannerVote={plannerVote}
       />
     </div>
   );

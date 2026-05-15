@@ -2467,10 +2467,6 @@ code {
   margin-bottom: 0.5rem;
 }
 
-.planner-ballot-results-shell {
-  padding: 1rem;
-}
-
 .venue-option-card--stacked {
   flex-direction: column;
   align-items: stretch;
@@ -2500,6 +2496,98 @@ code {
 .venue-option-actions--stacked .btn {
   width: 100%;
   justify-content: center;
+}
+
+.planner-category-vote-details {
+  margin: 0 0 0.75rem;
+}
+
+.planner-category-vote-details-body p:last-child {
+  margin-bottom: 0;
+}
+
+.planner-vote-view-toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-bottom: 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(28, 61, 90, 0.15);
+  overflow: hidden;
+  background: #fff;
+}
+
+.planner-vote-view-toggle button {
+  margin: 0;
+  padding: 0.45rem 0.85rem;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-slate);
+  cursor: pointer;
+  border-right: 1px solid rgba(28, 61, 90, 0.1);
+}
+
+.planner-vote-view-toggle button:last-child {
+  border-right: none;
+}
+
+.planner-vote-view-toggle button.is-active {
+  background: rgba(42, 85, 128, 0.12);
+  color: var(--color-fjord);
+}
+
+.venue-option-vote-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(28, 61, 90, 0.08);
+}
+
+.venue-option-vote-net {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-fjord);
+}
+
+.venue-option-vote-counts {
+  font-size: 0.82rem;
+}
+
+.planner-scores-compact-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.planner-scores-compact-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+}
+
+.planner-scores-compact-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.planner-scores-compact-score {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(28, 61, 90, 0.08);
 }
 
 .ballot-results-title-row {
