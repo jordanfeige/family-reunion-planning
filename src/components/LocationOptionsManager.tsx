@@ -1,7 +1,10 @@
+"use client";
+
 import {
   addLocationOptionAction,
   deleteLocationOptionAction,
 } from "@/app/actions/trips";
+import { ManualAddDrawer } from "@/components/ManualAddDrawer";
 import type { LocationOption } from "@/lib/locations";
 import { formatLocationLabel } from "@/lib/locations";
 
@@ -15,9 +18,45 @@ export function LocationOptionsManager({
   return (
     <div className="stack" style={{ marginTop: "1rem" }}>
       <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-        These appear on the family survey for multi-select voting. Add manually
-        or publish from the AI location brainstorm above.
+        These appear on the family survey for multi-select voting. Use{" "}
+        <strong>Add manually</strong> or publish from the AI location brainstorm above.
       </p>
+
+      <ManualAddDrawer title="Add location" triggerLabel="Add manually">
+        {({ close }) => (
+          <form
+            className="stack"
+            action={async (formData) => {
+              await addLocationOptionAction(formData);
+              close();
+            }}
+          >
+            <input type="hidden" name="slug" value={slug} />
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="loc_title">Destination name</label>
+                <input
+                  id="loc_title"
+                  name="title"
+                  required
+                  placeholder="Bergen & nearby fjords"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="loc_summary">Short pitch (optional)</label>
+                <input
+                  id="loc_summary"
+                  name="summary"
+                  placeholder="Easy flights, great food, mild summer weather"
+                />
+              </div>
+            </div>
+            <button type="submit" className="btn btn-berry" style={{ alignSelf: "flex-start" }}>
+              Add to survey
+            </button>
+          </form>
+        )}
+      </ManualAddDrawer>
 
       {locations.length > 0 ? (
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }} className="stack">
@@ -60,31 +99,10 @@ export function LocationOptionsManager({
         </ul>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          No locations on the survey yet—brainstorm with the AI, then click
-          &quot;Add to survey&quot; on its reply.
+          No locations on the survey yet—brainstorm with the AI, then click &quot;Add to survey&quot;
+          on its reply.
         </p>
       )}
-
-      <form action={addLocationOptionAction} className="stack">
-        <input type="hidden" name="slug" value={slug} />
-        <div className="grid-2">
-          <div className="field">
-            <label htmlFor="loc_title">Add location manually</label>
-            <input id="loc_title" name="title" required placeholder="Bergen & nearby fjords" />
-          </div>
-          <div className="field">
-            <label htmlFor="loc_summary">Short pitch (optional)</label>
-            <input
-              id="loc_summary"
-              name="summary"
-              placeholder="Easy flights, great food, mild summer weather"
-            />
-          </div>
-        </div>
-        <button type="submit" className="btn btn-secondary" style={{ alignSelf: "flex-start" }}>
-          Add to survey
-        </button>
-      </form>
     </div>
   );
 }

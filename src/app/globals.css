@@ -1773,6 +1773,99 @@ code {
   color: var(--color-fjord);
 }
 
+/* Manual add: slide-over (desktop) / full-viewport sheet (mobile) */
+.manual-add-drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.manual-add-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 34, 0.4);
+  cursor: pointer;
+}
+
+.manual-add-drawer-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(27rem, 100vw);
+  max-height: 100%;
+  background: var(--color-snow);
+  box-shadow: -8px 0 40px rgba(15, 23, 34, 0.15);
+  animation: manual-add-drawer-slide-in 0.25s ease-out;
+}
+
+@keyframes manual-add-drawer-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.manual-add-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(28, 61, 90, 0.1);
+  flex-shrink: 0;
+}
+
+.manual-add-drawer-title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-fjord);
+}
+
+.manual-add-drawer-close {
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 1.35rem;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--color-fjord-soft);
+  cursor: pointer;
+  padding: 0.25rem 0.35rem;
+}
+
+.manual-add-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1rem 1rem 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .manual-add-drawer-panel {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    animation: manual-add-drawer-sheet-in 0.28s ease-out;
+  }
+
+  @keyframes manual-add-drawer-sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+}
+
 .trip-basics-form .field {
   margin-bottom: 0.85rem;
 }

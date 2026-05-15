@@ -9,6 +9,7 @@ import {
   deleteVenueOptionAction,
   setPrimaryVenueAction,
 } from "@/app/actions/trips";
+import { ManualAddDrawer } from "@/components/ManualAddDrawer";
 import { VenueLinkButtons } from "@/components/LinkPreviewCard";
 import { formatVenuePrice } from "@/lib/venuePrices";
 import {
@@ -75,10 +76,83 @@ export function VenueOptionsManager({
           </span>
         </p>
 
+        <div
+          className="row"
+          style={{ flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem", alignItems: "center" }}
+        >
+          <ManualAddDrawer
+            key={activeCategory}
+            title={`Add to ${VENUE_CATEGORY_LABELS[activeCategory]}`}
+            triggerLabel="Add manually"
+          >
+            {({ close }) => (
+              <form
+                className="stack"
+                action={async (formData) => {
+                  await addVenueOptionAction(formData);
+                  close();
+                }}
+              >
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="category" value={activeCategory} />
+                <p className="muted" style={{ margin: 0, fontSize: "0.88rem" }}>
+                  Adds to the <strong>{VENUE_CATEGORY_LABELS[activeCategory]}</strong> shortlist (
+                  current tab).
+                </p>
+                <div className="field">
+                  <label htmlFor={`venue_title_${activeCategory}`}>Name</label>
+                  <input
+                    id={`venue_title_${activeCategory}`}
+                    name="title"
+                    required
+                    placeholder={
+                      activeCategory === "stay"
+                        ? "Eagle Ridge Resort"
+                        : activeCategory === "eat"
+                          ? "Riverbend Grill"
+                          : "Kayak rental / hike"
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor={`venue_summary_${activeCategory}`}>Notes (optional)</label>
+                  <textarea
+                    id={`venue_summary_${activeCategory}`}
+                    name="summary"
+                    placeholder="Capacity, vibe, parking…"
+                  />
+                </div>
+                <div className="grid-2">
+                  <div className="field">
+                    <label htmlFor={`venue_booking_${activeCategory}`}>Booking URL (optional)</label>
+                    <input
+                      id={`venue_booking_${activeCategory}`}
+                      name="booking_url"
+                      type="url"
+                      placeholder="https://…"
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor={`venue_maps_${activeCategory}`}>Map link (optional)</label>
+                    <input
+                      id={`venue_maps_${activeCategory}`}
+                      name="maps_url"
+                      type="url"
+                      placeholder="https://maps…"
+                    />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-berry" style={{ alignSelf: "flex-start" }}>
+                  Add to shortlist
+                </button>
+              </form>
+            )}
+          </ManualAddDrawer>
+        </div>
+
         {items.length === 0 ? (
           <p className="muted" style={{ margin: "0 0 0.75rem" }}>
-            Nothing here yet—ask WandrAI above or add manually below (type is preset to this
-            section).
+            Nothing here yet—ask WandrAI above or use <strong>Add manually</strong>.
           </p>
         ) : (
           <ul className="venue-options-list">
@@ -173,50 +247,6 @@ export function VenueOptionsManager({
           )}
         </div>
       </div>
-
-      <form action={addVenueOptionAction} className="stack venue-options-add-form card" key={activeCategory}>
-        <input type="hidden" name="slug" value={slug} />
-        <h4 className="venue-options-group-title" style={{ margin: 0 }}>
-          Add to {VENUE_CATEGORY_LABELS[activeCategory]}
-        </h4>
-        <div className="field">
-          <label htmlFor="venue_title">Name</label>
-          <input
-            id="venue_title"
-            name="title"
-            required
-            placeholder={
-              activeCategory === "stay"
-                ? "Eagle Ridge Resort"
-                : activeCategory === "eat"
-                  ? "Riverbend Grill"
-                  : "Kayak rental / hike"
-            }
-          />
-        </div>
-        <input type="hidden" name="category" value={activeCategory} />
-        <div className="field">
-          <label htmlFor="venue_summary">Notes (optional)</label>
-          <textarea
-            id="venue_summary"
-            name="summary"
-            placeholder="Capacity, vibe, parking…"
-          />
-        </div>
-        <div className="grid-2">
-          <div className="field">
-            <label htmlFor="venue_booking">Booking URL (optional)</label>
-            <input id="venue_booking" name="booking_url" type="url" placeholder="https://…" />
-          </div>
-          <div className="field">
-            <label htmlFor="venue_maps">Map link (optional)</label>
-            <input id="venue_maps" name="maps_url" type="url" placeholder="https://maps…" />
-          </div>
-        </div>
-        <button type="submit" className="btn btn-secondary" style={{ alignSelf: "flex-start" }}>
-          Add to shortlist
-        </button>
-      </form>
     </div>
   );
 }
