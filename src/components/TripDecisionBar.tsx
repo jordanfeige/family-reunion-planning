@@ -1,3 +1,9 @@
+"use client";
+
+import { useState } from "react";
+
+import { updateTripPlanContextAction } from "@/app/actions/trips";
+import { CompactSelect } from "@/components/CompactSelect";
 import {
   aggregateLocationAvailability,
   aggregateWeekendAvailability,
@@ -6,7 +12,6 @@ import {
 } from "@/lib/availability";
 import type { LocationOption } from "@/lib/locations";
 import { filterValidFridays, formatWeekendLabel } from "@/lib/weekends";
-import { updateTripPlanContextAction } from "@/app/actions/trips";
 
 export function TripDecisionBar({
   slug,
@@ -33,8 +38,29 @@ export function TripDecisionBar({
       ? headcountForWeekend(selectedWeekendFriday, weekendSlots, responses)
       : 0);
 
+  const [locationId, setLocationId] = useState(selectedLocationId ?? "");
+  const [weekendFriday, setWeekendFriday] = useState(selectedWeekendFriday ?? "");
+
+  const locationOptions = [
+    { value: "", label: "Choose a location…" },
+    ...locations.map((loc) => {
+      const votes = locationVotes.find((v) => v.locationId === loc.id);
+      const hint = votes?.totalAttendees ? ` · ${votes.totalAttendees} people` : "";
+      return { value: loc.id, label: `${loc.title}${hint}` };
+    }),
+  ];
+
+  const weekendOptions = [
+    { value: "", label: "Choose a weekend…" },
+    ...filterValidFridays(weekendSlots).map((iso) => {
+      const votes = weekendVotes.find((v) => v.fridayIso === iso);
+      const hint = votes?.totalAttendees ? ` · ${votes.totalAttendees} people` : "";
+      return { value: iso, label: `${formatWeekendLabel(iso)}${hint}` };
+    }),
+  ];
+
   return (
-    <form action={updateTripPlanContextAction} className="stack">
+    <form action={updateTripPlanContextAction} className="stack plan-context-form">
       <input type="hidden" name="slug" value={slug} />
       <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
         Lock the location and weekend for your day-by-day itinerary. RSVP counts
@@ -43,47 +69,25 @@ export function TripDecisionBar({
       <div className="grid-2">
         <div className="field">
           <label htmlFor="selected_location_id">Location</label>
-          <select
+          <CompactSelect
             id="selected_location_id"
             name="selected_location_id"
-            defaultValue={selectedLocationId ?? ""}
-          >
-            <option value="">Choose a location…</option>
-            {locations.map((loc) => {
-              const votes = locationVotes.find((v) => v.locationId === loc.id);
-              const hint = votes?.totalAttendees
-                ? ` · ${votes.totalAttendees} people`
-                : "";
-              return (
-                <option key={loc.id} value={loc.id}>
-                  {loc.title}
-                  {hint}
-                </option>
-              );
-            })}
-          </select>
+            value={locationId}
+            options={locationOptions}
+            onChange={setLocationId}
+            placeholder="Choose a location…"
+          />
         </div>
         <div className="field">
           <label htmlFor="selected_weekend_friday">Weekend</label>
-          <select
+          <CompactSelect
             id="selected_weekend_friday"
             name="selected_weekend_friday"
-            defaultValue={selectedWeekendFriday ?? ""}
-          >
-            <option value="">Choose a weekend…</option>
-            {filterValidFridays(weekendSlots).map((iso) => {
-              const votes = weekendVotes.find((v) => v.fridayIso === iso);
-              const hint = votes?.totalAttendees
-                ? ` · ${votes.totalAttendees} people`
-                : "";
-              return (
-                <option key={iso} value={iso}>
-                  {formatWeekendLabel(iso)}
-                  {hint}
-                </option>
-              );
-            })}
-          </select>
+            value={weekendFriday}
+            options={weekendOptions}
+            onChange={setWeekendFriday}
+            placeholder="Choose a weekend…"
+          />
         </div>
         <div className="field">
           <label htmlFor="plan_headcount">Planning headcount</label>
@@ -96,8 +100,8 @@ export function TripDecisionBar({
           />
         </div>
       </div>
-      <button type="submit" className="btn btn-primary" style={{ alignSelf: "flex-start" }}>
-        Save plan context
+      <button type="submit" className="btn btn-primary btn-block-sm">
+        Save location &amp; weekend
       </button>
     </form>
   );

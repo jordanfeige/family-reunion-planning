@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 import {
   filterValidFridays,
   formatWeekendLabel,
-  fridayIsoFromDate,
-  getCalendarDays,
+  formatWeekendLabelShort,
+  getFridaysInMonth,
   parseFridayIso,
 } from "@/lib/weekends";
 
@@ -26,12 +26,14 @@ export function WeekendDatePicker({
 
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
-  const days = useMemo(() => getCalendarDays(year, month), [year, month]);
+  const monthFridays = useMemo(() => getFridaysInMonth(year, month), [year, month]);
 
-  const monthLabel = viewDate.toLocaleDateString("en-US", {
+  const monthLabel = viewDate.toLocaleDateString(undefined, {
     month: "long",
     year: "numeric",
   });
+
+  const sortedSelected = filterValidFridays(selected);
 
   function toggleFriday(iso: string) {
     setSelected((prev) =>
@@ -39,159 +41,103 @@ export function WeekendDatePicker({
     );
   }
 
-  const sortedSelected = filterValidFridays(selected);
-
   return (
     <div className="field" style={{ gridColumn: "1 / -1" }}>
       <label>Candidate Fri–Sun weekends</label>
       <p className="muted" style={{ margin: "0.35rem 0 0.75rem", fontSize: "0.9rem" }}>
-        Select Fri–Sun weekends your family can consider. Only Fridays are
-        clickable—each adds that full weekend as one survey option.
+        Each option is a full Fri–Sun weekend for your family survey—same format
+        guests see when they RSVP.
       </p>
 
       <input type="hidden" name={name} value={sortedSelected.join(",")} />
 
-      <div
-        className="card"
-        style={{
-          padding: "1rem",
-          background: "#fff",
-          marginBottom: "0.75rem",
-        }}
-      >
-        <div
-          className="row"
-          style={{ justifyContent: "space-between", marginBottom: "0.75rem" }}
-        >
+      <div className="weekend-picker card">
+        <div className="weekend-picker-nav">
           <button
             type="button"
-            className="btn btn-secondary"
-            style={{ padding: "0.35rem 0.75rem", fontSize: "0.85rem" }}
-            onClick={() =>
-              setViewDate(new Date(year, month - 1, 1, 12, 0, 0, 0))
-            }
+            className="btn btn-secondary btn-sm"
+            aria-label="Previous month"
+            onClick={() => setViewDate(new Date(year, month - 1, 1, 12, 0, 0, 0))}
           >
             ←
           </button>
-          <strong style={{ color: "var(--color-fjord)" }}>{monthLabel}</strong>
+          <strong className="weekend-picker-month">{monthLabel}</strong>
           <button
             type="button"
-            className="btn btn-secondary"
-            style={{ padding: "0.35rem 0.75rem", fontSize: "0.85rem" }}
-            onClick={() =>
-              setViewDate(new Date(year, month + 1, 1, 12, 0, 0, 0))
-            }
+            className="btn btn-secondary btn-sm"
+            aria-label="Next month"
+            onClick={() => setViewDate(new Date(year, month + 1, 1, 12, 0, 0, 0))}
           >
             →
           </button>
         </div>
 
-        <div className="calendar-grid">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-            <div key={d} className="muted" style={{ fontWeight: 600 }}>
-              {d}
-            </div>
-          ))}
-          {days.map((day) => {
-            const iso = fridayIsoFromDate(day);
-            const inMonth = day.getMonth() === month;
-            const isFri = day.getDay() === 5;
-            const isSelected = selected.includes(iso);
-
-            if (!isFri) {
+        {monthFridays.length === 0 ? (
+          <p className="muted weekend-picker-empty">No Fridays in this month.</p>
+        ) : (
+          <ul className="choice-list weekend-picker-list">
+            {monthFridays.map((iso) => {
+              const isSelected = selected.includes(iso);
               return (
-                <div
-                  key={iso + day.getTime()}
-                  style={{
-                    padding: "0.5rem 0.25rem",
-                    borderRadius: "var(--radius-sm)",
-                    opacity: inMonth ? 0.35 : 0.2,
-                    color: "var(--color-slate)",
-                  }}
-                >
-                  {day.getDate()}
-                </div>
+                <li key={iso}>
+                  <label className="choice-card">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleFriday(iso)}
+                    />
+                    <span className="choice-card-body">
+                      <span className="choice-check" aria-hidden />
+                      <span className="weekend-picker-row-text">
+                        <span className="weekend-picker-row-primary">
+                          {formatWeekendLabelShort(iso)}
+                        </span>
+                        <span className="muted weekend-picker-row-year">
+                          {parseFridayIso(iso)?.getFullYear()}
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                </li>
               );
-            }
-
-            return (
-              <button
-                key={iso}
-                type="button"
-                className="calendar-day-btn"
-                onClick={() => toggleFriday(iso)}
-                style={{
-                  padding: "0.5rem 0.25rem",
-                  borderRadius: "var(--radius-sm)",
-                  border: isSelected
-                    ? "2px solid var(--color-berry)"
-                    : "1px solid rgba(28,61,90,0.2)",
-                  background: isSelected
-                    ? "rgba(212, 90, 58, 0.15)"
-                    : inMonth
-                      ? "#fff"
-                      : "rgba(255,255,255,0.6)",
-                  color: "var(--color-fjord)",
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: "pointer",
-                  opacity: inMonth ? 1 : 0.65,
-                }}
-                title={formatWeekendLabel(iso)}
-              >
-                {day.getDate()}
-              </button>
-            );
-          })}
-        </div>
+            })}
+          </ul>
+        )}
       </div>
 
-      {sortedSelected.length > 0 ? (
-        <ul
-          style={{
-            listStyle: "none",
-            padding: 0,
-            margin: 0,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "0.5rem",
-          }}
-        >
-          {sortedSelected.map((iso) => (
-            <li key={iso}>
-              <span
-                className="pill"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                }}
-              >
-                {formatWeekendLabel(iso)}
-                <button
-                  type="button"
-                  onClick={() => toggleFriday(iso)}
-                  aria-label={`Remove ${formatWeekendLabel(iso)}`}
-                  style={{
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    padding: 0,
-                    lineHeight: 1,
-                    color: "var(--color-berry)",
-                    fontWeight: 700,
-                  }}
-                >
-                  ×
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-          No weekends selected yet—click a Friday on the calendar.
+      <div className="weekend-picker-selected">
+        <p className="weekend-picker-selected-label">
+          Selected for survey
+          {sortedSelected.length > 0 ? (
+            <span className="pill" style={{ marginLeft: "0.5rem", fontSize: "0.72rem" }}>
+              {sortedSelected.length}
+            </span>
+          ) : null}
         </p>
-      )}
+        {sortedSelected.length > 0 ? (
+          <ul className="weekend-picker-pills">
+            {sortedSelected.map((iso) => (
+              <li key={iso}>
+                <span className="pill weekend-picker-pill">
+                  <span className="weekend-picker-pill-text">{formatWeekendLabel(iso)}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleFriday(iso)}
+                    aria-label={`Remove ${formatWeekendLabel(iso)}`}
+                    className="weekend-picker-pill-remove"
+                  >
+                    ×
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
+            No weekends selected yet—check one or more weekends above.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

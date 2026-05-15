@@ -37,7 +37,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const session = await auth();
+  let session = null;
+  try {
+    session = await auth();
+  } catch {
+    session = null;
+  }
 
   return (
     <html lang="en" className={`${outfit.variable} ${fraunces.variable}`}>

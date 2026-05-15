@@ -11,8 +11,10 @@ import {
   verificationTokens,
 } from "@/db/schema";
 import { resendEmailProvider } from "@/lib/auth/resendEmailProvider";
+import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
 
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
+  secret: process.env.AUTH_SECRET,
   trustHost: true,
   adapter: DrizzleAdapter(getDb(), {
     usersTable: users,
@@ -28,6 +30,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
     error: "/login/error",
   },
   providers: [resendEmailProvider()],
+  events: {
+    async signIn({ user }) {
+      if (user.id && user.email) {
+        try {
+          await claimTripInvitesForUser(user.id, user.email);
+        } catch (err) {
+          console.error("claimTripInvitesForUser:", err);
+        }
+      }
+    },
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

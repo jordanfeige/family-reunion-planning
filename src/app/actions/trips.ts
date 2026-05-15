@@ -13,6 +13,11 @@ import {
   type LocationOption,
 } from "@/lib/locations";
 import {
+  locationSuggestionsSchema,
+  mergeLocationSuggestions,
+  type LocationSuggestion,
+} from "@/lib/locationSuggestions";
+import {
   itineraryDaySchema,
   itineraryFromGenerated,
   itineraryGenerationSchema,
@@ -61,6 +66,7 @@ import {
   upsertTripConfirmation,
   getTripByShareToken,
 } from "@/lib/supabase/queries";
+import { deleteTripById, resetTripPlanning } from "@/lib/supabase/tripReset";
 
 async function requireSessionUserId() {
   const session = await auth();
@@ -105,6 +111,20 @@ async function loadTripForOrganizer(slug: string, userId: string) {
   return access;
 }
 
+function assertTripNameConfirmation(tripName: string, confirm: string) {
+  if (confirm.trim() !== tripName.trim()) {
+    throw new Error(`Type "${tripName}" exactly to confirm.`);
+  }
+}
+
+async function loadTripAsOwner(slug: string, userId: string) {
+  const access = await loadTripForOrganizer(slug, userId);
+  if (access.role !== "owner") {
+    throw new Error("Only the trip owner can do that.");
+  }
+  return access;
+}
+
 export async function updateTripBasicsAction(formData: FormData) {
   const userId = await requireSessionUserId();
   const slug = String(formData.get("slug") ?? "").trim();
@@ -118,11 +138,8 @@ export async function updateTripBasicsAction(formData: FormData) {
 
   await updateTripById(trip.id, {
     name: String(formData.get("name") ?? trip.name).trim() || trip.name,
-    tagline: String(formData.get("tagline") ?? "").trim() || null,
     destinationNotes: String(formData.get("destination") ?? "").trim() || null,
     targetBudget: String(formData.get("budget") ?? "").trim() || null,
-    tripStart: parseOptionalDate(formData.get("trip_start")),
-    tripEnd: parseOptionalDate(formData.get("trip_end")),
     proposedDateSlots,
   });
 
@@ -359,6 +376,59 @@ export async function deleteLocationOptionAction(formData: FormData) {
   revalidatePath(`/t/${slug}`);
 }
 
+async function extractLocationsFromAssistantText(
+  text: string,
+): Promise<LocationSuggestion[]> {
+  if (!hasAnthropicApiKey()) {
+    throw new Error("Add ANTHROPIC_API_KEY to publish locations from the AI planner.");
+  }
+
+  const { object } = await generateObject({
+    model: plannerModel(),
+    schema: locationSuggestionsSchema,
+    prompt: `Extract distinct trip destination or area options from this family reunion planning message. Return 2–6 clear choices families could vote on in a survey. Use concise titles (e.g. "Bergen & fjords", "Lofoten islands").\n\nMessage:\n${text}`,
+  });
+
+  return object.locations
+    .map((loc) => ({
+      title: loc.title.trim(),
+      summary: loc.summary?.trim() || undefined,
+    }))
+    .filter((loc) => loc.title.length > 0);
+}
+
+export async function extractLocationSuggestionsAction(
+  slug: string,
+  assistantText: string,
+): Promise<LocationSuggestion[]> {
+  const userId = await requireSessionUserId();
+  const text = assistantText.trim();
+  if (!text) throw new Error("No AI message to extract from.");
+
+  await loadTripForOrganizer(slug, userId);
+  return extractLocationsFromAssistantText(text);
+}
+
+export async function addLocationSuggestionAction(
+  slug: string,
+  title: string,
+  summary?: string,
+) {
+  const userId = await requireSessionUserId();
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) throw new Error("Location title is required.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const existing = normalizeLocationOptions(trip.locationOptions ?? []);
+  const { merged, added } = mergeLocationSuggestions(existing, [
+    { title: trimmedTitle, summary: summary?.trim() || undefined },
+  ]);
+
+  await updateTripById(trip.id, { locationOptions: merged });
+  revalidatePath(`/t/${slug}`);
+  return { added: added > 0, total: merged.length };
+}
+
 export async function publishLocationsFromChatAction(
   slug: string,
   assistantText: string,
@@ -367,47 +437,15 @@ export async function publishLocationsFromChatAction(
   const text = assistantText.trim();
   if (!text) throw new Error("No AI message to extract from.");
 
-  if (!hasAnthropicApiKey()) {
-    throw new Error("Add ANTHROPIC_API_KEY to publish locations from the AI planner.");
-  }
-
   const { trip } = await loadTripForOrganizer(slug, userId);
-
-  const { object } = await generateObject({
-    model: plannerModel(),
-    schema: z.object({
-      locations: z
-        .array(
-          z.object({
-            title: z.string(),
-            summary: z.string().optional(),
-          }),
-        )
-        .min(1)
-        .max(8),
-    }),
-    prompt: `Extract distinct trip destination or area options from this family reunion planning message. Return 2–6 clear choices families could vote on in a survey. Use concise titles (e.g. "Bergen & fjords", "Lofoten islands").\n\nMessage:\n${text}`,
-  });
-
+  const suggestions = await extractLocationsFromAssistantText(text);
   const existing = normalizeLocationOptions(trip.locationOptions ?? []);
-  const titles = new Set(existing.map((l) => l.title.toLowerCase()));
-  const merged = [...existing];
-
-  for (const loc of object.locations) {
-    const title = loc.title.trim();
-    if (!title || titles.has(title.toLowerCase())) continue;
-    titles.add(title.toLowerCase());
-    merged.push({
-      id: crypto.randomUUID(),
-      title,
-      summary: loc.summary?.trim() || undefined,
-    });
-  }
+  const { merged, added } = mergeLocationSuggestions(existing, suggestions);
 
   await updateTripById(trip.id, { locationOptions: merged });
 
   revalidatePath(`/t/${slug}`);
-  return { added: merged.length - existing.length, total: merged.length };
+  return { added, total: merged.length };
 }
 
 export async function updateTripPlanContextAction(formData: FormData) {
@@ -487,7 +525,7 @@ Rules:
 - Exactly 3 days: friday, saturday, sunday keys
 - Realistic pacing for a multi-generational group; include downtime
 - Mark lodging and restaurants that need reservations as status "to_book"
-- Include specific activity ideas with approximate times (e.g. "10:00")
+- Include specific activity ideas with approximate times in 12-hour form (e.g. "10:00 AM", "2:30 PM")
 - Use type: activity | meal | lodging | travel
 - No invented live prices; say "check availability" in notes when needed`,
   });
@@ -500,12 +538,11 @@ Rules:
   return { ok: true };
 }
 
-export async function updateItineraryBlockStatusAction(formData: FormData) {
+export async function updateItineraryBlockAction(formData: FormData) {
   const userId = await requireSessionUserId();
   const slug = String(formData.get("slug") ?? "").trim();
   const dayKey = String(formData.get("day_key") ?? "").trim() as DayKey;
   const blockId = String(formData.get("block_id") ?? "").trim();
-  const status = String(formData.get("status") ?? "").trim() as BlockStatus;
 
   if (!slug || !dayKey || !blockId) throw new Error("Missing fields.");
 
@@ -519,11 +556,24 @@ export async function updateItineraryBlockStatusAction(formData: FormData) {
   for (const day of itinerary.days) {
     if (day.key !== dayKey) continue;
     for (const block of day.blocks) {
-      if (block.id === blockId) {
+      if (block.id !== blockId) continue;
+      if (formData.has("status")) {
+        const status = String(formData.get("status") ?? "").trim() as BlockStatus;
+        if (!["idea", "to_book", "booked"].includes(status)) {
+          throw new Error("Invalid status.");
+        }
         block.status = status;
-        found = true;
-        break;
       }
+      if (formData.has("assigned_to_user_id")) {
+        const assignee = String(formData.get("assigned_to_user_id") ?? "").trim();
+        block.assignedToUserId = assignee || undefined;
+      }
+      if (formData.has("planner_notes")) {
+        const notes = String(formData.get("planner_notes") ?? "").trim();
+        block.plannerNotes = notes || undefined;
+      }
+      found = true;
+      break;
     }
   }
   if (!found) throw new Error("Block not found.");
@@ -531,6 +581,11 @@ export async function updateItineraryBlockStatusAction(formData: FormData) {
   await updateTripById(trip.id, { itinerary });
 
   revalidatePath(`/t/${slug}`);
+}
+
+/** @deprecated Use updateItineraryBlockAction */
+export async function updateItineraryBlockStatusAction(formData: FormData) {
+  return updateItineraryBlockAction(formData);
 }
 
 export async function refineItineraryDayAction(
@@ -775,4 +830,34 @@ export async function removeTripMemberAction(formData: FormData) {
   const { trip } = await loadTripForOrganizer(slug, userId);
   await deleteTripMember(memberId, trip.id);
   revalidatePath(`/t/${slug}`);
+}
+
+export async function resetTripPlanningAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const confirm = String(formData.get("confirm") ?? "");
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripAsOwner(slug, userId);
+  assertTripNameConfirmation(trip.name, confirm);
+
+  const survey = await getSurveyByTripId(trip.id);
+  await resetTripPlanning(trip.id, survey?.id ?? null);
+
+  revalidatePath(`/t/${slug}`);
+  revalidatePath("/dashboard");
+}
+
+export async function deleteTripAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const confirm = String(formData.get("confirm") ?? "");
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripAsOwner(slug, userId);
+  assertTripNameConfirmation(trip.name, confirm);
+
+  await deleteTripById(trip.id);
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
 }

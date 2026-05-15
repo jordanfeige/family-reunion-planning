@@ -1,4 +1,5 @@
 import { createSupabaseAdmin } from "@/lib/supabase/server";
+import { isMissingTableError } from "@/lib/supabase/errors";
 import { mapTrip, type Trip } from "@/lib/supabase/mappers";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -37,6 +38,16 @@ function newId() {
 
 function throwDb(error: { message: string } | null, context: string): never {
   throw new Error(error?.message ?? `Database error: ${context}`);
+}
+
+const COLLABORATOR_MIGRATION_HINT =
+  "Collaborator tables are missing. In Supabase → SQL Editor, run supabase/migrations/20260515100000_trip_collaborators.sql";
+
+function throwDbCollaborator(error: { message: string } | null, context: string): never {
+  if (isMissingTableError(error)) {
+    throw new Error(COLLABORATOR_MIGRATION_HINT);
+  }
+  throwDb(error, context);
 }
 
 function normalizeEmail(email: string) {
@@ -97,7 +108,10 @@ export async function getTripForOrganizer(
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error) throwDb(error, "getTripForOrganizer.member");
+  if (error) {
+    if (isMissingTableError(error)) return null;
+    throwDb(error, "getTripForOrganizer.member");
+  }
   if (member) return { trip, role: "editor" };
 
   return null;
@@ -127,7 +141,10 @@ export async function listTripsForUser(userId: string): Promise<TripListItem[]> 
     .select("trip_id")
     .eq("user_id", userId);
 
-  if (memberError) throwDb(memberError, "listTripsForUser.members");
+  if (memberError) {
+    if (isMissingTableError(memberError)) return items;
+    throwDb(memberError, "listTripsForUser.members");
+  }
 
   const sharedTripIds = (memberships ?? [])
     .map((m) => m.trip_id as string)
@@ -188,7 +205,10 @@ export async function listTripMembers(tripId: string): Promise<TripMemberWithUse
     .eq("trip_id", tripId)
     .order("created_at", { ascending: true });
 
-  if (error) throwDb(error, "listTripMembers");
+  if (error) {
+    if (isMissingTableError(error)) return [];
+    throwDb(error, "listTripMembers");
+  }
 
   const result: TripMemberWithUser[] = [];
   for (const row of (members ?? []) as TripMemberRow[]) {
@@ -212,7 +232,10 @@ export async function listTripInvites(tripId: string): Promise<TripInviteItem[]>
     .eq("trip_id", tripId)
     .order("created_at", { ascending: true });
 
-  if (error) throwDb(error, "listTripInvites");
+  if (error) {
+    if (isMissingTableError(error)) return [];
+    throwDb(error, "listTripInvites");
+  }
 
   return ((data ?? []) as TripInviteRow[]).map((row) => ({
     id: row.id,
@@ -229,7 +252,7 @@ export async function addTripMember(tripId: string, userId: string) {
     role: "editor",
   });
 
-  if (error) throwDb(error, "addTripMember");
+  if (error) throwDbCollaborator(error, "addTripMember");
 }
 
 export async function insertTripInvite(
@@ -244,7 +267,7 @@ export async function insertTripInvite(
     invited_by_user_id: invitedByUserId,
   });
 
-  if (error) throwDb(error, "insertTripInvite");
+  if (error) throwDbCollaborator(error, "insertTripInvite");
 }
 
 export async function deleteTripInvite(inviteId: string, tripId: string) {
@@ -254,7 +277,7 @@ export async function deleteTripInvite(inviteId: string, tripId: string) {
     .eq("id", inviteId)
     .eq("trip_id", tripId);
 
-  if (error) throwDb(error, "deleteTripInvite");
+  if (error) throwDbCollaborator(error, "deleteTripInvite");
 }
 
 export async function deleteTripMember(memberId: string, tripId: string) {
@@ -264,7 +287,7 @@ export async function deleteTripMember(memberId: string, tripId: string) {
     .eq("id", memberId)
     .eq("trip_id", tripId);
 
-  if (error) throwDb(error, "deleteTripMember");
+  if (error) throwDbCollaborator(error, "deleteTripMember");
 }
 
 export async function getTripMemberByUserId(tripId: string, userId: string) {
@@ -275,7 +298,10 @@ export async function getTripMemberByUserId(tripId: string, userId: string) {
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (error) throwDb(error, "getTripMemberByUserId");
+  if (error) {
+    if (isMissingTableError(error)) return null;
+    throwDb(error, "getTripMemberByUserId");
+  }
   return data as { id: string } | null;
 }
 
@@ -287,7 +313,10 @@ export async function getTripInviteByEmail(tripId: string, email: string) {
     .eq("email", normalizeEmail(email))
     .maybeSingle();
 
-  if (error) throwDb(error, "getTripInviteByEmail");
+  if (error) {
+    if (isMissingTableError(error)) return null;
+    throwDb(error, "getTripInviteByEmail");
+  }
   return data as { id: string } | null;
 }
 
@@ -298,7 +327,10 @@ export async function claimTripInvitesForUser(userId: string, email: string) {
     .select("*")
     .eq("email", normalized);
 
-  if (error) throwDb(error, "claimTripInvitesForUser");
+  if (error) {
+    if (isMissingTableError(error)) return 0;
+    throwDb(error, "claimTripInvitesForUser");
+  }
   if (!invites?.length) return 0;
 
   let claimed = 0;

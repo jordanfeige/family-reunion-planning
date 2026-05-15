@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 
 import {
   addTripOptionAction,
-  deleteGalleryItemAction,
   deleteSurveyResponseAction,
   deleteTripOptionAction,
   updateTripBasicsAction,
@@ -11,12 +10,16 @@ import {
 import { auth } from "@/auth";
 import { AvailabilitySnapshot } from "@/components/AvailabilitySnapshot";
 import { CopyButton } from "@/components/CopyButton";
-import { GalleryUploader } from "@/components/GalleryUploader";
+import { FormattedDateTime } from "@/components/FormattedDateTime";
+import { ShareLinkCard } from "@/components/ShareLinkCard";
 import { LocationOptionsManager } from "@/components/LocationOptionsManager";
 import { PlanConfirmationSnapshot } from "@/components/PlanConfirmationSnapshot";
-import { TripDecisionBar } from "@/components/TripDecisionBar";
 import { TripCollaborators } from "@/components/TripCollaborators";
+import { TripDecisionBar } from "@/components/TripDecisionBar";
+import { TripGallerySection } from "@/components/TripGallerySection";
+import { TripHubMenu } from "@/components/TripHubMenu";
 import { TripHubWizard } from "@/components/TripHubWizard";
+import { TripOwnerManagePanel } from "@/components/TripOwnerManagePanel";
 import { TripItineraryPanel } from "@/components/TripItineraryPanel";
 import { TripPlannerChat } from "@/components/TripPlannerChat";
 import { WeekendDatePicker } from "@/components/WeekendDatePicker";
@@ -29,6 +32,7 @@ import {
   listTripOptions,
 } from "@/lib/supabase/queries";
 import {
+  claimTripInvitesForUser,
   getUserById,
   listTripInvites,
   listTripMembers,
@@ -48,6 +52,10 @@ export default async function TripHubPage({
   const session = await auth();
   if (!session?.user?.id) {
     redirect(`/login?callbackUrl=${encodeURIComponent(`/t/${slug}`)}`);
+  }
+
+  if (session.user.email) {
+    await claimTripInvitesForUser(session.user.id, session.user.email);
   }
 
   const access = await getTripForOrganizer(slug, session.user.id);
@@ -84,108 +92,97 @@ export default async function TripHubPage({
   const hasDraftItinerary = itineraryHasContent(
     normalizeItinerary(trip.itinerary, trip.selectedWeekendFriday),
   );
+  const galleryUnlocked = hasPublishedPlan;
+  const planners = [
+    { userId: trip.ownerId, label: ownerLabel },
+    ...members.map((m) => ({
+      userId: m.userId,
+      label: m.name?.trim() || m.email || "Co-planner",
+    })),
+  ];
+
+  const confirmationCount = confirmations.filter(
+    (c) =>
+      c.weekendFriday === trip.selectedWeekendFriday &&
+      c.locationId === trip.selectedLocationId,
+  ).length;
 
   return (
-    <div className="shell" style={{ padding: "1rem 1.25rem 3rem" }}>
-      <nav className="row hub-jump-nav" style={{ marginBottom: "1rem", fontSize: "0.9rem" }}>
-        <Link href="/dashboard">← Dashboard</Link>
-      </nav>
-
-      <header className="trip-hub-header" style={{ marginBottom: "1rem" }}>
-        <div className="row" style={{ justifyContent: "space-between" }}>
-          <div>
-            <p className="pill">Trip hub · {trip.slug}</p>
-            <h1 style={{ color: "var(--color-fjord)", margin: "0.35rem 0" }}>{trip.name}</h1>
-            {trip.tagline ? <p className="muted">{trip.tagline}</p> : null}
-            {role === "editor" ? (
-              <p className="pill" style={{ marginTop: "0.5rem" }}>
-                Co-planner · shared with you
-              </p>
-            ) : null}
-          </div>
-          {trip.tripStart ? (
-            <span className="pill">
-              Target start:{" "}
-              {trip.tripStart.toLocaleString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              })}
-            </span>
-          ) : null}
-        </div>
-      </header>
-
-      <TripCollaborators
+    <div className="shell trip-hub-page">
+      <TripHubMenu
+        tripName={trip.name}
         slug={trip.slug}
         role={role}
-        ownerLabel={ownerLabel}
-        members={members}
-        pendingInvites={pendingInvites}
+        collaborators={
+          <TripCollaborators
+            slug={trip.slug}
+            role={role}
+            ownerLabel={ownerLabel}
+            members={members}
+            pendingInvites={pendingInvites}
+          />
+        }
+        manage={
+          <TripOwnerManagePanel slug={trip.slug} tripName={trip.name} role={role} />
+        }
       />
 
       <TripHubWizard
         slug={trip.slug}
+        galleryUnlocked={galleryUnlocked}
         completion={{
           basics: weekendSlots.length > 0,
           locations: locationOptions.length > 0,
           survey: responses.length > 0,
           blueprint: Boolean(
-            trip.selectedLocationId && trip.selectedWeekendFriday && hasDraftItinerary,
+            trip.selectedLocationId &&
+              trip.selectedWeekendFriday &&
+              hasDraftItinerary &&
+              hasPublishedPlan,
           ),
-          share: hasPublishedPlan || options.length > 0,
+          confirmations: hasPublishedPlan && confirmationCount > 0,
+          gallery: galleryUnlocked && gallery.length > 0,
         }}
         basics={
-        <form action={updateTripBasicsAction} className="stack">
+        <>
+        <form action={updateTripBasicsAction} className="stack trip-basics-form">
           <input type="hidden" name="slug" value={trip.slug} />
-          <div className="grid-2">
-            <div className="field">
-              <label htmlFor="name">Trip name</label>
-              <input id="name" name="name" defaultValue={trip.name} required />
-            </div>
-            <div className="field">
-              <label htmlFor="tagline">Tagline</label>
-              <input id="tagline" name="tagline" defaultValue={trip.tagline ?? ""} />
-            </div>
-            <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label htmlFor="destination">Destination ideas</label>
-              <textarea
-                id="destination"
-                name="destination"
-                defaultValue={trip.destinationNotes ?? ""}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="budget">Budget note</label>
-              <input id="budget" name="budget" defaultValue={trip.targetBudget ?? ""} />
-            </div>
-            <div className="field">
-              <label htmlFor="trip_start">Target start</label>
-              <input
-                id="trip_start"
-                name="trip_start"
-                type="datetime-local"
-                defaultValue={toLocalInput(trip.tripStart)}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="trip_end">Target end</label>
-              <input
-                id="trip_end"
-                name="trip_end"
-                type="datetime-local"
-                defaultValue={toLocalInput(trip.tripEnd)}
-              />
-            </div>
-            <WeekendDatePicker defaultSelected={weekendSlots} />
+          <div className="field">
+            <label htmlFor="name">Trip name</label>
+            <input id="name" name="name" defaultValue={trip.name} required />
           </div>
+          <div className="field">
+            <label htmlFor="destination">Destination ideas</label>
+            <textarea
+              id="destination"
+              name="destination"
+              placeholder="Bergen, lake house, dietary needs…"
+              defaultValue={trip.destinationNotes ?? ""}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="budget">Budget note (optional)</label>
+            <input
+              id="budget"
+              name="budget"
+              placeholder="$800–1200 per household"
+              defaultValue={trip.targetBudget ?? ""}
+            />
+          </div>
+          <WeekendDatePicker defaultSelected={weekendSlots} />
           <button type="submit" className="btn btn-primary btn-block-sm">
             Save details
           </button>
         </form>
+        </>
         }
         locations={
         <div className="stack">
-          <TripPlannerChat slug={trip.slug} tripName={trip.name} defaultMode="locations" />
+          <TripPlannerChat
+            slug={trip.slug}
+            tripName={trip.name}
+            existingLocationTitles={locationOptions.map((l) => l.title)}
+          />
           <div className="divider" />
           <h3 style={{ marginTop: 0, color: "var(--color-fjord)" }}>Survey location options</h3>
           <LocationOptionsManager slug={trip.slug} locations={locationOptions} />
@@ -194,7 +191,8 @@ export default async function TripHubPage({
         survey={
         <div className="stack">
           <p className="muted" style={{ margin: 0 }}>
-            Share this RSVP link with family—no login required. Works great on phones.
+            Share the preference survey—family picks weekends and places. This is not
+            their final yes/no yet.
           </p>
           {survey ? (
             <>
@@ -259,9 +257,11 @@ export default async function TripHubPage({
                           Note: {r.notes}
                         </div>
                       ) : null}
-                      <div className="muted" style={{ fontSize: "0.75rem", marginTop: "0.35rem" }}>
-                        {r.submittedAt?.toLocaleString?.() ?? ""}
-                      </div>
+                      <FormattedDateTime
+                        value={r.submittedAt}
+                        className="muted"
+                        style={{ fontSize: "0.75rem", marginTop: "0.35rem", display: "block" }}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -293,6 +293,46 @@ export default async function TripHubPage({
           selectedWeekendFriday={trip.selectedWeekendFriday}
           planHeadcount={trip.planHeadcount}
         />
+        <TripItineraryPanel
+          slug={trip.slug}
+          tripName={trip.name}
+          shareUrl={shareUrl}
+          itineraryRaw={trip.itinerary}
+          selectedWeekendFriday={trip.selectedWeekendFriday}
+          hasPlanContext={Boolean(
+            trip.selectedLocationId && trip.selectedWeekendFriday,
+          )}
+          isPublished={hasPublishedPlan}
+          planners={planners}
+        />
+        </div>
+        }
+        confirmations={
+        <div className="stack">
+        {!hasPublishedPlan ? (
+          <div
+            className="card"
+            style={{ padding: "1rem", background: "rgba(28, 61, 90, 0.04)" }}
+          >
+            <p className="muted" style={{ margin: 0 }}>
+              Publish your itinerary in <strong>Blueprint</strong> first. Then share the
+              link here so family can RSVP yes or no on the locked plan.
+            </p>
+          </div>
+        ) : (
+          <>
+            <p className="muted" style={{ margin: 0 }}>
+              Family sees the published plan and confirms yes or no with headcount.
+            </p>
+            <ShareLinkCard
+              url={shareUrl}
+              title="Share with family"
+              hint="Send this link so they can RSVP yes or no on the locked plan."
+              previewHref={`/o/${trip.shareOptionsToken}`}
+            />
+          </>
+        )}
+        <div className="divider" />
         <PlanConfirmationSnapshot
           confirmations={confirmations.map((c) => ({
             ...c,
@@ -303,177 +343,73 @@ export default async function TripHubPage({
           locationTitle={lockedLocationTitle}
           weekendLabel={lockedWeekendLabel}
         />
-        <div className="divider" />
-        <TripItineraryPanel
-          slug={trip.slug}
-          shareUrl={shareUrl}
-          itineraryRaw={trip.itinerary}
-          selectedWeekendFriday={trip.selectedWeekendFriday}
-          hasPlanContext={Boolean(
-            trip.selectedLocationId && trip.selectedWeekendFriday,
-          )}
-          isPublished={hasPublishedPlan}
-        />
+        <details style={{ marginTop: "0.5rem" }}>
+          <summary className="muted" style={{ cursor: "pointer", fontSize: "0.9rem" }}>
+            Advanced: comparison scenarios (optional)
+          </summary>
+          <div className="stack" style={{ marginTop: "0.75rem" }}>
+            <p className="muted" style={{ margin: 0, fontSize: "0.88rem" }}>
+              Legacy markdown options—only shown on the public page if you have not
+              published an itinerary.
+            </p>
+            <form action={addTripOptionAction} className="stack">
+              <input type="hidden" name="slug" value={trip.slug} />
+              <div className="field">
+                <label htmlFor="opt_title">Title</label>
+                <input id="opt_title" name="title" required placeholder="Scenario A" />
+              </div>
+              <div className="field">
+                <label htmlFor="opt_summary">One-line pitch</label>
+                <input id="opt_summary" name="summary" placeholder="Optional summary" />
+              </div>
+              <div className="field">
+                <label htmlFor="opt_content">Full breakdown</label>
+                <textarea id="opt_content" name="content" required rows={4} />
+              </div>
+              <button type="submit" className="btn btn-berry">
+                Save scenario
+              </button>
+            </form>
+            {options.length === 0 ? (
+              <p className="muted">No saved scenarios.</p>
+            ) : (
+              <div className="stack">
+                {options.map((opt) => (
+                  <article
+                    key={opt.id}
+                    style={{
+                      border: "1px solid rgba(28,61,90,0.12)",
+                      borderRadius: "var(--radius-md)",
+                      padding: "1rem",
+                      background: "#fff",
+                    }}
+                  >
+                    <div className="row" style={{ justifyContent: "space-between" }}>
+                      <h4 style={{ margin: 0, color: "var(--color-fjord)" }}>{opt.title}</h4>
+                      <form action={deleteTripOptionAction}>
+                        <input type="hidden" name="slug" value={trip.slug} />
+                        <input type="hidden" name="option_id" value={opt.id} />
+                        <button type="submit" className="btn btn-secondary" style={{ fontSize: "0.85rem" }}>
+                          Remove
+                        </button>
+                      </form>
+                    </div>
+                    {opt.summary ? <p className="muted">{opt.summary}</p> : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </details>
         </div>
         }
-        share={
-        <div className="stack">
-        <p className="muted" style={{ margin: 0 }}>
-          Publish your itinerary in the blueprint step, then share this link with family.
-        </p>
-        <p className="mono" style={{ marginTop: "0.75rem" }}>
-          {shareUrl}
-        </p>
-        <div className="row" style={{ marginTop: "0.75rem" }}>
-          <CopyButton text={shareUrl} label="Copy share link" />
-          <Link className="btn btn-secondary" href={`/o/${trip.shareOptionsToken}`} target="_blank">
-            Preview public page
-          </Link>
-        </div>
 
-        <div className="divider" />
-
-        <h3 style={{ marginTop: 0 }}>Add a saved option</h3>
-        <form action={addTripOptionAction} className="stack">
-          <input type="hidden" name="slug" value={trip.slug} />
-          <div className="field">
-            <label htmlFor="opt_title">Title</label>
-            <input id="opt_title" name="title" required placeholder="Scenario A · Fjord calm" />
-          </div>
-          <div className="field">
-            <label htmlFor="opt_summary">One-line pitch</label>
-            <input id="opt_summary" name="summary" placeholder="Slow mornings, big dinners, one hike" />
-          </div>
-          <div className="field">
-            <label htmlFor="opt_content">Full breakdown</label>
-            <textarea
-              id="opt_content"
-              name="content"
-              required
-              placeholder={"## Day 1\n- ...\n\n## Budget notes\n- ..."}
-            />
-          </div>
-          <button type="submit" className="btn btn-berry">
-            Save option
-          </button>
-        </form>
-
-        <div className="divider" />
-
-        <h3>Your saved options</h3>
-        {options.length === 0 ? (
-          <p className="muted">Nothing saved yet—start from WandrAI in the Locations step.</p>
-        ) : (
-          <div className="stack">
-            {options.map((opt) => (
-              <article
-                key={opt.id}
-                style={{
-                  border: "1px solid rgba(28,61,90,0.12)",
-                  borderRadius: "var(--radius-md)",
-                  padding: "1rem",
-                  background: "#fff",
-                }}
-              >
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <h4 style={{ margin: 0, color: "var(--color-fjord)" }}>{opt.title}</h4>
-                  <form action={deleteTripOptionAction}>
-                    <input type="hidden" name="slug" value={trip.slug} />
-                    <input type="hidden" name="option_id" value={opt.id} />
-                    <button type="submit" className="btn btn-secondary" style={{ fontSize: "0.85rem" }}>
-                      Remove
-                    </button>
-                  </form>
-                </div>
-                {opt.summary ? <p className="muted">{opt.summary}</p> : null}
-                <pre
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    fontFamily: "inherit",
-                    margin: "0.75rem 0 0",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {opt.contentMarkdown}
-                </pre>
-              </article>
-            ))}
-          </div>
-        )}
-        </div>
-        }
-        more={
-        <div className="stack">
-        <GalleryUploader slug={trip.slug} />
-        <div className="divider" />
-        <div
-          className="grid-2"
-          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}
-        >
-          {gallery.map((item) => (
-            <figure
-              key={item.id}
-              style={{
-                margin: 0,
-                borderRadius: "var(--radius-md)",
-                overflow: "hidden",
-                border: "1px solid rgba(28,61,90,0.1)",
-                background: "#fff",
-              }}
-            >
-              {item.mediaType === "video" ? (
-                <video src={item.url} controls style={{ width: "100%", display: "block" }} />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.url} alt={item.caption ?? ""} style={{ width: "100%", display: "block" }} />
-              )}
-              <figcaption style={{ padding: "0.65rem", fontSize: "0.85rem" }}>
-                {item.caption ?? <span className="muted">No caption</span>}
-                <form action={deleteGalleryItemAction} style={{ marginTop: "0.5rem" }}>
-                  <input type="hidden" name="slug" value={trip.slug} />
-                  <input type="hidden" name="item_id" value={item.id} />
-                  <button type="submit" className="btn btn-secondary" style={{ fontSize: "0.8rem" }}>
-                    Remove
-                  </button>
-                </form>
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-        <div className="divider" />
-        <h3 style={{ marginTop: 0, color: "var(--color-fjord)" }}>Helpful extras</h3>
-        <ul className="muted" style={{ lineHeight: 1.6, margin: 0, paddingLeft: "1.1rem" }}>
-          <li>
-            <strong>Weather sanity check:</strong> add a 10-day forecast peek the
-            week before—Norwegian coasts love a plot twist.
-          </li>
-          <li>
-            <strong>Dietary map:</strong> keep a running note of allergies in the
-            trip description so chefs and AI suggestions stay kind.
-          </li>
-          <li>
-            <strong>Shared kitty:</strong> decide if you are splitting a cabin,
-            groceries, or rides—surface that in your trip option write-ups.
-          </li>
-          <li>
-            <strong>After the hugs:</strong> export your gallery as a shared album
-            backup—this hub stays your living scrapbook.
-          </li>
-        </ul>
-        </div>
+        gallery={
+        <TripGallerySection slug={trip.slug} unlocked={galleryUnlocked} gallery={gallery} />
         }
       />
+
     </div>
   );
 }
 
-function toLocalInput(d: Date | null) {
-  if (!d) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mi = pad(d.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}

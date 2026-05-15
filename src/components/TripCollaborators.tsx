@@ -24,11 +24,8 @@ export function TripCollaborators({
   const canRemove = canRemoveMembers(role);
 
   return (
-    <div className="card" style={{ marginBottom: "1.25rem" }}>
-      <h2 style={{ marginTop: 0, color: "var(--color-fjord)", fontSize: "1.1rem" }}>
-        Planning team
-      </h2>
-      <p className="muted" style={{ margin: "0 0 1rem", fontSize: "0.9rem" }}>
+    <div className="trip-collaborators-panel">
+      <p className="muted" style={{ margin: "0 0 1rem", fontSize: "0.9rem", lineHeight: 1.5 }}>
         Invite co-planners who can edit this trip hub. Family RSVPs still use the public
         survey link—no account needed for them.
       </p>
@@ -79,7 +76,7 @@ export function TripCollaborators({
               <form action={removeTripMemberAction}>
                 <input type="hidden" name="slug" value={slug} />
                 <input type="hidden" name="member_id" value={m.id} />
-                <button type="submit" className="btn btn-secondary" style={{ fontSize: "0.8rem" }}>
+                <button type="submit" className="btn btn-secondary btn-sm">
                   Remove
                 </button>
               </form>
@@ -109,7 +106,7 @@ export function TripCollaborators({
               <form action={cancelTripInviteAction}>
                 <input type="hidden" name="slug" value={slug} />
                 <input type="hidden" name="invite_id" value={inv.id} />
-                <button type="submit" className="btn btn-secondary" style={{ fontSize: "0.8rem" }}>
+                <button type="submit" className="btn btn-secondary btn-sm">
                   Cancel
                 </button>
               </form>
@@ -133,7 +130,7 @@ export function TripCollaborators({
                 autoComplete="email"
                 style={{ flex: "1 1 12rem", minWidth: 0 }}
               />
-              <button type="submit" className="btn btn-primary">
+              <button type="submit" className="btn btn-primary btn-sm">
                 Send invite
               </button>
             </div>

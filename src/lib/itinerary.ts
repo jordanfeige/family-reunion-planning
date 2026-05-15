@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { formatTimeOfDay } from "@/lib/datetime";
 import { parseFridayIso, sundayFromFriday } from "@/lib/weekends";
 
 export const BLOCK_TYPES = ["activity", "meal", "lodging", "travel"] as const;
@@ -16,8 +17,10 @@ export type ItineraryBlock = {
   title: string;
   type: BlockType;
   notes?: string;
+  plannerNotes?: string;
   bookingUrl?: string;
   status: BlockStatus;
+  assignedToUserId?: string;
 };
 
 export type ItineraryDay = {
@@ -48,8 +51,10 @@ export const itineraryBlockSchema = z.object({
   title: z.string(),
   type: z.enum(["activity", "meal", "lodging", "travel"]),
   notes: z.string().optional(),
+  plannerNotes: z.string().optional(),
   bookingUrl: z.string().optional(),
   status: z.enum(["idea", "to_book", "booked"]),
+  assignedToUserId: z.string().optional(),
 });
 
 export const itineraryDaySchema = z.object({
@@ -78,7 +83,7 @@ export function defaultDayLabels(fridayIso: string): ItineraryDay[] {
   const fmt = (iso: string) => {
     const d = parseFridayIso(iso);
     if (!d) return iso;
-    return d.toLocaleDateString("en-US", {
+    return d.toLocaleDateString(undefined, {
       weekday: "long",
       month: "short",
       day: "numeric",
@@ -122,14 +127,16 @@ export function normalizeItinerary(
       : DAY_KEYS[i] ?? "friday") as DayKey;
     const blocks: ItineraryBlock[] = (day.blocks ?? []).map((b) => ({
       id: b.id || crypto.randomUUID(),
-      time: b.time?.trim() || undefined,
+      time: b.time?.trim() ? formatTimeOfDay(b.time.trim()) : undefined,
       title: String(b.title ?? "").trim() || "Untitled",
       type: BLOCK_TYPES.includes(b.type as BlockType) ? (b.type as BlockType) : "activity",
       notes: b.notes?.trim() || undefined,
+      plannerNotes: b.plannerNotes?.trim() || undefined,
       bookingUrl: b.bookingUrl?.trim() || undefined,
       status: BLOCK_STATUSES.includes(b.status as BlockStatus)
         ? (b.status as BlockStatus)
         : "idea",
+      assignedToUserId: b.assignedToUserId?.trim() || undefined,
     }));
     return {
       key,
@@ -158,7 +165,7 @@ export function itineraryFromGenerated(
       dateIso: def.dateIso,
       blocks: gen.blocks.map((b) => ({
         id: crypto.randomUUID(),
-        time: b.time?.trim() || undefined,
+        time: b.time?.trim() ? formatTimeOfDay(b.time.trim()) : undefined,
         title: b.title.trim(),
         type: b.type,
         notes: b.notes?.trim() || undefined,
@@ -212,6 +219,6 @@ export function weekendDateRangeLabel(fridayIso: string): string {
   const fri = parseFridayIso(fridayIso);
   if (!fri || !sun) return fridayIso;
   const fmt = (d: Date) =>
-    d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   return `${fmt(fri)} – ${fmt(sun)}`;
 }

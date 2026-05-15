@@ -7,27 +7,30 @@ export type TripHubCompletion = {
   locations: boolean;
   survey: boolean;
   blueprint: boolean;
-  share: boolean;
+  confirmations: boolean;
+  gallery: boolean;
 };
 
 export function TripHubWizard({
   slug,
   completion,
+  galleryUnlocked,
   basics,
   locations,
   survey,
   blueprint,
-  share,
-  more,
+  confirmations,
+  gallery,
 }: {
   slug: string;
   completion: TripHubCompletion;
+  galleryUnlocked: boolean;
   basics: React.ReactNode;
   locations: React.ReactNode;
   survey: React.ReactNode;
   blueprint: React.ReactNode;
-  share: React.ReactNode;
-  more: React.ReactNode;
+  confirmations: React.ReactNode;
+  gallery: React.ReactNode;
 }) {
   const steps: WizardStepDef[] = [
     {
@@ -52,11 +55,11 @@ export function TripHubWizard({
     },
     {
       id: "survey",
-      label: "Survey & RSVPs",
-      shortLabel: "RSVP",
+      label: "Family survey",
+      shortLabel: "Survey",
       icon: "survey",
       description:
-        "Share the RSVP link with family (works great on phones). Watch responses and availability here.",
+        "Share the preference survey—family picks weekends and places (not a final commitment yet).",
       complete: completion.survey,
       content: survey,
     },
@@ -66,27 +69,31 @@ export function TripHubWizard({
       shortLabel: "Plan",
       icon: "blueprint",
       description:
-        "Lock the winning location and weekend, generate your Fri–Sun itinerary, and track bookings.",
+        "Lock the winning location and weekend, build your Fri–Sun itinerary, and publish.",
       complete: completion.blueprint,
       content: blueprint,
     },
     {
-      id: "share",
-      label: "Share plan",
-      shortLabel: "Share",
+      id: "confirmations",
+      label: "Confirmations",
+      shortLabel: "RSVP",
       icon: "share",
-      description:
-        "Publish the day-by-day plan for family, and optionally save extra comparison scenarios.",
-      complete: completion.share,
-      content: share,
+      description: galleryUnlocked
+        ? "Share the published plan link and track final yes/no RSVPs."
+        : "Publish your plan in Blueprint first, then share the link for final RSVPs.",
+      complete: completion.confirmations,
+      content: confirmations,
     },
     {
-      id: "more",
-      label: "Gallery & tips",
+      id: "gallery",
+      label: "Gallery & memories",
       shortLabel: "Photos",
       icon: "gallery",
-      description: "Upload memories after the trip and keep helpful planning notes handy.",
-      content: more,
+      description: galleryUnlocked
+        ? "Upload photos and videos after the trip."
+        : "Opens after you publish the plan—save memories from the reunion here.",
+      complete: completion.gallery,
+      content: gallery,
     },
   ];
 

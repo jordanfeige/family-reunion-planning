@@ -28,8 +28,8 @@ export function PlanConfirmationSnapshot({
         }}
       >
         <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-          Lock a location and weekend above, then publish your plan. Family will confirm
-          yes or no on the share link—you&apos;ll see final headcount here.
+          Lock a location and weekend in Blueprint, publish, then share the plan link in
+          Confirmations—final RSVPs appear here.
         </p>
       </div>
     );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { FormattedTimeOfDay } from "@/components/FormattedTimeOfDay";
 import {
   normalizeItinerary,
   type DayKey,
@@ -83,16 +84,15 @@ export function PublicItineraryView({
                 >
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "baseline", flexWrap: "wrap" }}>
                     {block.time ? (
-                      <span
+                      <FormattedTimeOfDay
+                        value={block.time}
                         style={{
                           fontWeight: 600,
                           fontSize: "0.85rem",
                           color: "var(--color-fjord)",
                           minWidth: "3.5rem",
                         }}
-                      >
-                        {block.time}
-                      </span>
+                      />
                     ) : null}
                     <span className="pill" style={{ fontSize: "0.7rem" }}>
                       {TYPE_LABELS[block.type] ?? block.type}

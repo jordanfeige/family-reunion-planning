@@ -8,36 +8,37 @@ import {
   publishItineraryAction,
   refineItineraryDayAction,
   unpublishItineraryAction,
-  updateItineraryBlockStatusAction,
 } from "@/app/actions/trips";
+import {
+  ItineraryBlockCard,
+  type PlannerOption,
+} from "@/components/ItineraryBlockCard";
+import { ShareLinkCard } from "@/components/ShareLinkCard";
+import { TripItineraryChat } from "@/components/TripItineraryChat";
 import {
   getBookingBlocks,
   normalizeItinerary,
-  type BlockStatus,
   type DayKey,
 } from "@/lib/itinerary";
 
-const TYPE_LABELS: Record<string, string> = {
-  activity: "Activity",
-  meal: "Meal",
-  lodging: "Lodging",
-  travel: "Travel",
-};
-
 export function TripItineraryPanel({
   slug,
+  tripName,
   shareUrl,
   itineraryRaw,
   selectedWeekendFriday,
   hasPlanContext,
   isPublished,
+  planners,
 }: {
   slug: string;
+  tripName: string;
   shareUrl: string;
   itineraryRaw: unknown;
   selectedWeekendFriday: string | null;
   hasPlanContext: boolean;
   isPublished: boolean;
+  planners: PlannerOption[];
 }) {
   const router = useRouter();
   const itinerary = normalizeItinerary(itineraryRaw, selectedWeekendFriday);
@@ -83,16 +84,6 @@ export function TripItineraryPanel({
     }
   }
 
-  async function setBlockStatus(dayKey: DayKey, blockId: string, next: BlockStatus) {
-    const fd = new FormData();
-    fd.set("slug", slug);
-    fd.set("day_key", dayKey);
-    fd.set("block_id", blockId);
-    fd.set("status", next);
-    await updateItineraryBlockStatusAction(fd);
-    router.refresh();
-  }
-
   if (!hasPlanContext) {
     return (
       <p className="muted" style={{ margin: 0 }}>
@@ -103,14 +94,15 @@ export function TripItineraryPanel({
 
   return (
     <div className="stack">
-      <div className="row" style={{ flexWrap: "wrap", gap: "0.75rem" }}>
+      <div className="action-stack" aria-label="Itinerary actions">
+        <p className="action-stack-caption">Itinerary</p>
         <button
           type="button"
           className="btn btn-berry"
           disabled={busy}
           onClick={() => generate()}
         >
-          {busy ? "Generating…" : hasBlocks ? "Regenerate full itinerary" : "Generate itinerary"}
+          {busy ? "Generating…" : hasBlocks ? "Regenerate itinerary" : "Generate itinerary"}
         </button>
         {hasBlocks ? (
           <button
@@ -159,19 +151,14 @@ export function TripItineraryPanel({
       </div>
 
       {isPublished ? (
-        <div className="success-banner" style={{ margin: 0 }}>
-          <strong>Live for family:</strong>{" "}
-          <a href={shareUrl} target="_blank" rel="noreferrer">
-            {shareUrl}
-          </a>
-          <span className="muted" style={{ display: "block", marginTop: "0.35rem", fontSize: "0.85rem" }}>
-            Same link as Trip options below. Re-publish after edits to update what they see.
-          </span>
-        </div>
+        <ShareLinkCard
+          url={shareUrl}
+          title="Live for family"
+          hint="Same link as Confirmations. Re-publish after edits to update what they see."
+        />
       ) : hasBlocks ? (
         <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-          When ready, publish so family can view the day-by-day plan at your share link (
-          <span className="mono">{shareUrl}</span>).
+          When ready, publish so family can view the day-by-day plan at your share link.
         </p>
       ) : null}
 
@@ -206,70 +193,26 @@ export function TripItineraryPanel({
               {currentDay.blocks.length === 0 ? (
                 <p className="muted">Nothing planned this day yet.</p>
               ) : (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0 }} className="stack">
+                <ul className="itinerary-block-list">
                   {currentDay.blocks.map((block) => (
-                    <li
+                    <ItineraryBlockCard
                       key={block.id}
-                      style={{
-                        border: "1px solid rgba(28,61,90,0.12)",
-                        borderRadius: "var(--radius-md)",
-                        padding: "0.85rem 1rem",
-                        background: "#fff",
-                      }}
-                    >
-                      <div className="row" style={{ justifyContent: "space-between", gap: "0.5rem" }}>
-                        <div>
-                          <span className="pill" style={{ fontSize: "0.72rem", marginRight: "0.5rem" }}>
-                            {TYPE_LABELS[block.type] ?? block.type}
-                          </span>
-                          {block.time ? (
-                            <span className="muted" style={{ fontSize: "0.85rem" }}>
-                              {block.time}
-                            </span>
-                          ) : null}
-                        </div>
-                        <select
-                          value={block.status}
-                          onChange={(e) =>
-                            setBlockStatus(
-                              currentDay.key,
-                              block.id,
-                              e.target.value as BlockStatus,
-                            )
-                          }
-                          style={{ fontSize: "0.8rem" }}
-                        >
-                          <option value="idea">Idea</option>
-                          <option value="to_book">To book</option>
-                          <option value="booked">Booked</option>
-                        </select>
-                      </div>
-                      <strong style={{ display: "block", marginTop: "0.35rem" }}>
-                        {block.title}
-                      </strong>
-                      {block.notes ? (
-                        <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.9rem" }}>
-                          {block.notes}
-                        </p>
-                      ) : null}
-                      {block.bookingUrl ? (
-                        <p style={{ margin: "0.35rem 0 0", fontSize: "0.85rem" }}>
-                          <a href={block.bookingUrl} target="_blank" rel="noreferrer">
-                            Booking link
-                          </a>
-                        </p>
-                      ) : null}
-                    </li>
+                      slug={slug}
+                      dayKey={currentDay.key}
+                      block={block}
+                      planners={planners}
+                    />
                   ))}
                 </ul>
               )}
+
 
               <div className="card" style={{ padding: "1rem", background: "#fff" }}>
                 <p className="muted" style={{ margin: "0 0 0.5rem", fontSize: "0.9rem" }}>
                   Refine this day with AI
                 </p>
-                <div className="row" style={{ alignItems: "flex-end", gap: "0.75rem" }}>
-                  <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+                <div className="refine-row">
+                  <div className="field" style={{ flex: 1, marginBottom: 0, minWidth: 0 }}>
                     <label htmlFor={`refine-${activeDay}`} className="sr-only">
                       Refine day
                     </label>
@@ -283,7 +226,7 @@ export function TripItineraryPanel({
                   </div>
                   <button
                     type="button"
-                    className="btn btn-secondary"
+                    className="btn btn-secondary btn-block-sm"
                     disabled={busy}
                     onClick={() => refineDay()}
                   >
@@ -291,6 +234,21 @@ export function TripItineraryPanel({
                   </button>
                 </div>
               </div>
+
+              <details className="itinerary-chat-details">
+                <summary className="itinerary-chat-details-summary">
+                  Ask WandrAI about this plan
+                </summary>
+                <div className="itinerary-chat-details-body">
+                  <TripItineraryChat
+                    slug={slug}
+                    tripName={tripName}
+                    focusDay={activeDay}
+                    focusDayLabel={currentDay?.label ?? activeDay}
+                    hasBlocks={hasBlocks}
+                  />
+                </div>
+              </details>
             </div>
           ) : null}
 
@@ -321,10 +279,28 @@ export function TripItineraryPanel({
           ) : null}
         </>
       ) : (
-        <p className="muted" style={{ margin: 0 }}>
-          Click <strong>Generate itinerary</strong> for a full Fri–Sun plan with activities,
-          meals, and lodging ideas.
-        </p>
+        <>
+          <details className="itinerary-chat-details">
+            <summary className="itinerary-chat-details-summary">
+              Ask WandrAI about this plan
+            </summary>
+            <div className="itinerary-chat-details-body">
+              <TripItineraryChat
+                slug={slug}
+                tripName={tripName}
+                focusDay={activeDay}
+                focusDayLabel={
+                  itinerary.days.find((d) => d.key === activeDay)?.label ?? activeDay
+                }
+                hasBlocks={false}
+              />
+            </div>
+          </details>
+          <p className="muted" style={{ margin: 0 }}>
+            Click <strong>Generate itinerary</strong> for a full Fri–Sun plan with activities,
+            meals, and lodging ideas.
+          </p>
+        </>
       )}
     </div>
   );

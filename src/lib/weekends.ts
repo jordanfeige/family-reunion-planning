@@ -46,7 +46,7 @@ export function formatWeekendLabel(fridayIso: string): string {
   if (!sun) return fridayIso;
 
   const fmt = (d: Date) =>
-    d.toLocaleDateString("en-US", {
+    d.toLocaleDateString(undefined, {
       weekday: "short",
       month: "short",
       day: "numeric",
@@ -91,4 +91,32 @@ export function getCalendarDays(year: number, month: number): Date[] {
     cursor.setDate(cursor.getDate() + 1);
   }
   return days;
+}
+
+/** All Friday ISO dates in a calendar month (local time). */
+export function getFridaysInMonth(year: number, month: number): string[] {
+  const fridays: string[] = [];
+  const lastDay = new Date(year, month + 1, 0, 12, 0, 0, 0).getDate();
+  for (let day = 1; day <= lastDay; day++) {
+    const date = new Date(year, month, day, 12, 0, 0, 0);
+    if (date.getDay() === 5) {
+      fridays.push(fridayIsoFromDate(date));
+    }
+  }
+  return fridays;
+}
+
+/** Short label for list rows, e.g. "Fri, Aug 14 – Sun, Aug 16". */
+export function formatWeekendLabelShort(fridayIso: string): string {
+  const fri = parseFridayIso(fridayIso);
+  if (!fri) return fridayIso;
+  const sun = sundayFromFriday(fridayIso);
+  if (!sun) return fridayIso;
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  return `${fmt(fri)} – ${fmt(sun)}`;
 }

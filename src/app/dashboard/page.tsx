@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { createTripAction } from "@/app/actions/trips";
+import { TripDashboardManage } from "@/components/TripDashboardManage";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
 import { listTripsForUser } from "@/lib/supabase/queries";
@@ -83,15 +84,8 @@ export default async function DashboardPage() {
           ) : (
             <ul className="stack" style={{ listStyle: "none", padding: 0, margin: 0 }}>
               {list.map((trip) => (
-                <li
-                  key={trip.id}
-                  style={{
-                    border: "1px solid rgba(28,61,90,0.1)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "1rem",
-                  }}
-                >
-                  <div className="row" style={{ justifyContent: "space-between" }}>
+                <li key={trip.id} className="trip-dashboard-item">
+                  <div className="trip-dashboard-item-main">
                     <div>
                       <strong style={{ color: "var(--color-fjord)" }}>{trip.name}</strong>
                       {trip.access === "collaborator" ? (
@@ -105,9 +99,16 @@ export default async function DashboardPage() {
                         </p>
                       ) : null}
                     </div>
-                    <Link className="btn btn-primary" href={`/t/${trip.slug}`}>
-                      Open hub
-                    </Link>
+                    <div className="trip-dashboard-item-actions">
+                      <Link className="btn btn-primary btn-sm" href={`/t/${trip.slug}`}>
+                        Open hub
+                      </Link>
+                      <TripDashboardManage
+                        slug={trip.slug}
+                        tripName={trip.name}
+                        access={trip.access}
+                      />
+                    </div>
                   </div>
                 </li>
               ))}
