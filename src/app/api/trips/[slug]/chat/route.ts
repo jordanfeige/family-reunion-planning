@@ -1,4 +1,4 @@
-import { convertToModelMessages, streamText } from "ai";
+import { convertToModelMessages, streamText, type UIMessage } from "ai";
 
 import { auth } from "@/auth";
 import { hasAnthropicApiKey, plannerModel } from "@/lib/ai";
@@ -13,6 +13,11 @@ import {
   formatVenuesForPrompt,
   normalizeVenueOptions,
 } from "@/lib/venues";
+import {
+  normalizeChatFocusDay,
+  saveChatThread,
+  type ChatThreadMode,
+} from "@/lib/supabase/chatHistory";
 import {
   getTripForOrganizer,
   getSurveyByTripId,
@@ -53,13 +58,13 @@ export async function POST(
     mode?: string;
     focusDay?: string;
   };
-  const mode =
+  const mode: ChatThreadMode =
     body.mode === "itinerary"
       ? "itinerary"
       : body.mode === "venues"
         ? "venues"
         : "locations";
-  const focusDay = body.focusDay;
+  const focusDay = normalizeChatFocusDay(mode, body.focusDay);
 
   if (mode === "itinerary") {
     const { trip: t } = access;
@@ -196,5 +201,15 @@ ${contextBits}`;
     messages: modelMessages,
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({
+    originalMessages: rawMessages as UIMessage[],
+    onFinish: async ({ messages }) => {
+      await saveChatThread({
+        tripId: trip.id,
+        mode,
+        focusDay,
+        messages,
+      });
+    },
+  });
 }

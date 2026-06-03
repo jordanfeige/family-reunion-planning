@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 
+import { ChatClearButton } from "@/components/ChatClearButton";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
 import { VenueSuggestionCards } from "@/components/VenueSuggestionCards";
@@ -15,11 +16,13 @@ export function TripVenueChat({
   lockedLocationTitle,
   headcount,
   existingVenues,
+  initialMessages = [],
 }: {
   slug: string;
   lockedLocationTitle: string;
   headcount: number | null;
   existingVenues: VenueOption[];
+  initialMessages?: UIMessage[];
 }) {
   const transport = useMemo(
     () =>
@@ -32,9 +35,10 @@ export function TripVenueChat({
     [slug],
   );
 
-  const { messages, sendMessage, status, error, clearError } = useChat({
+  const { messages, sendMessage, status, error, clearError, setMessages } = useChat({
     transport,
     id: `${slug}-venues`,
+    messages: initialMessages,
   });
 
   const [draft, setDraft] = useState("");
@@ -47,6 +51,14 @@ export function TripVenueChat({
 
   return (
     <div className="stack chat-panel">
+      <div className="row" style={{ justifyContent: "flex-end" }}>
+        <ChatClearButton
+          slug={slug}
+          mode="venues"
+          disabled={busy || messages.length === 0}
+          onCleared={() => setMessages([])}
+        />
+      </div>
       <p className="muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.5 }}>
         Compare resorts, rentals, restaurants, and gathering spots within{" "}
         <strong>{lockedLocationTitle}</strong>. Add picks to your private shortlist—family

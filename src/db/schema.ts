@@ -336,3 +336,19 @@ export const tripContributions = pgTable("trip_contribution", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+export const tripChatMessages = pgTable("trip_chat_message", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tripId: text("trip_id")
+    .notNull()
+    .references(() => trips.id, { onDelete: "cascade" }),
+  mode: text("mode").notNull(),
+  focusDay: text("focus_day"),
+  messageId: text("message_id").notNull(),
+  role: text("role").notNull(),
+  parts: jsonb("parts").notNull(),
+  sortIndex: integer("sort_index").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});

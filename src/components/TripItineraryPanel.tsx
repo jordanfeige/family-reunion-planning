@@ -1,5 +1,6 @@
 "use client";
 
+import type { UIMessage } from "ai";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -30,6 +31,7 @@ export function TripItineraryPanel({
   hasPlanContext,
   isPublished,
   planners,
+  initialChatByDay = {},
 }: {
   slug: string;
   tripName: string;
@@ -39,6 +41,7 @@ export function TripItineraryPanel({
   hasPlanContext: boolean;
   isPublished: boolean;
   planners: PlannerOption[];
+  initialChatByDay?: Partial<Record<DayKey, UIMessage[]>>;
 }) {
   const router = useRouter();
   const itinerary = normalizeItinerary(itineraryRaw, selectedWeekendFriday);
@@ -241,11 +244,13 @@ export function TripItineraryPanel({
                 </summary>
                 <div className="itinerary-chat-details-body">
                   <TripItineraryChat
+                    key={activeDay}
                     slug={slug}
                     tripName={tripName}
                     focusDay={activeDay}
                     focusDayLabel={currentDay?.label ?? activeDay}
                     hasBlocks={hasBlocks}
+                    initialMessages={initialChatByDay[activeDay] ?? []}
                   />
                 </div>
               </details>
@@ -286,6 +291,7 @@ export function TripItineraryPanel({
             </summary>
             <div className="itinerary-chat-details-body">
               <TripItineraryChat
+                key={activeDay}
                 slug={slug}
                 tripName={tripName}
                 focusDay={activeDay}
@@ -293,6 +299,7 @@ export function TripItineraryPanel({
                   itinerary.days.find((d) => d.key === activeDay)?.label ?? activeDay
                 }
                 hasBlocks={false}
+                initialMessages={initialChatByDay[activeDay] ?? []}
               />
             </div>
           </details>

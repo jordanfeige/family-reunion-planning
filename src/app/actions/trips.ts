@@ -1158,6 +1158,26 @@ Return the full updated day with realistic times and mark reservations as to_boo
   return { ok: true };
 }
 
+export async function clearChatThreadAction(
+  slug: string,
+  mode: "locations" | "venues" | "itinerary",
+  focusDay: string | null = null,
+) {
+  const userId = await requireSessionUserId();
+  const { trip } = await loadTripForOrganizer(slug, userId);
+
+  const { clearChatThread, normalizeChatFocusDay } = await import(
+    "@/lib/supabase/chatHistory"
+  );
+  await clearChatThread({
+    tripId: trip.id,
+    mode,
+    focusDay: normalizeChatFocusDay(mode, focusDay ?? undefined),
+  });
+
+  revalidatePath(`/t/${slug}`);
+}
+
 export async function publishItineraryAction(slug: string) {
   const userId = await requireSessionUserId();
   const { trip } = await loadTripForOrganizer(slug, userId);

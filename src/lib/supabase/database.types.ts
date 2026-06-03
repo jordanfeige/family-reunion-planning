@@ -270,6 +270,31 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["trip_contribution"]["Insert"]>;
       };
+      trip_chat_message: {
+        Row: {
+          id: string;
+          trip_id: string;
+          mode: string;
+          focus_day: string | null;
+          message_id: string;
+          role: string;
+          parts: Json;
+          sort_index: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trip_id: string;
+          mode: string;
+          focus_day?: string | null;
+          message_id: string;
+          role: string;
+          parts: Json;
+          sort_index?: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["trip_chat_message"]["Insert"]>;
+      };
     };
   };
 };

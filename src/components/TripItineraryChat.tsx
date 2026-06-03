@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 
 import { refineItineraryDayAction } from "@/app/actions/trips";
+import { ChatClearButton } from "@/components/ChatClearButton";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
 import { textFromMessage } from "@/lib/chatMessage";
@@ -17,12 +18,14 @@ export function TripItineraryChat({
   focusDay,
   focusDayLabel,
   hasBlocks,
+  initialMessages = [],
 }: {
   slug: string;
   tripName: string;
   focusDay: DayKey;
   focusDayLabel: string;
   hasBlocks: boolean;
+  initialMessages?: UIMessage[];
 }) {
   const router = useRouter();
   const [applyStatus, setApplyStatus] = useState<string | null>(null);
@@ -39,9 +42,10 @@ export function TripItineraryChat({
     [slug, focusDay],
   );
 
-  const { messages, sendMessage, status, error, clearError } = useChat({
+  const { messages, sendMessage, status, error, clearError, setMessages } = useChat({
     transport,
     id: `${slug}-itinerary-${focusDay}`,
+    messages: initialMessages,
   });
 
   const [draft, setDraft] = useState("");
@@ -70,6 +74,15 @@ export function TripItineraryChat({
 
   return (
     <div className="stack itinerary-chat">
+      <div className="row" style={{ justifyContent: "flex-end" }}>
+        <ChatClearButton
+          slug={slug}
+          mode="itinerary"
+          focusDay={focusDay}
+          disabled={busy || messages.length === 0}
+          onCleared={() => setMessages([])}
+        />
+      </div>
       <p className="muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.5 }}>
         Chat about your locked plan for <strong>{tripName}</strong>. Focus is{" "}
         <strong>{focusDayLabel}</strong>—switch days above to change focus. Use{" "}

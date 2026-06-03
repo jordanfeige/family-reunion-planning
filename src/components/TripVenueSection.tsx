@@ -1,3 +1,5 @@
+import type { UIMessage } from "ai";
+
 import { TripVenueChat } from "@/components/TripVenueChat";
 import { VenueOptionsManager } from "@/components/VenueOptionsManager";
 import type { OptionVoteTally } from "@/lib/ballotResults";
@@ -11,6 +13,7 @@ export function TripVenueSection({
   selectedVenueId,
   locationLocked,
   plannerVote,
+  initialChatMessages = [],
 }: {
   slug: string;
   lockedLocationTitle: string | null;
@@ -19,6 +22,7 @@ export function TripVenueSection({
   selectedVenueId: string | null;
   locationLocked: boolean;
   plannerVote?: { tallies: Map<string, OptionVoteTally>; voterCount: number } | null;
+  initialChatMessages?: UIMessage[];
 }) {
   if (!locationLocked || !lockedLocationTitle) {
     return (
@@ -54,6 +58,7 @@ export function TripVenueSection({
         lockedLocationTitle={lockedLocationTitle}
         headcount={headcount}
         existingVenues={venues}
+        initialMessages={initialChatMessages}
       />
 
       <div className="divider" />

@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 
+import { ChatClearButton } from "@/components/ChatClearButton";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
 import { LocationSuggestionCards } from "@/components/LocationSuggestionCards";
@@ -13,10 +14,12 @@ export function TripPlannerChat({
   slug,
   tripName,
   existingLocationTitles,
+  initialMessages = [],
 }: {
   slug: string;
   tripName: string;
   existingLocationTitles: string[];
+  initialMessages?: UIMessage[];
 }) {
   const transport = useMemo(
     () =>
@@ -29,9 +32,10 @@ export function TripPlannerChat({
     [slug],
   );
 
-  const { messages, sendMessage, status, error, clearError } = useChat({
+  const { messages, sendMessage, status, error, clearError, setMessages } = useChat({
     transport,
     id: `${slug}-locations`,
+    messages: initialMessages,
   });
 
   const [draft, setDraft] = useState("");
@@ -42,6 +46,14 @@ export function TripPlannerChat({
 
   return (
     <div className="stack chat-panel">
+      <div className="row" style={{ justifyContent: "flex-end" }}>
+        <ChatClearButton
+          slug={slug}
+          mode="locations"
+          disabled={busy || messages.length === 0}
+          onCleared={() => setMessages([])}
+        />
+      </div>
       <p className="muted" style={{ margin: 0, fontSize: "0.88rem", lineHeight: 1.5 }}>
         Brainstorm destinations and areas. Each WandrAI reply can surface location cards—use{" "}
         <strong>Add to survey</strong> so family can vote below.

@@ -47,7 +47,9 @@ import {
 import { appOrigin } from "@/lib/appOrigin";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
 import { normalizeVenueOptions } from "@/lib/venues";
-import { itineraryHasContent, normalizeItinerary } from "@/lib/itinerary";
+import { DAY_KEYS, itineraryHasContent, normalizeItinerary, type DayKey } from "@/lib/itinerary";
+import { loadChatThread } from "@/lib/supabase/chatHistory";
+import type { UIMessage } from "ai";
 import { partyAdults, partyKids, partyTotal } from "@/lib/partyCount";
 import { filterValidFridays, formatWeekendLabel } from "@/lib/weekends";
 
@@ -126,6 +128,19 @@ export default async function TripHubPage({
   ).length;
 
   const tripBudget = await getTripBudget(trip.id);
+
+  const [locationsChatMessages, venuesChatMessages, ...itineraryDayThreads] =
+    await Promise.all([
+      loadChatThread({ tripId: trip.id, mode: "locations", focusDay: null }),
+      loadChatThread({ tripId: trip.id, mode: "venues", focusDay: null }),
+      ...DAY_KEYS.map((day) =>
+        loadChatThread({ tripId: trip.id, mode: "itinerary", focusDay: day }),
+      ),
+    ]);
+
+  const itineraryChatByDay = Object.fromEntries(
+    DAY_KEYS.map((day, i) => [day, itineraryDayThreads[i] ?? []]),
+  ) as Record<DayKey, UIMessage[]>;
 
   return (
     <div className="shell trip-hub-page">
@@ -207,6 +222,7 @@ export default async function TripHubPage({
             slug={trip.slug}
             tripName={trip.name}
             existingLocationTitles={locationOptions.map((l) => l.title)}
+            initialMessages={locationsChatMessages}
           />
           <div className="divider" />
           <h3 style={{ marginTop: 0, color: "var(--color-fjord)" }}>Survey location options</h3>
@@ -332,6 +348,7 @@ export default async function TripHubPage({
             venues={venueOptions}
             selectedVenueId={trip.selectedVenueId}
             locationLocked={Boolean(trip.selectedLocationId)}
+            initialChatMessages={venuesChatMessages}
             plannerVote={
               trip.ballotStatus !== "draft" && ballotOptionCount > 0
                 ? { tallies: ballotTallies, voterCount: ballotVoterCount }
@@ -363,6 +380,7 @@ export default async function TripHubPage({
           )}
           isPublished={hasPublishedPlan}
           planners={planners}
+          initialChatByDay={itineraryChatByDay}
         />
         </div>
         }
