@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { resendEmailProvider } from "@/lib/auth/resendEmailProvider";
 import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
+import { claimGuestSubmissionsForUser } from "@/lib/supabase/guestIdentity";
 
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   secret: process.env.AUTH_SECRET,
@@ -37,6 +38,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
           await claimTripInvitesForUser(user.id, user.email);
         } catch (err) {
           console.error("claimTripInvitesForUser:", err);
+        }
+        try {
+          await claimGuestSubmissionsForUser(user.id, user.email);
+        } catch (err) {
+          console.error("claimGuestSubmissionsForUser:", err);
         }
       }
     },

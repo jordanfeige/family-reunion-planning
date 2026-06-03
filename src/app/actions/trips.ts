@@ -72,8 +72,12 @@ import {
   getTripForOrganizer,
   getSurveyAndTripByPublicToken,
   getSurveyByTripId,
+  getSurveyResponseByUserId,
+  getTripConfirmationByUserId,
   insertGalleryItem,
   insertSurveyResponse,
+  upsertSurveyResponseForUser,
+  upsertTripConfirmationForUser,
   insertTripOption,
   listSurveyResponsesForChat,
   listTripConfirmations,
@@ -82,12 +86,41 @@ import {
   getTripByShareToken,
 } from "@/lib/supabase/queries";
 import { deleteTripById, resetTripPlanning } from "@/lib/supabase/tripReset";
+import { guestSessionFromUser } from "@/lib/guestSession";
+import {
+  EXPENSE_CATEGORIES,
+  SPLIT_METHODS,
+  normalizeExpenseCategory,
+  normalizeSplitMethod,
+  parseDollarsToCents,
+} from "@/lib/budget";
+import {
+  countTripExpenses,
+  deleteTripContributionRow,
+  deleteTripExpenseRow,
+  ensureBudgetContributionsFromConfirmations,
+  getTripContributionById,
+  getTripExpenseById,
+  insertTripExpense,
+  listTripContributions,
+  listTripExpenses,
+  updateTripContributionRow,
+  updateTripExpenseRow,
+  upsertTripContributionRow,
+  countConfirmedHouseholds,
+} from "@/lib/supabase/budget";
+import type { TripContribution, TripExpense } from "@/lib/supabase/mappers";
 
 async function requireSessionUserId() {
   const session = await auth();
   const id = session?.user?.id;
   if (!id) redirect("/login?callbackUrl=/dashboard");
   return id;
+}
+
+async function getGuestSessionForPublicSubmit() {
+  const session = await auth();
+  return guestSessionFromUser(session?.user ?? {});
 }
 
 export async function createTripAction(formData: FormData) {
@@ -288,17 +321,35 @@ export async function submitSurveyResponseAction(formData: FormData) {
     throw new Error("Invalid location selection.");
   }
 
-  await insertSurveyResponse({
-    surveyId: surveyRow.survey.id,
-    respondentName,
-    respondentEmail,
-    selectedSlots: validSelected,
-    selectedLocations: validLocations,
-    adultCount,
-    kidCount,
-    attendeeCount,
-    notes,
-  });
+  const guest = await getGuestSessionForPublicSubmit();
+
+  if (guest) {
+    const lockedEmail = guest.email.trim().toLowerCase();
+    await upsertSurveyResponseForUser({
+      surveyId: surveyRow.survey.id,
+      userId: guest.userId,
+      respondentName: respondentName || guest.name,
+      respondentEmail: lockedEmail,
+      selectedSlots: validSelected,
+      selectedLocations: validLocations,
+      adultCount,
+      kidCount,
+      attendeeCount,
+      notes,
+    });
+  } else {
+    await insertSurveyResponse({
+      surveyId: surveyRow.survey.id,
+      respondentName,
+      respondentEmail,
+      selectedSlots: validSelected,
+      selectedLocations: validLocations,
+      adultCount,
+      kidCount,
+      attendeeCount,
+      notes,
+    });
+  }
 
   let emailed = false;
   if (sendEmailCopy && respondentEmail) {
@@ -847,18 +898,30 @@ export async function submitBallotVotesAction(formData: FormData) {
   const validIds = new Set(options.map((o) => o.id));
   votes = votes.filter((v) => validIds.has(v.optionId));
 
-  const matched =
-    voterEmail != null
-      ? await findSurveyResponseByEmail(survey.id, voterEmail)
+  const guest = await getGuestSessionForPublicSubmit();
+  const lockedEmail = guest?.email.trim().toLowerCase() ?? voterEmail;
+
+  const surveyRowByUser =
+    guest != null
+      ? await getSurveyResponseByUserId(survey.id, guest.userId)
       : null;
 
+  const matched =
+    surveyRowByUser != null
+      ? { id: surveyRowByUser.id, respondentName: surveyRowByUser.respondentName }
+      : lockedEmail != null
+        ? await findSurveyResponseByEmail(survey.id, lockedEmail)
+        : null;
+
   const { voterKey, surveyResponseId } = resolveVoterKey({
+    userId: guest?.userId ?? null,
     surveyResponseId: matched?.id ?? null,
-    email: voterEmail,
-    guestId: guestId?.trim() || crypto.randomUUID(),
+    email: lockedEmail,
+    guestId: guest ? null : guestId?.trim() || crypto.randomUUID(),
   });
 
-  const name = matched?.respondentName ?? voterName;
+  const name = guest?.name ?? matched?.respondentName ?? voterName;
+  const emailForRow = guest?.email ?? lockedEmail;
 
   const { listBallotVotesForVoter, upsertBallotVotes, deleteBallotVotesForVoter } =
     await import("@/lib/supabase/ballotVotes");
@@ -872,9 +935,10 @@ export async function submitBallotVotesAction(formData: FormData) {
   await deleteBallotVotesForVoter(trip.id, voterKey, toClear);
   await upsertBallotVotes({
     tripId: trip.id,
+    userId: guest?.userId ?? null,
     voterKey,
     voterName: name,
-    voterEmail,
+    voterEmail: emailForRow,
     surveyResponseId,
     votes,
   });
@@ -1176,24 +1240,39 @@ export async function submitPlanConfirmationAction(formData: FormData) {
     );
   }
 
-  const existing = await listTripConfirmations(trip.id);
+  const guest = await getGuestSessionForPublicSubmit();
 
-  const match = existing.find((row) => {
-    if (respondentEmail && row.respondentEmail) {
-      return row.respondentEmail.toLowerCase() === respondentEmail.toLowerCase();
-    }
-    return row.respondentName.toLowerCase() === respondentName.toLowerCase();
-  });
+  if (guest) {
+    const lockedEmail = guest.email.trim().toLowerCase();
+    await upsertTripConfirmationForUser(trip.id, guest.userId, {
+      respondentName: respondentName || guest.name,
+      respondentEmail: lockedEmail,
+      status: status as "confirmed" | "declined",
+      adultCount,
+      kidCount,
+      weekendFriday,
+      locationId,
+    });
+  } else {
+    const existing = await listTripConfirmations(trip.id);
 
-  await upsertTripConfirmation(trip.id, match?.id ?? null, {
-    respondentName,
-    respondentEmail,
-    status: status as "confirmed" | "declined",
-    adultCount,
-    kidCount,
-    weekendFriday,
-    locationId,
-  });
+    const match = existing.find((row) => {
+      if (respondentEmail && row.respondentEmail) {
+        return row.respondentEmail.toLowerCase() === respondentEmail.toLowerCase();
+      }
+      return row.respondentName.toLowerCase() === respondentName.toLowerCase();
+    });
+
+    await upsertTripConfirmation(trip.id, match?.id ?? null, {
+      respondentName,
+      respondentEmail,
+      status: status as "confirmed" | "declined",
+      adultCount,
+      kidCount,
+      weekendFriday,
+      locationId,
+    });
+  }
 
   revalidatePath(`/o/${token}`);
   revalidatePath(`/t/${trip.slug}`);
@@ -1306,4 +1385,251 @@ export async function deleteTripAction(formData: FormData) {
   await deleteTripById(trip.id);
   revalidatePath("/dashboard");
   redirect("/dashboard");
+}
+
+const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
+const splitMethodSchema = z.enum(SPLIT_METHODS);
+const contributionStatusSchema = z.enum(["pending", "paid"] as const);
+
+const expenseInputSchema = z.object({
+  title: z.string().trim().min(1, "Title is required."),
+  category: expenseCategorySchema,
+  amountCents: z.number().int().min(0),
+  splitMethod: splitMethodSchema,
+  paidByName: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
+const contributionInputSchema = z.object({
+  householdName: z.string().trim().min(1, "Household name is required."),
+  householdEmail: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null)),
+  amountCents: z.number().int().min(0),
+  status: contributionStatusSchema,
+  method: z.string().trim().optional(),
+});
+
+export type TripBudgetSnapshot = {
+  expenses: TripExpense[];
+  contributions: TripContribution[];
+  totals: {
+    totalExpenseCents: number;
+    totalCollectedCents: number;
+    totalOutstandingCents: number;
+  };
+  perHouseholdEstimateCents: number;
+  confirmedHouseholdCount: number;
+};
+
+export async function getTripBudget(tripId: string): Promise<TripBudgetSnapshot> {
+  await ensureBudgetContributionsFromConfirmations(tripId);
+
+  const [expenses, contributions, confirmations] = await Promise.all([
+    listTripExpenses(tripId),
+    listTripContributions(tripId),
+    listTripConfirmations(tripId),
+  ]);
+
+  const totalExpenseCents = expenses.reduce((sum, e) => sum + e.amountCents, 0);
+  const totalCollectedCents = contributions
+    .filter((c) => c.status === "paid")
+    .reduce((sum, c) => sum + c.amountCents, 0);
+  const totalOutstandingCents = Math.max(0, totalExpenseCents - totalCollectedCents);
+  const confirmedHouseholdCount = countConfirmedHouseholds(confirmations);
+  const perHouseholdEstimateCents =
+    confirmedHouseholdCount > 0
+      ? Math.round(totalExpenseCents / confirmedHouseholdCount)
+      : 0;
+
+  return {
+    expenses,
+    contributions,
+    totals: {
+      totalExpenseCents,
+      totalCollectedCents,
+      totalOutstandingCents,
+    },
+    perHouseholdEstimateCents,
+    confirmedHouseholdCount,
+  };
+}
+
+function parseExpenseForm(formData: FormData) {
+  const amountCents = parseDollarsToCents(String(formData.get("amount_dollars") ?? ""));
+  return expenseInputSchema.parse({
+    title: String(formData.get("title") ?? ""),
+    category: normalizeExpenseCategory(String(formData.get("category") ?? "other")),
+    amountCents,
+    splitMethod: normalizeSplitMethod(
+      String(formData.get("split_method") ?? "even_per_household"),
+    ),
+    paidByName: String(formData.get("paid_by_name") ?? "").trim() || undefined,
+    notes: String(formData.get("notes") ?? "").trim() || undefined,
+  });
+}
+
+function parseContributionForm(formData: FormData) {
+  const amountCents = parseDollarsToCents(String(formData.get("amount_dollars") ?? "0"));
+  return contributionInputSchema.parse({
+    householdName: String(formData.get("household_name") ?? ""),
+    householdEmail: String(formData.get("household_email") ?? ""),
+    amountCents,
+    status: String(formData.get("status") ?? "pending") as "pending" | "paid",
+    method: String(formData.get("method") ?? "").trim() || undefined,
+  });
+}
+
+export async function createExpenseAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const input = parseExpenseForm(formData);
+  const sortOrder = await countTripExpenses(trip.id);
+
+  await insertTripExpense({
+    tripId: trip.id,
+    title: input.title,
+    category: input.category,
+    amountCents: input.amountCents,
+    splitMethod: input.splitMethod,
+    paidByName: input.paidByName ?? null,
+    notes: input.notes ?? null,
+    sortOrder,
+  });
+
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function updateExpenseAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const expenseId = String(formData.get("expense_id") ?? "").trim();
+  if (!slug || !expenseId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const existing = await getTripExpenseById(trip.id, expenseId);
+  if (!existing) throw new Error("Expense not found.");
+
+  const input = parseExpenseForm(formData);
+  await updateTripExpenseRow(trip.id, expenseId, {
+    title: input.title,
+    category: input.category,
+    amount_cents: input.amountCents,
+    split_method: input.splitMethod,
+    paid_by_name: input.paidByName ?? null,
+    notes: input.notes ?? null,
+  });
+
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function deleteExpenseAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const expenseId = String(formData.get("expense_id") ?? "").trim();
+  if (!slug || !expenseId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  await deleteTripExpenseRow(trip.id, expenseId);
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function upsertContributionAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const contributionId = String(formData.get("contribution_id") ?? "").trim() || undefined;
+  const input = parseContributionForm(formData);
+
+  const existing = contributionId
+    ? await getTripContributionById(trip.id, contributionId)
+    : null;
+  const paidAt =
+    input.status === "paid"
+      ? (existing?.paidAt?.toISOString() ?? new Date().toISOString())
+      : null;
+
+  await upsertTripContributionRow({
+    tripId: trip.id,
+    id: contributionId,
+    householdName: input.householdName,
+    householdEmail: input.householdEmail,
+    amountCents: input.amountCents,
+    status: input.status,
+    method: input.method ?? null,
+    paidAt,
+  });
+
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function markContributionPaidAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const contributionId = String(formData.get("contribution_id") ?? "").trim();
+  if (!slug || !contributionId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const row = await getTripContributionById(trip.id, contributionId);
+  if (!row) throw new Error("Contribution not found.");
+
+  const method = z
+    .string()
+    .trim()
+    .optional()
+    .parse(String(formData.get("method") ?? "").trim() || undefined);
+
+  await updateTripContributionRow(trip.id, contributionId, {
+    status: "paid",
+    method: method ?? row.method,
+    paid_at: new Date().toISOString(),
+  });
+
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function markContributionPendingAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const contributionId = String(formData.get("contribution_id") ?? "").trim();
+  if (!slug || !contributionId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const row = await getTripContributionById(trip.id, contributionId);
+  if (!row) throw new Error("Contribution not found.");
+
+  await updateTripContributionRow(trip.id, contributionId, {
+    status: "pending",
+    paid_at: null,
+  });
+
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function deleteContributionAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  const contributionId = String(formData.get("contribution_id") ?? "").trim();
+  if (!slug || !contributionId) throw new Error("Missing fields.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  await deleteTripContributionRow(trip.id, contributionId);
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function syncBudgetHouseholdsAction(formData: FormData) {
+  const userId = await requireSessionUserId();
+  const slug = String(formData.get("slug") ?? "").trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  await ensureBudgetContributionsFromConfirmations(trip.id);
+  revalidatePath(`/t/${slug}`);
 }

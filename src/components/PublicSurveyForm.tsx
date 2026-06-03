@@ -9,8 +9,19 @@ import { WizardStepper } from "@/components/WizardStepper";
 import { useWizardFooterReveal } from "@/components/useWizardFooterReveal";
 import type { WizardIconName } from "@/components/wizard-icons";
 import { formatLocationLabel, type LocationOption } from "@/lib/locations";
+import type { GuestSession } from "@/lib/guestSession";
 import type { SurveyNextStep } from "@/lib/surveyNextSteps";
 import { formatWeekendLabel } from "@/lib/weekends";
+
+type SurveyInitial = {
+  respondentName: string;
+  respondentEmail: string | null;
+  adultCount: number;
+  kidCount: number;
+  notes: string | null;
+  selectedLocations: string[];
+  selectedSlots: string[];
+};
 
 type SurveyStep = "party" | "locations" | "weekends" | "notes";
 
@@ -23,6 +34,8 @@ export function PublicSurveyForm({
   nextSteps,
   planUrl,
   showPlanLink = false,
+  guestSession = null,
+  initialResponse = null,
 }: {
   action: (formData: FormData) => Promise<void>;
   token: string;
@@ -32,20 +45,29 @@ export function PublicSurveyForm({
   nextSteps: SurveyNextStep[];
   planUrl?: string;
   showPlanLink?: boolean;
+  guestSession?: GuestSession | null;
+  initialResponse?: SurveyInitial | null;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<SurveyStep>("party");
   const { sentinelRef, revealed } = useWizardFooterReveal(step);
+  const emailLocked = Boolean(guestSession);
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [adultCount, setAdultCount] = useState(1);
-  const [kidCount, setKidCount] = useState(0);
-  const [notes, setNotes] = useState("");
-  const [selectedLocations, setSelectedLocations] = useState<Set<string>>(
-    () => new Set(),
+  const [name, setName] = useState(
+    initialResponse?.respondentName ?? guestSession?.name ?? "",
   );
-  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(() => new Set());
+  const [email, setEmail] = useState(
+    guestSession?.email ?? initialResponse?.respondentEmail ?? "",
+  );
+  const [adultCount, setAdultCount] = useState(initialResponse?.adultCount ?? 1);
+  const [kidCount, setKidCount] = useState(initialResponse?.kidCount ?? 0);
+  const [notes, setNotes] = useState(initialResponse?.notes ?? "");
+  const [selectedLocations, setSelectedLocations] = useState<Set<string>>(
+    () => new Set(initialResponse?.selectedLocations ?? []),
+  );
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(
+    () => new Set(initialResponse?.selectedSlots ?? []),
+  );
   const [sendEmailCopy, setSendEmailCopy] = useState(false);
 
   const steps = useMemo(() => {
@@ -220,15 +242,28 @@ export function PublicSurveyForm({
               />
             </div>
             <div className="field">
-              <label htmlFor="email">Email (optional)</label>
+              <label htmlFor="email">
+                Email {emailLocked ? "" : "(optional)"}
+              </label>
               <input
                 id="email"
                 type="email"
-                placeholder="for reminders only"
+                placeholder={emailLocked ? undefined : "for reminders only"}
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                readOnly={emailLocked}
+                required={emailLocked}
+                onChange={(e) => {
+                  if (emailLocked) return;
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
               />
+              {emailLocked ? (
+                <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.82rem" }}>
+                  Locked to your signed-in account.
+                </p>
+              ) : null}
             </div>
             <div className="grid-2">
               <div className="field">

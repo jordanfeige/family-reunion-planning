@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { submitBallotVotesAction } from "@/app/actions/trips";
 import { VenueLinkButtons } from "@/components/LinkPreviewCard";
 import { formatVenuePrice } from "@/lib/venuePrices";
+import type { GuestSession } from "@/lib/guestSession";
 import {
   ballotOptionsForVoting,
   VENUE_CATEGORIES,
@@ -24,6 +25,9 @@ export function BallotVoteForm({
   initialVotes,
   showTallies,
   tallies,
+  guestSession = null,
+  initialName = "",
+  initialEmail = "",
 }: {
   surveyToken: string;
   tripName: string;
@@ -31,7 +35,11 @@ export function BallotVoteForm({
   initialVotes: Record<string, VoteChoice>;
   showTallies: boolean;
   tallies: Record<string, { up: number; down: number; net: number }>;
+  guestSession?: GuestSession | null;
+  initialName?: string;
+  initialEmail?: string;
 }) {
+  const emailLocked = Boolean(guestSession);
   const ballotOptions = useMemo(() => ballotOptionsForVoting(options), [options]);
   const categoriesInBallot = useMemo(
     () =>
@@ -42,21 +50,22 @@ export function BallotVoteForm({
   );
 
   const [stepIdx, setStepIdx] = useState(0);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(initialName || guestSession?.name || "");
+  const [email, setEmail] = useState(initialEmail || guestSession?.email || "");
   const [votes, setVotes] = useState<Record<string, VoteChoice>>(initialVotes);
   const [guestId, setGuestId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    if (emailLocked) return;
     let id = localStorage.getItem(GUEST_KEY);
     if (!id) {
       id = crypto.randomUUID();
       localStorage.setItem(GUEST_KEY, id);
     }
     setGuestId(id);
-  }, []);
+  }, [emailLocked]);
 
   const currentCategory = categoriesInBallot[stepIdx];
   const stepCount = categoriesInBallot.length;
@@ -104,7 +113,7 @@ export function BallotVoteForm({
       fd.set("survey_token", surveyToken);
       fd.set("voter_name", name.trim());
       if (email.trim()) fd.set("voter_email", email.trim());
-      fd.set("guest_id", guestId);
+      if (!emailLocked && guestId) fd.set("guest_id", guestId);
       fd.set("votes_json", JSON.stringify(payload));
       await submitBallotVotesAction(fd);
     } catch (err) {
@@ -138,14 +147,26 @@ export function BallotVoteForm({
           />
         </div>
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="voter_email">Email (optional)</label>
+          <label htmlFor="voter_email">
+            Email {emailLocked ? "" : "(optional)"}
+          </label>
           <input
             id="voter_email"
             type="email"
-            placeholder="Matches planning survey if you used one"
+            placeholder={emailLocked ? undefined : "Matches planning survey if you used one"}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            readOnly={emailLocked}
+            required={emailLocked}
+            onChange={(e) => {
+              if (emailLocked) return;
+              setEmail(e.target.value);
+            }}
           />
+          {emailLocked ? (
+            <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.82rem" }}>
+              Locked to your signed-in account.
+            </p>
+          ) : null}
         </div>
       </div>
 

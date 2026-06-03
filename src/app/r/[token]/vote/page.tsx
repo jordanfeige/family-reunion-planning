@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { auth } from "@/auth";
 import { BallotVoteForm } from "@/components/BallotVoteForm";
+import { GuestSaveSignIn, GuestSignedInBanner } from "@/components/GuestSaveSignIn";
+import { voterKeyFromUserId } from "@/lib/ballotVoter";
 import { tallyBallotVotes } from "@/lib/ballotResults";
 import { APP_NAME } from "@/lib/brand";
 import { appOrigin } from "@/lib/appOrigin";
-import { listBallotVotesForTrip } from "@/lib/supabase/ballotVotes";
+import { guestSessionFromUser } from "@/lib/guestSession";
+import { listBallotVotesForTrip, listBallotVotesForVoter } from "@/lib/supabase/ballotVotes";
 import { getSurveyAndTripByPublicToken } from "@/lib/supabase/queries";
 import { ballotOptionsForVoting } from "@/lib/venues";
 
@@ -21,6 +25,10 @@ export default async function BallotVotePage({
   const data = await getSurveyAndTripByPublicToken(token);
   if (!data) notFound();
 
+  const session = await auth();
+  const guestSession = guestSessionFromUser(session?.user ?? {});
+  const callbackUrl = `${appOrigin()}/r/${token}/vote`;
+
   const { survey, trip } = data;
   const options = ballotOptionsForVoting(trip.venueOptions ?? []);
   const voteRecords = await listBallotVotesForTrip(trip.id);
@@ -33,6 +41,17 @@ export default async function BallotVotePage({
 
   const showTallies = trip.ballotStatus === "open" || trip.ballotStatus === "closed";
   const planUrl = `${appOrigin()}/o/${trip.shareOptionsToken}`;
+
+  let initialVotes: Record<string, "up" | "down"> = {};
+  if (guestSession) {
+    const myVotes = await listBallotVotesForVoter(
+      trip.id,
+      voterKeyFromUserId(guestSession.userId),
+    );
+    for (const v of myVotes) {
+      initialVotes[v.optionId] = v.vote;
+    }
+  }
 
   if (trip.ballotStatus === "draft") {
     return (
@@ -71,14 +90,24 @@ export default async function BallotVotePage({
       ) : null}
 
       {trip.ballotStatus === "open" ? (
-        <BallotVoteForm
-          surveyToken={token}
-          tripName={trip.name}
-          options={trip.venueOptions ?? []}
-          initialVotes={{}}
-          showTallies={showTallies}
-          tallies={tallies}
-        />
+        <>
+          {guestSession ? (
+            <GuestSignedInBanner email={guestSession.email} />
+          ) : (
+            <GuestSaveSignIn callbackUrl={callbackUrl} />
+          )}
+          <BallotVoteForm
+            surveyToken={token}
+            tripName={trip.name}
+            options={trip.venueOptions ?? []}
+            initialVotes={initialVotes}
+            showTallies={showTallies}
+            tallies={tallies}
+            guestSession={guestSession}
+            initialName={guestSession?.name}
+            initialEmail={guestSession?.email}
+          />
+        </>
       ) : (
         <p className="muted">
           Voting has ended.{" "}

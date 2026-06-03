@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { submitSurveyResponseAction } from "@/app/actions/trips";
+import { auth } from "@/auth";
+import { GuestSaveSignIn, GuestSignedInBanner } from "@/components/GuestSaveSignIn";
 import { PublicSurveyForm } from "@/components/PublicSurveyForm";
+import { guestSessionFromUser } from "@/lib/guestSession";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
 import { APP_NAME } from "@/lib/brand";
 import { appOrigin } from "@/lib/appOrigin";
@@ -9,7 +12,10 @@ import { itineraryHasContent, normalizeItinerary, type PublishedItinerary } from
 import { getSurveyNextSteps } from "@/lib/surveyNextSteps";
 import { filterValidFridays, formatWeekendLabel } from "@/lib/weekends";
 import { SurveyNextSteps } from "@/components/SurveyNextSteps";
-import { getSurveyAndTripByPublicToken } from "@/lib/supabase/queries";
+import {
+  getSurveyAndTripByPublicToken,
+  getSurveyResponseByUserId,
+} from "@/lib/supabase/queries";
 
 export default async function PublicSurveyPage({
   params,
@@ -23,7 +29,15 @@ export default async function PublicSurveyPage({
   const data = await getSurveyAndTripByPublicToken(token);
   if (!data) notFound();
 
+  const session = await auth();
+  const guestSession = guestSessionFromUser(session?.user ?? {});
+  const callbackUrl = `${appOrigin()}/r/${token}`;
+
   const { survey, trip } = data;
+  const existingResponse =
+    guestSession != null
+      ? await getSurveyResponseByUserId(survey.id, guestSession.userId)
+      : null;
   const slots = filterValidFridays(trip.proposedDateSlots ?? []);
   const locations = normalizeLocationOptions(trip.locationOptions ?? []);
   const planReady = Boolean(trip.selectedLocationId && trip.selectedWeekendFriday);
@@ -83,22 +97,42 @@ export default async function PublicSurveyPage({
         ) : null}
 
         {!thanks ? (
-          <PublicSurveyForm
-            action={submitSurveyResponseAction}
-            token={token}
-            tripName={trip.name}
-            slots={slots}
-            locations={locations}
-            nextSteps={nextSteps}
-            planUrl={planUrl}
-            showPlanLink={planReady}
-          />
+          <>
+            {guestSession ? (
+              <GuestSignedInBanner email={guestSession.email} />
+            ) : (
+              <GuestSaveSignIn callbackUrl={callbackUrl} />
+            )}
+            <PublicSurveyForm
+              action={submitSurveyResponseAction}
+              token={token}
+              tripName={trip.name}
+              slots={slots}
+              locations={locations}
+              nextSteps={nextSteps}
+              planUrl={planUrl}
+              showPlanLink={planReady}
+              guestSession={guestSession}
+              initialResponse={
+                existingResponse
+                  ? {
+                      respondentName: existingResponse.respondentName,
+                      respondentEmail: existingResponse.respondentEmail,
+                      adultCount: existingResponse.adultCount,
+                      kidCount: existingResponse.kidCount,
+                      notes: existingResponse.notes,
+                      selectedLocations: existingResponse.selectedLocations,
+                      selectedSlots: existingResponse.selectedSlots,
+                    }
+                  : null
+              }
+            />
+          </>
         ) : null}
 
-        {thanks ? (
+        {thanks && guestSession ? (
           <p className="muted" style={{ marginTop: "1.25rem", fontSize: "0.85rem" }}>
-            Need to change your answer later? Ask the organizer for a fresh link
-            or have them nudge us to add edits—coming soon.
+            You can return to this page anytime while signed in to update your answers.
           </p>
         ) : null}
       </div>

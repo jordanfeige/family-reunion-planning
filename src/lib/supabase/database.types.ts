@@ -74,6 +74,7 @@ export type Database = {
           trip_id: string;
           option_id: string;
           vote: string;
+          user_id: string | null;
           survey_response_id: string | null;
           voter_name: string | null;
           voter_email: string | null;
@@ -85,6 +86,7 @@ export type Database = {
           trip_id: string;
           option_id: string;
           vote: string;
+          user_id?: string | null;
           survey_response_id?: string | null;
           voter_name?: string | null;
           voter_email?: string | null;
@@ -114,6 +116,7 @@ export type Database = {
         Row: {
           id: string;
           survey_id: string;
+          user_id: string | null;
           respondent_name: string;
           respondent_email: string | null;
           selected_slots: string[];
@@ -127,6 +130,7 @@ export type Database = {
         Insert: {
           id?: string;
           survey_id: string;
+          user_id?: string | null;
           respondent_name: string;
           respondent_email?: string | null;
           selected_slots?: string[];
@@ -143,6 +147,7 @@ export type Database = {
         Row: {
           id: string;
           trip_id: string;
+          user_id: string | null;
           respondent_name: string;
           respondent_email: string | null;
           status: string;
@@ -156,6 +161,7 @@ export type Database = {
         Insert: {
           id?: string;
           trip_id: string;
+          user_id?: string | null;
           respondent_name: string;
           respondent_email?: string | null;
           status: string;
@@ -207,6 +213,62 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["gallery_item"]["Insert"]>;
+      };
+      trip_expense: {
+        Row: {
+          id: string;
+          trip_id: string;
+          title: string;
+          category: string;
+          amount_cents: number;
+          split_method: string;
+          paid_by_name: string | null;
+          notes: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          trip_id: string;
+          title: string;
+          category: string;
+          amount_cents: number;
+          split_method?: string;
+          paid_by_name?: string | null;
+          notes?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["trip_expense"]["Insert"]>;
+      };
+      trip_contribution: {
+        Row: {
+          id: string;
+          trip_id: string;
+          household_name: string;
+          household_email: string | null;
+          amount_cents: number;
+          status: string;
+          method: string | null;
+          paid_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          trip_id: string;
+          household_name: string;
+          household_email?: string | null;
+          amount_cents?: number;
+          status?: string;
+          method?: string | null;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["trip_contribution"]["Insert"]>;
       };
     };
   };

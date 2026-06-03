@@ -14,6 +14,8 @@ type SurveyResponseRow = Database["public"]["Tables"]["survey_response"]["Row"];
 type TripConfirmationRow = Database["public"]["Tables"]["trip_confirmation"]["Row"];
 type TripOptionRow = Database["public"]["Tables"]["trip_option"]["Row"];
 type GalleryItemRow = Database["public"]["Tables"]["gallery_item"]["Row"];
+type TripExpenseRow = Database["public"]["Tables"]["trip_expense"]["Row"];
+type TripContributionRow = Database["public"]["Tables"]["trip_contribution"]["Row"];
 
 export type Trip = {
   id: string;
@@ -53,6 +55,7 @@ export type Survey = {
 export type SurveyResponse = {
   id: string;
   surveyId: string;
+  userId: string | null;
   respondentName: string;
   respondentEmail: string | null;
   selectedSlots: string[];
@@ -67,6 +70,7 @@ export type SurveyResponse = {
 export type TripConfirmation = {
   id: string;
   tripId: string;
+  userId: string | null;
   respondentName: string;
   respondentEmail: string | null;
   status: "confirmed" | "declined";
@@ -95,6 +99,33 @@ export type GalleryItem = {
   mediaType: string;
   caption: string | null;
   createdAt: Date;
+};
+
+export type TripExpense = {
+  id: string;
+  tripId: string;
+  title: string;
+  category: string;
+  amountCents: number;
+  splitMethod: string;
+  paidByName: string | null;
+  notes: string | null;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type TripContribution = {
+  id: string;
+  tripId: string;
+  householdName: string;
+  householdEmail: string | null;
+  amountCents: number;
+  status: "pending" | "paid";
+  method: string | null;
+  paidAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 function parseDate(value: string | null): Date | null {
@@ -146,6 +177,7 @@ export function mapSurveyResponse(row: SurveyResponseRow): SurveyResponse {
   return {
     id: row.id,
     surveyId: row.survey_id,
+    userId: row.user_id ?? null,
     respondentName: row.respondent_name,
     respondentEmail: row.respondent_email,
     selectedSlots: row.selected_slots ?? [],
@@ -162,6 +194,7 @@ export function mapTripConfirmation(row: TripConfirmationRow): TripConfirmation 
   return {
     id: row.id,
     tripId: row.trip_id,
+    userId: row.user_id ?? null,
     respondentName: row.respondent_name,
     respondentEmail: row.respondent_email,
     status: row.status as "confirmed" | "declined",
@@ -194,6 +227,37 @@ export function mapGalleryItem(row: GalleryItemRow): GalleryItem {
     mediaType: row.media_type,
     caption: row.caption,
     createdAt: new Date(row.created_at),
+  };
+}
+
+export function mapTripExpense(row: TripExpenseRow): TripExpense {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    title: row.title,
+    category: row.category,
+    amountCents: row.amount_cents,
+    splitMethod: row.split_method,
+    paidByName: row.paid_by_name,
+    notes: row.notes,
+    sortOrder: row.sort_order,
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  };
+}
+
+export function mapTripContribution(row: TripContributionRow): TripContribution {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    householdName: row.household_name,
+    householdEmail: row.household_email,
+    amountCents: row.amount_cents,
+    status: row.status as "pending" | "paid",
+    method: row.method,
+    paidAt: parseDate(row.paid_at),
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
   };
 }
 

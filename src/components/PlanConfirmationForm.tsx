@@ -3,19 +3,43 @@
 import { useState } from "react";
 
 import { submitPlanConfirmationAction } from "@/app/actions/trips";
+import type { GuestSession } from "@/lib/guestSession";
+
+type ConfirmationInitial = {
+  respondentName: string;
+  respondentEmail: string | null;
+  status: "confirmed" | "declined";
+  adultCount: number;
+  kidCount: number;
+};
 
 export function PlanConfirmationForm({
   shareToken,
   weekendLabel,
   locationTitle,
   canConfirm,
+  guestSession = null,
+  initial = null,
 }: {
   shareToken: string;
   weekendLabel: string;
   locationTitle: string;
   canConfirm: boolean;
+  guestSession?: GuestSession | null;
+  initial?: ConfirmationInitial | null;
 }) {
-  const [status, setStatus] = useState<"confirmed" | "declined" | null>(null);
+  const emailLocked = Boolean(guestSession);
+  const [status, setStatus] = useState<"confirmed" | "declined" | null>(
+    initial?.status ?? null,
+  );
+  const [name, setName] = useState(
+    initial?.respondentName ?? guestSession?.name ?? "",
+  );
+  const [email, setEmail] = useState(
+    guestSession?.email ?? initial?.respondentEmail ?? "",
+  );
+  const [adultCount, setAdultCount] = useState(initial?.adultCount ?? 1);
+  const [kidCount, setKidCount] = useState(initial?.kidCount ?? 0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -56,6 +80,12 @@ export function PlanConfirmationForm({
           try {
             const fd = new FormData(e.currentTarget);
             fd.set("status", status);
+            fd.set("name", name.trim());
+            if (email.trim()) fd.set("email", email.trim());
+            if (status === "confirmed") {
+              fd.set("adult_count", String(adultCount));
+              fd.set("kid_count", String(kidCount));
+            }
             await submitPlanConfirmationAction(fd);
           } catch (err) {
             setError(err instanceof Error ? err.message : "Could not save.");
@@ -99,9 +129,10 @@ export function PlanConfirmationForm({
                 name="adult_count"
                 type="number"
                 min={1}
-                defaultValue={1}
+                value={adultCount}
                 inputMode="numeric"
                 required
+                onChange={(e) => setAdultCount(Number.parseInt(e.target.value, 10) || 1)}
               />
             </div>
             <div className="field">
@@ -111,8 +142,9 @@ export function PlanConfirmationForm({
                 name="kid_count"
                 type="number"
                 min={0}
-                defaultValue={0}
+                value={kidCount}
                 inputMode="numeric"
+                onChange={(e) => setKidCount(Number.parseInt(e.target.value, 10) || 0)}
               />
             </div>
           </div>
@@ -120,17 +152,41 @@ export function PlanConfirmationForm({
 
         <div className="field">
           <label htmlFor="confirm_name">Your name *</label>
-          <input id="confirm_name" name="name" required autoComplete="name" />
+          <input
+            id="confirm_name"
+            required
+            autoComplete="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </div>
         <div className="field">
-          <label htmlFor="confirm_email">Email (optional)</label>
-          <input id="confirm_email" name="email" type="email" autoComplete="email" />
+          <label htmlFor="confirm_email">
+            Email {emailLocked ? "" : "(optional)"}
+          </label>
+          <input
+            id="confirm_email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            readOnly={emailLocked}
+            required={emailLocked}
+            onChange={(e) => {
+              if (emailLocked) return;
+              setEmail(e.target.value);
+            }}
+          />
+          {emailLocked ? (
+            <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.82rem" }}>
+              Locked to your signed-in account.
+            </p>
+          ) : null}
         </div>
 
         {error ? <p className="error-banner" style={{ margin: 0 }}>{error}</p> : null}
 
         <button type="submit" className="btn btn-berry btn-block-sm" disabled={busy}>
-          {busy ? "Saving…" : "Submit RSVP"}
+          {busy ? "Saving…" : initial ? "Update RSVP" : "Submit RSVP"}
         </button>
       </form>
     </div>

@@ -237,6 +237,7 @@ export const surveyResponses = pgTable("survey_response", {
   surveyId: text("survey_id")
     .notNull()
     .references(() => surveys.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   respondentName: text("respondent_name").notNull(),
   respondentEmail: text("respondent_email"),
   selectedSlots: jsonb("selected_slots")
@@ -262,6 +263,7 @@ export const tripConfirmations = pgTable("trip_confirmation", {
   tripId: text("trip_id")
     .notNull()
     .references(() => trips.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   respondentName: text("respondent_name").notNull(),
   respondentEmail: text("respondent_email"),
   status: text("status").notNull().$type<"confirmed" | "declined">(),
@@ -298,4 +300,39 @@ export const galleryItems = pgTable("gallery_item", {
   mediaType: text("media_type").notNull(),
   caption: text("caption"),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const tripExpenses = pgTable("trip_expense", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tripId: text("trip_id")
+    .notNull()
+    .references(() => trips.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  category: text("category").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  splitMethod: text("split_method").notNull().default("even_per_household"),
+  paidByName: text("paid_by_name"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});
+
+export const tripContributions = pgTable("trip_contribution", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tripId: text("trip_id")
+    .notNull()
+    .references(() => trips.id, { onDelete: "cascade" }),
+  householdName: text("household_name").notNull(),
+  householdEmail: text("household_email"),
+  amountCents: integer("amount_cents").notNull().default(0),
+  status: text("status").notNull().default("pending"),
+  method: text("method"),
+  paidAt: timestamp("paid_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

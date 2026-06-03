@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 
+import { auth } from "@/auth";
+import { GuestSaveSignIn, GuestSignedInBanner } from "@/components/GuestSaveSignIn";
 import { PlanConfirmationForm } from "@/components/PlanConfirmationForm";
+import { guestSessionFromUser } from "@/lib/guestSession";
+import { appOrigin } from "@/lib/appOrigin";
 import { PublicItineraryView } from "@/components/PublicItineraryView";
 import { PublicVenuesShowcase } from "@/components/PublicVenuesShowcase";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
@@ -9,7 +13,11 @@ import { listBallotVotesForTrip } from "@/lib/supabase/ballotVotes";
 import { normalizeVenueOptions } from "@/lib/venues";
 import { itineraryHasContent, normalizeItinerary, type PublishedItinerary } from "@/lib/itinerary";
 import { APP_NAME } from "@/lib/brand";
-import { getTripByShareToken, listTripOptions } from "@/lib/supabase/queries";
+import {
+  getTripByShareToken,
+  getTripConfirmationByUserId,
+  listTripOptions,
+} from "@/lib/supabase/queries";
 import { formatWeekendLabel } from "@/lib/weekends";
 
 export default async function PublicOptionsPage({
@@ -23,6 +31,14 @@ export default async function PublicOptionsPage({
   const { confirmed } = await searchParams;
   const trip = await getTripByShareToken(token);
   if (!trip) notFound();
+
+  const session = await auth();
+  const guestSession = guestSessionFromUser(session?.user ?? {});
+  const callbackUrl = `${appOrigin()}/o/${token}`;
+  const existingConfirmation =
+    guestSession != null
+      ? await getTripConfirmationByUserId(trip.id, guestSession.userId)
+      : null;
 
   const options = await listTripOptions(trip.id);
 
@@ -111,11 +127,29 @@ export default async function PublicOptionsPage({
         </div>
       )}
 
+      {guestSession ? (
+        <GuestSignedInBanner email={guestSession.email} />
+      ) : (
+        <GuestSaveSignIn callbackUrl={callbackUrl} />
+      )}
+
       <PlanConfirmationForm
         shareToken={token}
         weekendLabel={weekendLabel ?? "TBD"}
         locationTitle={lockedLocation?.title ?? "TBD"}
         canConfirm={canConfirm}
+        guestSession={guestSession}
+        initial={
+          existingConfirmation
+            ? {
+                respondentName: existingConfirmation.respondentName,
+                respondentEmail: existingConfirmation.respondentEmail,
+                status: existingConfirmation.status,
+                adultCount: existingConfirmation.adultCount,
+                kidCount: existingConfirmation.kidCount,
+              }
+            : null
+        }
       />
 
       {showPublished && options.length > 0 ? (

@@ -6,6 +6,10 @@ import { createTripAction } from "@/app/actions/trips";
 import { TripDashboardManage } from "@/components/TripDashboardManage";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
+import {
+  claimGuestSubmissionsForUser,
+  userHasGuestParticipation,
+} from "@/lib/supabase/guestIdentity";
 import { listTripsForUser } from "@/lib/supabase/queries";
 
 export default async function DashboardPage() {
@@ -16,9 +20,55 @@ export default async function DashboardPage() {
 
   if (session.user.email) {
     await claimTripInvitesForUser(session.user.id, session.user.email);
+    await claimGuestSubmissionsForUser(session.user.id, session.user.email);
   }
 
   const list = await listTripsForUser(session.user.id);
+  const isGuestOnly =
+    list.length === 0 &&
+    (await userHasGuestParticipation(session.user.id, session.user.email));
+
+  if (isGuestOnly) {
+    return (
+      <div className="shell" style={{ padding: "1.5rem 1.25rem 3rem" }}>
+        <header style={{ marginBottom: "2rem" }}>
+          <p className="pill">{APP_NAME}</p>
+          <h1 style={{ color: "var(--color-fjord)", margin: "0.5rem 0 0" }}>
+            You&apos;re signed in
+          </h1>
+          <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.95rem" }}>
+            {APP_TAGLINE}
+          </p>
+        </header>
+
+        <div
+          className="card"
+          style={{
+            padding: "1.25rem",
+            maxWidth: "36rem",
+            background: "rgba(42, 85, 128, 0.06)",
+            border: "1px solid rgba(28, 61, 90, 0.12)",
+          }}
+        >
+          <p style={{ margin: "0 0 0.75rem", color: "var(--color-fjord)", lineHeight: 1.5 }}>
+            Open the link your organizer shared to view your trip, RSVP on the plan, answer
+            the planning survey, and vote on stays and activities.
+          </p>
+          <p className="muted" style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.5 }}>
+            Your answers are tied to <strong>{session.user.email}</strong> so you can come
+            back and edit them anytime. This account does not include organizer tools—only
+            family-facing pages from your invite link.
+          </p>
+        </div>
+
+        <p className="muted" style={{ marginTop: "1.5rem", fontSize: "0.88rem" }}>
+          Planning the reunion yourself?{" "}
+          <Link href="/login?callbackUrl=/dashboard">Sign in with a different email</Link>{" "}
+          or ask the organizer to invite you as a co-planner.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="shell" style={{ padding: "1.5rem 1.25rem 3rem" }}>
@@ -116,6 +166,11 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/*
+        Apply schema: npm run db:push
+        (requires DATABASE_URL in .env)
+      */}
     </div>
   );
 }

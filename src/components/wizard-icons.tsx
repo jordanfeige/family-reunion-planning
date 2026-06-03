@@ -6,6 +6,7 @@ export type WizardIconName =
   | "survey"
   | "ballot"
   | "blueprint"
+  | "budget"
   | "share"
   | "gallery"
   | "party"
@@ -41,6 +42,12 @@ const paths: Record<WizardIconName, ReactNode> = {
     <>
       <path d="M6 4h12v16H6z" />
       <path d="M9 8h6M9 12h6M9 16h4" />
+    </>
+  ),
+  budget: (
+    <>
+      <rect x="2" y="6" width="20" height="14" rx="2" />
+      <path d="M2 10h20M6 14h4" />
     </>
   ),
   share: (

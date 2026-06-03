@@ -8,6 +8,7 @@ export type TripHubCompletion = {
   survey: boolean;
   ballot: boolean;
   blueprint: boolean;
+  budget: boolean;
   confirmations: boolean;
   gallery: boolean;
 };
@@ -21,6 +22,7 @@ export function TripHubWizard({
   survey,
   ballot,
   blueprint,
+  budget,
   confirmations,
   gallery,
 }: {
@@ -32,6 +34,7 @@ export function TripHubWizard({
   survey: React.ReactNode;
   ballot: React.ReactNode;
   blueprint: React.ReactNode;
+  budget: React.ReactNode;
   confirmations: React.ReactNode;
   gallery: React.ReactNode;
 }) {
@@ -85,6 +88,16 @@ export function TripHubWizard({
         "Build your Fri–Sun itinerary from the winning picks and publish the plan.",
       complete: completion.blueprint,
       content: blueprint,
+    },
+    {
+      id: "budget",
+      label: "Budget",
+      shortLabel: "Budget",
+      icon: "budget",
+      description:
+        "Log shared costs, track who paid in, and see an even split estimate per confirmed household.",
+      complete: completion.budget,
+      content: budget,
     },
     {
       id: "confirmations",

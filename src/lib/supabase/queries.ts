@@ -248,8 +248,24 @@ export async function listSurveyResponses(surveyId: string): Promise<SurveyRespo
   return (data ?? []).map((row) => mapSurveyResponse(row as SurveyResponseRow));
 }
 
+export async function getSurveyResponseByUserId(
+  surveyId: string,
+  userId: string,
+): Promise<SurveyResponse | null> {
+  const { data, error } = await supabase()
+    .from("survey_response")
+    .select("*")
+    .eq("survey_id", surveyId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throwDb(error, "getSurveyResponseByUserId");
+  return data ? mapSurveyResponse(data as SurveyResponseRow) : null;
+}
+
 export async function insertSurveyResponse(input: {
   surveyId: string;
+  userId?: string | null;
   respondentName: string;
   respondentEmail: string | null;
   selectedSlots: string[];
@@ -262,6 +278,7 @@ export async function insertSurveyResponse(input: {
   const { error } = await supabase().from("survey_response").insert({
     id: newId(),
     survey_id: input.surveyId,
+    user_id: input.userId ?? null,
     respondent_name: input.respondentName,
     respondent_email: input.respondentEmail,
     selected_slots: input.selectedSlots,
@@ -273,6 +290,68 @@ export async function insertSurveyResponse(input: {
   });
 
   if (error) throwDb(error, "insertSurveyResponse");
+}
+
+export async function upsertSurveyResponseForUser(input: {
+  surveyId: string;
+  userId: string;
+  respondentName: string;
+  respondentEmail: string | null;
+  selectedSlots: string[];
+  selectedLocations: string[];
+  adultCount: number;
+  kidCount: number;
+  attendeeCount: number;
+  notes: string | null;
+}): Promise<SurveyResponse> {
+  const existing = await getSurveyResponseByUserId(input.surveyId, input.userId);
+  const row = {
+    survey_id: input.surveyId,
+    user_id: input.userId,
+    respondent_name: input.respondentName,
+    respondent_email: input.respondentEmail,
+    selected_slots: input.selectedSlots,
+    selected_locations: input.selectedLocations,
+    adult_count: input.adultCount,
+    kid_count: input.kidCount,
+    attendee_count: input.attendeeCount,
+    notes: input.notes,
+    submitted_at: new Date().toISOString(),
+  };
+
+  if (existing) {
+    const { data, error } = await supabase()
+      .from("survey_response")
+      .update(row)
+      .eq("id", existing.id)
+      .select("*")
+      .single();
+    if (error) throwDb(error, "upsertSurveyResponseForUser.update");
+    return mapSurveyResponse(data as SurveyResponseRow);
+  }
+
+  const { data, error } = await supabase()
+    .from("survey_response")
+    .insert({ id: newId(), ...row })
+    .select("*")
+    .single();
+  if (error) throwDb(error, "upsertSurveyResponseForUser.insert");
+  return mapSurveyResponse(data as SurveyResponseRow);
+}
+
+export async function getTripConfirmationByUserId(
+  tripId: string,
+  userId: string,
+): Promise<TripConfirmation | null> {
+  const { data, error } = await supabase()
+    .from("trip_confirmation")
+    .select("*")
+    .eq("trip_id", tripId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throwDb(error, "getTripConfirmationByUserId");
+  return data ? mapTripConfirmation(data as TripConfirmationRow) : null;
 }
 
 export async function deleteSurveyResponse(surveyId: string, responseId: string) {
@@ -389,6 +468,7 @@ export async function upsertTripConfirmation(
   tripId: string,
   existingId: string | null,
   payload: {
+    userId?: string | null;
     respondentName: string;
     respondentEmail: string | null;
     status: "confirmed" | "declined";
@@ -400,6 +480,7 @@ export async function upsertTripConfirmation(
 ) {
   const row = {
     trip_id: tripId,
+    user_id: payload.userId ?? null,
     respondent_name: payload.respondentName,
     respondent_email: payload.respondentEmail,
     status: payload.status,
@@ -422,6 +503,26 @@ export async function upsertTripConfirmation(
       .insert({ id: newId(), ...row });
     if (error) throwDb(error, "insertTripConfirmation");
   }
+}
+
+export async function upsertTripConfirmationForUser(
+  tripId: string,
+  userId: string,
+  payload: {
+    respondentName: string;
+    respondentEmail: string | null;
+    status: "confirmed" | "declined";
+    adultCount: number;
+    kidCount: number;
+    weekendFriday: string;
+    locationId: string;
+  },
+): Promise<void> {
+  const existing = await getTripConfirmationByUserId(tripId, userId);
+  await upsertTripConfirmation(tripId, existing?.id ?? null, {
+    ...payload,
+    userId,
+  });
 }
 
 export async function listSurveyResponsesForChat(surveyId: string) {

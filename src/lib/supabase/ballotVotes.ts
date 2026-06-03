@@ -13,6 +13,7 @@ export type BallotVoteRecord = {
   tripId: string;
   optionId: string;
   vote: "up" | "down";
+  userId: string | null;
   surveyResponseId: string | null;
   voterName: string | null;
   voterEmail: string | null;
@@ -25,6 +26,7 @@ type VoteRow = {
   trip_id: string;
   option_id: string;
   vote: string;
+  user_id: string | null;
   survey_response_id: string | null;
   voter_name: string | null;
   voter_email: string | null;
@@ -38,6 +40,7 @@ function mapVote(row: VoteRow): BallotVoteRecord {
     tripId: row.trip_id,
     optionId: row.option_id,
     vote: row.vote as "up" | "down",
+    userId: row.user_id,
     surveyResponseId: row.survey_response_id,
     voterName: row.voter_name,
     voterEmail: row.voter_email,
@@ -72,6 +75,7 @@ export async function listBallotVotesForVoter(
 
 export async function upsertBallotVotes(input: {
   tripId: string;
+  userId: string | null;
   voterKey: string;
   voterName: string;
   voterEmail: string | null;
@@ -83,6 +87,7 @@ export async function upsertBallotVotes(input: {
     trip_id: input.tripId,
     option_id: v.optionId,
     vote: v.vote,
+    user_id: input.userId,
     survey_response_id: input.surveyResponseId,
     voter_name: input.voterName,
     voter_email: input.voterEmail,

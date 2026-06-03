@@ -5,6 +5,7 @@ import {
   addTripOptionAction,
   deleteSurveyResponseAction,
   deleteTripOptionAction,
+  getTripBudget,
   updateTripBasicsAction,
 } from "@/app/actions/trips";
 import { auth } from "@/auth";
@@ -22,6 +23,7 @@ import { TripHubWizard } from "@/components/TripHubWizard";
 import { TripOwnerManagePanel } from "@/components/TripOwnerManagePanel";
 import { TripItineraryPanel } from "@/components/TripItineraryPanel";
 import { TripBallotControls } from "@/components/TripBallotControls";
+import { TripBudgetPanel } from "@/components/TripBudgetPanel";
 import { TripVenueSection } from "@/components/TripVenueSection";
 import { tallyBallotVotes, countDistinctVoters } from "@/lib/ballotResults";
 import { listBallotVotesForTrip } from "@/lib/supabase/ballotVotes";
@@ -62,6 +64,8 @@ export default async function TripHubPage({
 
   if (session.user.email) {
     await claimTripInvitesForUser(session.user.id, session.user.email);
+    const { claimGuestSubmissionsForUser } = await import("@/lib/supabase/guestIdentity");
+    await claimGuestSubmissionsForUser(session.user.id, session.user.email);
   }
 
   const access = await getTripForOrganizer(slug, session.user.id);
@@ -121,6 +125,8 @@ export default async function TripHubPage({
       c.locationId === trip.selectedLocationId,
   ).length;
 
+  const tripBudget = await getTripBudget(trip.id);
+
   return (
     <div className="shell trip-hub-page">
       <TripHubMenu
@@ -158,6 +164,7 @@ export default async function TripHubPage({
               hasDraftItinerary &&
               hasPublishedPlan,
           ),
+          budget: tripBudget.expenses.length > 0,
           confirmations: hasPublishedPlan && confirmationCount > 0,
           gallery: galleryUnlocked && gallery.length > 0,
         }}
@@ -359,6 +366,7 @@ export default async function TripHubPage({
         />
         </div>
         }
+        budget={<TripBudgetPanel slug={trip.slug} budget={tripBudget} />}
         confirmations={
         <div className="stack">
         {!hasPublishedPlan ? (

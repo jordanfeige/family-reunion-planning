@@ -14,11 +14,22 @@ export function voterKeyFromGuest(guestId: string): string {
   return `guest:${guestId}`;
 }
 
+export function voterKeyFromUserId(userId: string): string {
+  return `user:${userId}`;
+}
+
 export function resolveVoterKey(input: {
+  userId?: string | null;
   surveyResponseId?: string | null;
   email?: string | null;
   guestId?: string | null;
 }): { voterKey: string; surveyResponseId: string | null } {
+  if (input.userId?.trim()) {
+    return {
+      voterKey: voterKeyFromUserId(input.userId.trim()),
+      surveyResponseId: input.surveyResponseId ?? null,
+    };
+  }
   if (input.surveyResponseId) {
     return {
       voterKey: voterKeyFromSurveyResponse(input.surveyResponseId),
