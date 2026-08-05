@@ -11,6 +11,7 @@ import { APP_TAGLINE } from "@/lib/brand";
 export function SiteHeader({ session }: { session: Session | null }) {
   const pathname = usePathname();
   const isTripHub = pathname?.startsWith("/t/");
+  const isSurveyLink = pathname?.startsWith("/r/");
   const isMarketingHome = pathname === "/";
   const isPlan = pathname === "/plan" || pathname?.startsWith("/plan/");
   const isDashboard = pathname === "/dashboard";
@@ -21,6 +22,7 @@ export function SiteHeader({ session }: { session: Session | null }) {
     "topbar",
     isMarketingHome ? "topbar--marketing" : "",
     quietChrome ? "topbar--quiet" : "",
+    isSurveyLink ? "topbar--survey-link" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -29,86 +31,88 @@ export function SiteHeader({ session }: { session: Session | null }) {
     <header className={topbarClass}>
       <BrandMark
         variant={isMarketingHome ? "on-dark" : quietChrome ? "compact" : "default"}
-        showTagline={!isMarketingHome && !quietChrome}
+        showTagline={!isMarketingHome && !quietChrome && !isSurveyLink}
         tagline={APP_TAGLINE}
       />
-      <nav className={`nav-actions${quietChrome ? " nav-actions--quiet" : ""}`}>
-        {session?.user ? (
-          <>
-            {!isPlan ? (
+      {isSurveyLink ? null : (
+        <nav className={`nav-actions${quietChrome ? " nav-actions--quiet" : ""}`}>
+          {session?.user ? (
+            <>
+              {!isPlan ? (
+                <Link
+                  className={
+                    isMarketingHome
+                      ? "landing-nav-link"
+                      : quietChrome
+                        ? "nav-text-link"
+                        : "btn btn-secondary"
+                  }
+                  href="/plan"
+                >
+                  Plan a trip
+                </Link>
+              ) : null}
+              {!isDashboard ? (
+                <Link
+                  className={
+                    isMarketingHome
+                      ? "landing-nav-link"
+                      : quietChrome
+                        ? "nav-text-link"
+                        : "btn btn-secondary"
+                  }
+                  href="/dashboard"
+                >
+                  Trips
+                </Link>
+              ) : null}
+              <form action={signOutAction}>
+                <button
+                  type="submit"
+                  className={
+                    isMarketingHome
+                      ? "landing-nav-link"
+                      : quietChrome
+                        ? "nav-text-link"
+                        : "btn btn-secondary"
+                  }
+                >
+                  Sign out
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              {!isPlan ? (
+                <Link
+                  className={
+                    isMarketingHome
+                      ? "landing-nav-link"
+                      : quietChrome
+                        ? "nav-text-link"
+                        : "btn btn-secondary"
+                  }
+                  href="/plan"
+                >
+                  Plan a trip
+                </Link>
+              ) : null}
               <Link
                 className={
                   isMarketingHome
                     ? "landing-nav-link"
                     : quietChrome
-                      ? "nav-text-link"
-                      : "btn btn-secondary"
+                      ? "nav-text-link nav-text-link--emphasis"
+                      : "btn btn-primary"
                 }
-                href="/plan"
+                href="/login"
               >
-                Plan a trip
+                Sign in
               </Link>
-            ) : null}
-            {!isDashboard ? (
-              <Link
-                className={
-                  isMarketingHome
-                    ? "landing-nav-link"
-                    : quietChrome
-                      ? "nav-text-link"
-                      : "btn btn-secondary"
-                }
-                href="/dashboard"
-              >
-                Trips
-              </Link>
-            ) : null}
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className={
-                  isMarketingHome
-                    ? "landing-nav-link"
-                    : quietChrome
-                      ? "nav-text-link"
-                      : "btn btn-secondary"
-                }
-              >
-                Sign out
-              </button>
-            </form>
-          </>
-        ) : (
-          <>
-            {!isPlan ? (
-              <Link
-                className={
-                  isMarketingHome
-                    ? "landing-nav-link"
-                    : quietChrome
-                      ? "nav-text-link"
-                      : "btn btn-secondary"
-                }
-                href="/plan"
-              >
-                Plan a trip
-              </Link>
-            ) : null}
-            <Link
-              className={
-                isMarketingHome
-                  ? "landing-nav-link"
-                  : quietChrome
-                    ? "nav-text-link nav-text-link--emphasis"
-                    : "btn btn-primary"
-              }
-              href="/login"
-            >
-              Sign in
-            </Link>
-          </>
-        )}
-      </nav>
+            </>
+          )}
+        </nav>
+      )}
     </header>
   );
 }
