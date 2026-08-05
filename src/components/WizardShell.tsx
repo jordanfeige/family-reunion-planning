@@ -8,9 +8,10 @@ import { WizardIcon, type WizardIconName } from "@/components/wizard-icons";
 import {
   readWizardStep,
   subscribeWizardStep,
-  tripHubStepKey,
   writeWizardStep,
 } from "@/lib/wizardNav";
+
+export { tripHubStepKey } from "@/lib/wizardNav";
 
 export type WizardStepDef = {
   id: string;
@@ -103,6 +104,9 @@ export function WizardShell({
   function goTo(id: string) {
     if (!steps.some((s) => s.id === id)) return;
     writeWizardStep(storageKey, id);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }
 
   function goToPhase(phaseId: string) {
@@ -280,7 +284,7 @@ export function WizardShell({
         </div>
 
         <WizardFooter
-          revealed={revealed}
+          revealed={quiet ? true : revealed}
           isFirst={isFirst}
           isLast={isLast}
           onBack={goBack}
@@ -293,5 +297,3 @@ export function WizardShell({
     </div>
   );
 }
-
-export { tripHubStepKey };

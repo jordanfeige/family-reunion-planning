@@ -42,6 +42,15 @@ export function readWizardStep(storageKey: string, validIds: string[]): string {
 export function writeWizardStep(storageKey: string, stepId: string) {
   try {
     localStorage.setItem(storageKey, stepId);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("step") !== stepId) {
+      url.searchParams.set("step", stepId);
+      window.history.replaceState(
+        {},
+        "",
+        `${url.pathname}?${url.searchParams.toString()}${url.hash}`,
+      );
+    }
   } catch {
     /* private mode */
   }

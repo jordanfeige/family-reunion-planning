@@ -824,15 +824,6 @@ code {
     display: none;
   }
 
-  .topbar--trip-hub {
-    padding-top: 0.65rem;
-    padding-bottom: 0.65rem;
-  }
-
-  .topbar--trip-hub .brand span {
-    font-size: 1.1rem;
-  }
-
   .action-stack .btn {
     border-radius: var(--radius-md);
   }
@@ -2446,14 +2437,14 @@ code {
   }
 }
 
-/* Trip hub — landing-aligned (aurora hero → light content) */
-.site-chrome--trip-hub {
+/* Trip hub — quiet app shell (matches dashboard / plan) */
+.site-chrome--app {
   min-height: 100dvh;
-  background: linear-gradient(180deg, #e8eef4 0%, var(--color-mist) 28%, var(--color-snow) 55%);
+  background: linear-gradient(180deg, #e8eef4 0%, var(--color-mist) 32%, var(--color-snow) 62%);
 }
 
-.site-chrome--trip-hub main {
-  min-height: 100dvh;
+.site-chrome--app main {
+  min-height: 0;
 }
 
 .trip-hub-page {
@@ -2461,47 +2452,17 @@ code {
   max-width: none;
 }
 
-.trip-hub-hero {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  margin: 0;
-  padding:
-    max(1rem, env(safe-area-inset-top, 0px))
-    1.25rem
-    2.25rem;
-  color: var(--color-snow);
-  background:
-    radial-gradient(700px 340px at 16% 10%, rgba(94, 234, 212, 0.26), transparent 55%),
-    radial-gradient(560px 300px at 92% 0%, rgba(212, 90, 58, 0.2), transparent 50%),
-    radial-gradient(640px 380px at 50% 120%, rgba(42, 85, 128, 0.4), transparent 55%),
-    linear-gradient(165deg, #0f1722 0%, #1c3d5a 48%, #2a5580 78%, #3d4f63 100%);
-}
-
-.trip-hub-hero-glow {
-  position: absolute;
-  inset: -30% -15%;
-  background:
-    radial-gradient(circle at 28% 40%, rgba(94, 234, 212, 0.12), transparent 42%),
-    radial-gradient(circle at 72% 28%, rgba(232, 120, 92, 0.1), transparent 36%);
-  pointer-events: none;
-  z-index: 0;
-  animation: landing-glow-drift 14s ease-in-out infinite alternate;
-}
-
-.trip-hub-hero-inner {
-  position: relative;
-  z-index: 1;
-  width: min(40rem, 100%);
+.trip-hub-header {
+  width: min(48rem, 100%);
   margin: 0 auto;
+  padding: 0.35rem 1.25rem 0.85rem;
 }
 
-.trip-hub-hero-top {
+.trip-hub-header-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 1.75rem;
 }
 
 .trip-hub-menu-btn {
@@ -2509,21 +2470,22 @@ code {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.65rem;
-  height: 2.65rem;
+  width: 2.5rem;
+  height: 2.5rem;
   padding: 0;
-  border: none;
+  border: 1px solid rgba(28, 61, 90, 0.14);
   border-radius: 999px;
-  background: rgba(246, 244, 239, 0.08);
+  background: rgba(255, 255, 255, 0.72);
   cursor: pointer;
 }
 
 .trip-hub-menu-btn:hover {
-  background: rgba(246, 244, 239, 0.16);
+  background: #fff;
+  border-color: rgba(28, 61, 90, 0.22);
 }
 
 .trip-hub-menu-btn:focus-visible {
-  outline: 2px solid var(--color-aurora);
+  outline: 2px solid var(--color-fjord);
   outline-offset: 2px;
 }
 
@@ -2531,35 +2493,28 @@ code {
   display: block;
   width: 1.05rem;
   height: 2px;
-  background: rgba(246, 244, 239, 0.92);
+  background: var(--color-fjord);
   box-shadow:
-    0 -5px 0 rgba(246, 244, 239, 0.92),
-    0 5px 0 rgba(246, 244, 239, 0.92);
-}
-
-.trip-hub-hero-copy {
-  text-align: center;
-  padding-bottom: 0.35rem;
+    0 -5px 0 var(--color-fjord),
+    0 5px 0 var(--color-fjord);
 }
 
 .trip-hub-title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(2.1rem, 7vw, 3.1rem);
+  font-size: clamp(1.65rem, 4vw, 2rem);
   font-weight: 600;
   letter-spacing: -0.03em;
-  color: var(--color-snow);
-  line-height: 1.08;
+  color: var(--color-fjord);
+  line-height: 1.15;
 }
 
 .trip-hub-tagline {
-  margin: 0.75rem auto 0;
-  max-width: 28rem;
-  font-family: var(--font-display);
-  font-size: clamp(1.05rem, 2.8vw, 1.3rem);
-  font-weight: 500;
-  line-height: 1.4;
-  color: rgba(246, 244, 239, 0.88);
+  margin: 0.35rem 0 0;
+  max-width: 32rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--color-slate);
 }
 
 .trip-hub-slug {
@@ -2567,17 +2522,15 @@ code {
 }
 
 .trip-hub-role-pill {
-  margin-top: 0.75rem;
+  margin-top: 0.55rem;
   font-size: 0.72rem;
-  background: rgba(246, 244, 239, 0.14);
-  color: rgba(246, 244, 239, 0.92);
 }
 
 .trip-hub-body {
   width: min(48rem, 100%);
-  margin: -1.75rem auto 0;
+  margin: 0 auto;
   position: relative;
-  z-index: 2;
+  z-index: 1;
   padding: 0 1.25rem calc(3.5rem + env(safe-area-inset-bottom, 0px));
 }
 
@@ -4997,6 +4950,3 @@ code {
   max-height: min(55vh, 26rem);
 }
 
-.topbar--trip-hub {
-  padding: 0.55rem 0;
-}
