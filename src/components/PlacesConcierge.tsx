@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useChat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
@@ -10,12 +10,15 @@ import {
 } from "ai";
 import { useRouter } from "next/navigation";
 
-import { publishPlacesDraftAction } from "@/app/actions/trips";
+import {
+  addLocationOptionAction,
+  publishPlacesDraftAction,
+} from "@/app/actions/trips";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
 import { CopyButton } from "@/components/CopyButton";
 import { ManualAddDrawer } from "@/components/ManualAddDrawer";
-import { addLocationOptionAction } from "@/app/actions/trips";
+import { queueTrailBeat } from "@/components/TrailBeat";
 import {
   normalizePlacesDraft,
   placesDraftSchema,
@@ -72,6 +75,7 @@ export function PlacesConcierge({
   initialMessages = [],
   aiEnabled,
   surveyUrl,
+  basicsSlot,
 }: {
   slug: string;
   tripName: string;
@@ -79,175 +83,169 @@ export function PlacesConcierge({
   initialMessages?: UIMessage[];
   aiEnabled: boolean;
   surveyUrl?: string;
+  basicsSlot?: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
   const router = useRouter();
+  const [refining, setRefining] = useState(locations.length === 0 && aiEnabled);
 
-  return (
-    <div className="places-concierge">
-      {locations.length === 0 ? (
-        <div className="places-concierge-empty">
-          <div className="places-concierge-empty-art" aria-hidden>
-            <span />
-          </div>
-          <p className="places-concierge-empty-title">
-            Choose survey destinations with WandrAI
-          </p>
-          <p className="muted places-concierge-empty-copy">
-            Share a few preferences and WandrAI will suggest places your group can vote on.
-          </p>
-          <button
-            type="button"
-            className="btn btn-berry places-concierge-cta"
-            onClick={() => setOpen(true)}
-            disabled={!aiEnabled}
-          >
-            Plan places with WandrAI
-          </button>
-          {!aiEnabled ? (
-            <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.88rem" }}>
-              AI needs an API key. You can still add places manually below.
+  useEffect(() => {
+    if (locations.length === 0 && aiEnabled) setRefining(true);
+  }, [locations.length, aiEnabled]);
+
+  if (!refining && locations.length > 0) {
+    return (
+      <div className="places-fullpage">
+        <header className="hub-workspace-head">
+          <div>
+            <h2 className="hub-workspace-title">Destinations</h2>
+            <p className="hub-workspace-lede">
+              Shortlist published — refine anytime, then share the survey.
             </p>
-          ) : null}
-          <div className="places-concierge-manual">
-            <ManualAddOnly slug={slug} />
           </div>
+        </header>
+        {basicsSlot}
+        <div className="places-published-banner">
+          <p className="places-published-title">Shortlist published</p>
+          <p className="muted" style={{ margin: "0.25rem 0 0" }}>
+            {locations.length} place{locations.length === 1 ? "" : "s"} on the
+            survey.
+          </p>
         </div>
-      ) : (
-        <div className="places-concierge-ready">
-          <div className="places-published-banner">
-            <p className="places-published-title">Shortlist published</p>
-            <p className="muted" style={{ margin: "0.25rem 0 0" }}>
-              {locations.length} place{locations.length === 1 ? "" : "s"} on the survey — your
-              group can vote.
-            </p>
-          </div>
-          <ul className="places-ready-list" aria-label="Places">
-            {locations.map((loc, i) => (
-              <li key={loc.id}>
-                <span className="places-ready-num">{i + 1}</span>
-                <span>
-                  <strong>{formatLocationLabel(loc)}</strong>
-                  {loc.summary ? (
-                    <span className="muted places-ready-summary">{loc.summary}</span>
-                  ) : null}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="places-concierge-ready-actions">
-            {surveyUrl ? (
-              <CopyButton
-                text={surveyUrl}
-                label="Copy survey link"
-                className="btn-berry"
-              />
-            ) : (
-              <button
-                type="button"
-                className="btn btn-berry"
-                onClick={() => goToTripHubStep(slug, "survey")}
-              >
-                Open survey
-              </button>
-            )}
+        <ul className="places-ready-list" aria-label="Places">
+          {locations.map((loc, i) => (
+            <li key={loc.id}>
+              <span className="places-ready-num">{i + 1}</span>
+              <span>
+                <strong>{formatLocationLabel(loc)}</strong>
+                {loc.summary ? (
+                  <span className="muted places-ready-summary">{loc.summary}</span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="places-concierge-ready-actions">
+          {surveyUrl ? (
+            <CopyButton text={surveyUrl} label="Copy survey link" className="btn-berry" />
+          ) : (
             <button
               type="button"
-              className="btn btn-secondary"
-              onClick={() => setOpen(true)}
-              disabled={!aiEnabled}
+              className="btn btn-berry"
+              onClick={() => goToTripHubStep(slug, "survey")}
             >
-              Refine with WandrAI
+              Open survey
             </button>
-          </div>
-          {surveyUrl ? (
-            <p className="places-ready-survey-link">
-              <button type="button" onClick={() => goToTripHubStep(slug, "survey")}>
-                Open survey step
-              </button>
-            </p>
-          ) : null}
-          <ManualAddOnly slug={slug} />
+          )}
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setRefining(true)}
+            disabled={!aiEnabled}
+          >
+            Refine with WandrAI
+          </button>
         </div>
-      )}
+        <ManualAddOnly slug={slug} />
+      </div>
+    );
+  }
 
-      <PlacesConciergeSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        slug={slug}
-        tripName={tripName}
-        initialMessages={initialMessages}
-        seedPlaces={locations.map((l) => ({
-          title: l.title,
-          summary: l.summary,
-          selected: true,
-        }))}
-        onPublished={() => {
-          setOpen(false);
-          goToTripHubStep(slug, "survey");
-          router.refresh();
-        }}
-      />
+  return (
+    <div className="places-fullpage">
+      <header className="hub-workspace-head">
+        <div>
+          <h2 className="hub-workspace-title">Destinations</h2>
+          <p className="hub-workspace-lede">
+            Chat with WandrAI to build destinations your family can vote on.
+          </p>
+        </div>
+      </header>
+      {basicsSlot}
+      {!aiEnabled ? (
+        <p className="muted" style={{ marginBottom: "1rem" }}>
+          AI needs an API key. Add places manually below.
+        </p>
+      ) : null}
+      {aiEnabled ? (
+        <PlacesFullPlanner
+          slug={slug}
+          tripName={tripName}
+          initialMessages={initialMessages}
+          seedPlaces={locations.map((l) => ({
+            title: l.title,
+            summary: l.summary,
+            selected: true,
+          }))}
+          onPublished={(names) => {
+            queueTrailBeat(slug, "shortlist", names.join("|"));
+            goToTripHubStep(slug, "survey");
+            router.refresh();
+          }}
+          onCancelRefine={
+            locations.length > 0 ? () => setRefining(false) : undefined
+          }
+        />
+      ) : null}
+      <ManualAddOnly slug={slug} />
     </div>
   );
 }
 
 function ManualAddOnly({ slug }: { slug: string }) {
   return (
-    <ManualAddDrawer title="Add location" triggerLabel="Add manually">
-      {({ close }) => (
-        <form
-          className="stack"
-          action={async (formData) => {
-            await addLocationOptionAction(formData);
-            close();
-          }}
-        >
-          <input type="hidden" name="slug" value={slug} />
-          <div className="field">
-            <label htmlFor="loc_title_concierge">Destination name</label>
-            <input
-              id="loc_title_concierge"
-              name="title"
-              required
-              placeholder="Lake Tahoe or Outer Banks"
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="loc_summary_concierge">Short pitch (optional)</label>
-            <input
-              id="loc_summary_concierge"
-              name="summary"
-              placeholder="Easy flights, great food, mild weather"
-            />
-          </div>
-          <button type="submit" className="btn btn-berry" style={{ alignSelf: "flex-start" }}>
-            Add to survey
-          </button>
-        </form>
-      )}
-    </ManualAddDrawer>
+    <div className="places-fullpage-manual">
+      <ManualAddDrawer title="Add location" triggerLabel="Add manually">
+        {({ close }) => (
+          <form
+            className="stack"
+            action={async (formData) => {
+              await addLocationOptionAction(formData);
+              close();
+            }}
+          >
+            <input type="hidden" name="slug" value={slug} />
+            <div className="field">
+              <label htmlFor="loc_title_concierge">Destination name</label>
+              <input
+                id="loc_title_concierge"
+                name="title"
+                required
+                placeholder="Lake Tahoe or Outer Banks"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="loc_summary_concierge">Short pitch (optional)</label>
+              <input
+                id="loc_summary_concierge"
+                name="summary"
+                placeholder="Easy flights, great food, mild weather"
+              />
+            </div>
+            <button type="submit" className="btn btn-berry" style={{ alignSelf: "flex-start" }}>
+              Add to survey
+            </button>
+          </form>
+        )}
+      </ManualAddDrawer>
+    </div>
   );
 }
 
-function PlacesConciergeSheet({
-  open,
-  onClose,
+function PlacesFullPlanner({
   slug,
   tripName,
   initialMessages,
   seedPlaces,
   onPublished,
+  onCancelRefine,
 }: {
-  open: boolean;
-  onClose: () => void;
   slug: string;
   tripName: string;
   initialMessages: UIMessage[];
   seedPlaces: PlacesDraftItem[];
-  onPublished: () => void;
+  onPublished: (names: string[]) => void;
+  onCancelRefine?: () => void;
 }) {
-  const titleId = useId();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [draftText, setDraftText] = useState("");
   const [unchecked, setUnchecked] = useState<Record<string, true>>({});
@@ -286,30 +284,13 @@ function PlacesConciergeSheet({
   const streamingAssistant =
     busy && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const userTurns = messages.filter((m) => m.role === "user").length;
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = prev;
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, onClose]);
+  const selected = places.filter((p) => p.selected !== false);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [messages, streamingAssistant]);
-
-  if (!open) return null;
-
-  const selected = places.filter((p) => p.selected !== false);
 
   function publish() {
     if (selected.length === 0) {
@@ -323,7 +304,7 @@ function PlacesConciergeSheet({
           slug,
           selected.map((p) => ({ title: p.title, summary: p.summary })),
         );
-        onPublished();
+        onPublished(selected.map((p) => p.title));
       } catch (err) {
         setPublishError(err instanceof Error ? err.message : "Could not publish places.");
       }
@@ -331,153 +312,137 @@ function PlacesConciergeSheet({
   }
 
   return (
-    <div className="create-trip-root places-sheet-root" role="presentation">
-      <button
-        type="button"
-        className="create-trip-backdrop"
-        aria-label="Close"
-        onClick={onClose}
-      />
-      <div
-        className="places-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-      >
-        <header className="places-sheet-header">
-          <div>
-            <p className="places-sheet-eyebrow">WandrAI Concierge</p>
-            <h2 id={titleId} className="places-sheet-title">
-              Plan places
-            </h2>
-          </div>
-          <button type="button" className="places-sheet-close" aria-label="Close" onClick={onClose}>
-            ×
+    <div className="places-fullpage-planner">
+      {error || publishError ? (
+        <div className="error-banner">
+          {publishError ?? error?.message}
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ marginLeft: "0.75rem" }}
+            onClick={() => {
+              setPublishError(null);
+              clearError();
+            }}
+          >
+            Dismiss
           </button>
-        </header>
+        </div>
+      ) : null}
 
-        <div className="places-sheet-grid">
-          <section className="places-sheet-chat" aria-label="WandrAI chat">
-            {error || publishError ? (
-              <div className="error-banner">
-                {publishError ?? error?.message}
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  style={{ marginLeft: "0.75rem" }}
-                  onClick={() => {
-                    setPublishError(null);
-                    clearError();
-                  }}
-                >
-                  Dismiss
-                </button>
-              </div>
+      <div className="places-fullpage-grid">
+        <section className="places-sheet-chat" aria-label="WandrAI chat">
+          <div className="places-chat-pane places-chat-pane--embedded">
+            <div className="places-chat-scroll" ref={scrollRef}>
+              {messages.map((message) => (
+                <ChatBubble
+                  key={message.id}
+                  message={message}
+                  streaming={message.id === streamingAssistant}
+                />
+              ))}
+            </div>
+            <ChatComposer
+              id={`places-chat-${slug}`}
+              placeholder={
+                userTurns === 0
+                  ? "e.g. lakes and mountains in the Midwest"
+                  : "Message WandrAI…"
+              }
+              value={draftText}
+              busy={busy || pending}
+              compact
+              onChange={setDraftText}
+              onSubmit={async () => {
+                const text = draftText.trim();
+                if (!text || busy) return;
+                setDraftText("");
+                setIgnoreChatDraft(false);
+                await sendMessage({ text });
+              }}
+            />
+          </div>
+        </section>
+
+        <aside className="places-sheet-draft places-sheet-draft--embedded" aria-label="Survey destinations draft">
+          <div className="places-draft-head">
+            <p className="create-trip-draft-eyebrow">Survey destinations</p>
+            {places.length > 0 ? (
+              <span className="places-draft-live">Live draft</span>
             ) : null}
-
-            <div className="places-chat-pane">
-              <div className="places-chat-scroll" ref={scrollRef}>
-                {messages.map((message) => (
-                  <ChatBubble
-                    key={message.id}
-                    message={message}
-                    streaming={message.id === streamingAssistant}
-                  />
-                ))}
-              </div>
-              <ChatComposer
-                id={`places-chat-${slug}`}
-                placeholder={
-                  userTurns === 0
-                    ? "e.g. lakes and mountains in the Midwest"
-                    : "Message WandrAI…"
-                }
-                value={draftText}
-                busy={busy || pending}
-                compact
-                onChange={setDraftText}
-                onSubmit={async () => {
-                  const text = draftText.trim();
-                  if (!text || busy) return;
-                  setDraftText("");
-                  setIgnoreChatDraft(false);
-                  await sendMessage({ text });
-                }}
-              />
-            </div>
-          </section>
-
-          <aside className="places-sheet-draft" aria-label="Survey destinations draft">
-            <div className="places-draft-head">
-              <p className="create-trip-draft-eyebrow">Survey destinations</p>
-              {places.length > 0 ? (
-                <span className="places-draft-live">Live draft</span>
-              ) : null}
-            </div>
-            <p className="muted places-draft-sub">
-              These places will appear in your survey for group feedback.
+          </div>
+          <p className="muted places-draft-sub">
+            Check the ones that feel right, then publish to the survey.
+          </p>
+          {places.length === 0 ? (
+            <p className="muted" style={{ margin: "0.75rem 0 0", fontSize: "0.9rem", lineHeight: 1.5 }}>
+              As you chat, places show up here.
             </p>
-            {places.length === 0 ? (
-              <p className="muted" style={{ margin: "0.75rem 0 0", fontSize: "0.9rem", lineHeight: 1.5 }}>
-                As you chat, places show up here. Check the ones to publish.
-              </p>
-            ) : (
-              <ul className="places-draft-list">
-                {places.map((place) => {
-                  const key = place.title.trim().toLowerCase();
-                  const checked = place.selected !== false;
-                  return (
-                    <li key={place.title}>
-                      <label className="places-draft-item">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            setUnchecked((prev) => {
-                              const next = { ...prev };
-                              if (checked) next[key] = true;
-                              else delete next[key];
-                              return next;
-                            });
-                          }}
-                        />
-                        <span>
-                          <strong>{place.title}</strong>
-                          {place.summary ? (
-                            <span className="muted places-draft-summary">{place.summary}</span>
-                          ) : null}
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+          ) : (
+            <ul className="places-draft-list">
+              {places.map((place) => {
+                const key = place.title.trim().toLowerCase();
+                const checked = place.selected !== false;
+                return (
+                  <li key={place.title}>
+                    <label className="places-draft-item">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setUnchecked((prev) => {
+                            const next = { ...prev };
+                            if (checked) next[key] = true;
+                            else delete next[key];
+                            return next;
+                          });
+                        }}
+                      />
+                      <span>
+                        <strong>{place.title}</strong>
+                        {place.summary ? (
+                          <span className="muted places-draft-summary">{place.summary}</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-            <button
-              type="button"
-              className="btn btn-berry places-publish-btn"
-              disabled={pending || selected.length === 0}
-              onClick={publish}
-            >
-              {pending
-                ? "Publishing…"
-                : `Publish to survey${selected.length ? ` (${selected.length})` : ""}`}
-            </button>
+          <button
+            type="button"
+            className="btn btn-berry places-publish-btn"
+            disabled={pending || selected.length === 0}
+            onClick={publish}
+          >
+            {pending
+              ? "Publishing…"
+              : `These feel right${selected.length ? ` (${selected.length})` : ""}`}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm places-restart-btn"
+            disabled={busy}
+            onClick={() => {
+              setMessages([starterMessage(tripName)]);
+              setUnchecked({});
+              setIgnoreChatDraft(true);
+            }}
+          >
+            Restart chat
+          </button>
+          {onCancelRefine ? (
             <button
               type="button"
               className="btn btn-secondary btn-sm places-restart-btn"
-              disabled={busy}
-              onClick={() => {
-                setMessages([starterMessage(tripName)]);
-                setUnchecked({});
-                setIgnoreChatDraft(true);
-              }}
+              onClick={onCancelRefine}
             >
-              Restart chat
+              Cancel refine
             </button>
-          </aside>
-        </div>
+          ) : null}
+        </aside>
       </div>
     </div>
   );

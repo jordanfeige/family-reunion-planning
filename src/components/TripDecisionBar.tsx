@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { updateTripPlanContextAction } from "@/app/actions/trips";
 import { CompactSelect } from "@/components/CompactSelect";
+import { queueTrailBeat } from "@/components/TrailBeat";
 import {
   aggregateLocationAvailability,
   aggregateWeekendAvailability,
@@ -11,6 +13,8 @@ import {
   type SurveyResponseRow,
 } from "@/lib/availability";
 import type { LocationOption } from "@/lib/locations";
+import { findLocationById } from "@/lib/locations";
+import { goToTripHubStep } from "@/lib/wizardNav";
 import { filterValidFridays, formatWeekendLabel } from "@/lib/weekends";
 
 export function TripDecisionBar({
@@ -21,6 +25,7 @@ export function TripDecisionBar({
   selectedLocationId,
   selectedWeekendFriday,
   planHeadcount,
+  celebrate = false,
 }: {
   slug: string;
   locations: LocationOption[];
@@ -29,7 +34,11 @@ export function TripDecisionBar({
   selectedLocationId: string | null;
   selectedWeekendFriday: string | null;
   planHeadcount: number | null;
+  /** When true, saving a full place+weekend queues the We’re going beat. */
+  celebrate?: boolean;
 }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const locationVotes = aggregateLocationAvailability(locations, responses);
   const weekendVotes = aggregateWeekendAvailability(weekendSlots, responses);
   const defaultHeadcount =
@@ -60,11 +69,33 @@ export function TripDecisionBar({
   ];
 
   return (
-    <form action={updateTripPlanContextAction} className="stack plan-context-form">
+    <form
+      className="stack plan-context-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const data = new FormData(form);
+        startTransition(async () => {
+          await updateTripPlanContextAction(data);
+          const loc = String(data.get("selected_location_id") ?? "").trim();
+          const weekend = String(data.get("selected_weekend_friday") ?? "").trim();
+          const changed =
+            loc !== (selectedLocationId ?? "") ||
+            weekend !== (selectedWeekendFriday ?? "");
+          if (celebrate && loc && weekend && (changed || !selectedLocationId || !selectedWeekendFriday)) {
+            const title = findLocationById(locations, loc)?.title ?? "Your destination";
+            const label = formatWeekendLabel(weekend);
+            queueTrailBeat(slug, "decision", `${title}|${label}`);
+            goToTripHubStep(slug, "weekend");
+          }
+          router.refresh();
+        });
+      }}
+    >
       <input type="hidden" name="slug" value={slug} />
       <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-        Lock the location and weekend for your day-by-day itinerary. RSVP counts
-        are shown as hints.
+        Soft-lock the location and weekend for your day-by-day itinerary. You can
+        change them later. RSVP counts are shown as hints.
       </p>
       <div className="grid-2">
         <div className="field">
@@ -100,8 +131,8 @@ export function TripDecisionBar({
           />
         </div>
       </div>
-      <button type="submit" className="btn btn-primary btn-block-sm">
-        Save location &amp; weekend
+      <button type="submit" className="btn btn-berry btn-block-sm" disabled={pending}>
+        {pending ? "Saving…" : "Save location & weekend"}
       </button>
     </form>
   );

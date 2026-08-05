@@ -1,170 +1,82 @@
 "use client";
 
-import { WizardShell, type WizardPhaseDef, type WizardStepDef } from "@/components/WizardShell";
+import { WizardShell, type WizardStepDef } from "@/components/WizardShell";
 
 export type TripHubCompletion = {
-  basics: boolean;
-  locations: boolean;
+  destinations: boolean;
   survey: boolean;
-  ballot: boolean;
-  blueprint: boolean;
-  budget: boolean;
-  confirmations: boolean;
-  gallery: boolean;
-};
-
-export type TripHubPhaseSummaries = {
-  decide?: string;
-  shape?: string;
-  gather?: string;
+  decision: boolean;
+  weekend: boolean;
+  share: boolean;
 };
 
 export function TripHubWizard({
   slug,
   completion,
-  galleryUnlocked,
-  phaseSummaries,
   initialStepId,
-  basics,
-  locations,
+  destinations,
   survey,
-  ballot,
-  blueprint,
-  budget,
-  confirmations,
-  gallery,
+  decision,
+  weekend,
+  share,
 }: {
   slug: string;
   completion: TripHubCompletion;
-  galleryUnlocked: boolean;
-  phaseSummaries?: TripHubPhaseSummaries;
   initialStepId?: string;
-  basics: React.ReactNode;
-  locations: React.ReactNode;
+  destinations: React.ReactNode;
   survey: React.ReactNode;
-  ballot: React.ReactNode;
-  blueprint: React.ReactNode;
-  budget: React.ReactNode;
-  confirmations: React.ReactNode;
-  gallery: React.ReactNode;
+  decision: React.ReactNode;
+  weekend: React.ReactNode;
+  share: React.ReactNode;
 }) {
-  const phases: WizardPhaseDef[] = [
-    {
-      id: "decide",
-      label: "Decide",
-      summary: phaseSummaries?.decide,
-    },
-    {
-      id: "shape",
-      label: "Shape",
-      summary: phaseSummaries?.shape,
-    },
-    {
-      id: "gather",
-      label: "Gather",
-      summary: phaseSummaries?.gather,
-      muted: !galleryUnlocked,
-    },
-  ];
-
   const steps: WizardStepDef[] = [
     {
-      id: "basics",
-      phaseId: "decide",
-      label: "Trip basics",
-      shortLabel: "Basics",
-      icon: "basics",
-      description:
-        "Pick Fri–Sun weekends for the family survey.",
-      complete: completion.basics,
-      content: basics,
-    },
-    {
-      id: "locations",
-      phaseId: "decide",
-      label: "Places",
-      shortLabel: "Places",
-      icon: "locations",
-      description: "Destinations your family can vote on.",
-      complete: completion.locations,
-      content: locations,
+      id: "destinations",
+      label: "Destinations",
+      shortLabel: "Destinations",
+      description: "Chat with WandrAI to build a survey shortlist.",
+      complete: completion.destinations,
+      content: destinations,
     },
     {
       id: "survey",
-      phaseId: "decide",
       label: "Family survey",
       shortLabel: "Survey",
-      icon: "survey",
       description: "Share the link so family can weigh in.",
       complete: completion.survey,
       content: survey,
     },
     {
-      id: "ballot",
-      phaseId: "shape",
-      label: "Group vote",
-      shortLabel: "Vote",
-      icon: "ballot",
-      description:
-        "Lock where you’re going, add stays/meals/activities with AI, then let family thumbs-up or down each option.",
-      complete: completion.ballot,
-      content: ballot,
+      id: "decision",
+      label: "Decision",
+      shortLabel: "Decision",
+      description: "Lock place and weekend for the itinerary.",
+      complete: completion.decision,
+      content: decision,
     },
     {
-      id: "blueprint",
-      phaseId: "shape",
-      label: "Blueprint",
-      shortLabel: "Plan",
-      icon: "blueprint",
-      description:
-        "Build your Fri–Sun itinerary from the winning picks and publish the plan.",
-      complete: completion.blueprint,
-      content: blueprint,
+      id: "weekend",
+      label: "Weekend plan",
+      shortLabel: "Weekend",
+      description: "Generate and publish the Fri–Sun itinerary.",
+      complete: completion.weekend,
+      content: weekend,
     },
     {
-      id: "budget",
-      phaseId: "gather",
-      label: "Budget",
-      shortLabel: "Budget",
-      icon: "budget",
-      description:
-        "Log shared costs, track who paid in, and see an even split estimate per confirmed household.",
-      complete: completion.budget,
-      content: budget,
-    },
-    {
-      id: "confirmations",
-      phaseId: "gather",
-      label: "Confirmations",
-      shortLabel: "RSVP",
-      icon: "share",
-      description: galleryUnlocked
-        ? "Share the published plan link and track final yes/no RSVPs."
-        : "Publish your plan in Blueprint first, then share the link for final RSVPs.",
-      complete: completion.confirmations,
-      content: confirmations,
-    },
-    {
-      id: "gallery",
-      phaseId: "gather",
-      label: "Gallery & memories",
-      shortLabel: "Photos",
-      icon: "gallery",
-      description: galleryUnlocked
-        ? "Upload photos and videos after the trip."
-        : "Opens after you publish the plan—save memories from the reunion here.",
-      complete: completion.gallery,
-      content: gallery,
+      id: "share",
+      label: "Share & RSVP",
+      shortLabel: "Share",
+      description: "Share the live plan and track RSVPs.",
+      complete: completion.share,
+      content: share,
     },
   ];
 
   return (
     <WizardShell
       storageKey={`trip-hub-step-${slug}`}
-      phases={phases}
       steps={steps}
       initialStepId={initialStepId}
-      quiet
       lastStepLabel="Back to start"
     />
   );

@@ -1,4 +1,6 @@
-/** Shared trip-hub wizard step navigation (localStorage-backed). */
+/** Shared trip-hub trail navigation (localStorage + URL ?stop=). */
+
+import { normalizeTrailStopId } from "@/lib/trailStops";
 
 const listeners = new Map<string, Set<() => void>>();
 
@@ -26,12 +28,18 @@ export function readWizardStep(storageKey: string, validIds: string[]): string {
   if (validIds.length === 0) return "";
   try {
     const params = new URLSearchParams(window.location.search);
-    const fromUrl = params.get("step");
-    if (fromUrl && validIds.includes(fromUrl)) {
-      localStorage.setItem(storageKey, fromUrl);
-      return fromUrl;
+    const fromStop = normalizeTrailStopId(params.get("stop"));
+    if (fromStop && validIds.includes(fromStop)) {
+      localStorage.setItem(storageKey, fromStop);
+      return fromStop;
     }
-    const saved = localStorage.getItem(storageKey);
+    const fromStep = normalizeTrailStopId(params.get("step"));
+    if (fromStep && validIds.includes(fromStep)) {
+      localStorage.setItem(storageKey, fromStep);
+      return fromStep;
+    }
+    const savedRaw = localStorage.getItem(storageKey);
+    const saved = normalizeTrailStopId(savedRaw) ?? savedRaw;
     if (saved && validIds.includes(saved)) return saved;
   } catch {
     /* private mode */
@@ -43,21 +51,23 @@ export function writeWizardStep(storageKey: string, stepId: string) {
   try {
     localStorage.setItem(storageKey, stepId);
     const url = new URL(window.location.href);
-    if (url.searchParams.get("step") !== stepId) {
-      url.searchParams.set("step", stepId);
-      window.history.replaceState(
-        {},
-        "",
-        `${url.pathname}?${url.searchParams.toString()}${url.hash}`,
-      );
+    url.searchParams.delete("step");
+    if (url.searchParams.get("stop") !== stepId) {
+      url.searchParams.set("stop", stepId);
     }
+    const qs = url.searchParams.toString();
+    window.history.replaceState(
+      {},
+      "",
+      qs ? `${url.pathname}?${qs}${url.hash}` : `${url.pathname}${url.hash}`,
+    );
   } catch {
     /* private mode */
   }
   emitWizardStep(storageKey);
 }
 
-/** Jump the hub wizard to a step (e.g. after publishing places → survey). */
+/** Jump the hub wizard to a trail stop (e.g. after publishing places → survey). */
 export function goToTripHubStep(slug: string, stepId: string) {
   writeWizardStep(tripHubStepKey(slug), stepId);
 }

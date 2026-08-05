@@ -15,12 +15,14 @@ import {
   type PlannerOption,
 } from "@/components/ItineraryBlockCard";
 import { ShareLinkCard } from "@/components/ShareLinkCard";
+import { queueTrailBeat } from "@/components/TrailBeat";
 import { TripItineraryChat } from "@/components/TripItineraryChat";
 import {
   getBookingBlocks,
   normalizeItinerary,
   type DayKey,
 } from "@/lib/itinerary";
+import { goToTripHubStep } from "@/lib/wizardNav";
 
 export function TripItineraryPanel({
   slug,
@@ -32,6 +34,7 @@ export function TripItineraryPanel({
   isPublished,
   planners,
   initialChatByDay = {},
+  lockedChip,
 }: {
   slug: string;
   tripName: string;
@@ -42,6 +45,7 @@ export function TripItineraryPanel({
   isPublished: boolean;
   planners: PlannerOption[];
   initialChatByDay?: Partial<Record<DayKey, UIMessage[]>>;
+  lockedChip?: string | null;
 }) {
   const router = useRouter();
   const itinerary = normalizeItinerary(itineraryRaw, selectedWeekendFriday);
@@ -90,13 +94,18 @@ export function TripItineraryPanel({
   if (!hasPlanContext) {
     return (
       <p className="muted" style={{ margin: 0 }}>
-        Select a location and weekend above, then generate your Fri–Sun itinerary.
+        Save a location and weekend on Decision, then generate your Fri–Sun itinerary.
       </p>
     );
   }
 
   return (
-    <div className="stack">
+    <div className={`stack${hasBlocks ? " itinerary-reveal" : ""}`}>
+      {lockedChip ? (
+        <p className="trail-locked-chip" aria-label="Locked plan context">
+          {lockedChip}
+        </p>
+      ) : null}
       <div className="action-stack" aria-label="Itinerary actions">
         <p className="action-stack-caption">Itinerary</p>
         <button
@@ -117,7 +126,12 @@ export function TripItineraryPanel({
               setStatus(null);
               try {
                 await publishItineraryAction(slug);
-                setStatus("Published! Family can view the plan at your share link.");
+                if (!isPublished) {
+                  queueTrailBeat(slug, "plan");
+                  goToTripHubStep(slug, "share");
+                } else {
+                  setStatus("Published plan updated.");
+                }
                 router.refresh();
               } catch (err) {
                 setStatus(err instanceof Error ? err.message : "Could not publish.");
@@ -157,7 +171,7 @@ export function TripItineraryPanel({
         <ShareLinkCard
           url={shareUrl}
           title="Live for family"
-          hint="Same link as Confirmations. Re-publish after edits to update what they see."
+          hint="Same link as Share. Re-publish after edits to update what they see."
         />
       ) : hasBlocks ? (
         <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
