@@ -92,10 +92,10 @@ export function TripHubWizard({
     {
       id: "survey",
       phaseId: "decide",
-      label: "Survey",
+      label: "Family survey",
       shortLabel: "Survey",
       icon: "survey",
-      description: "Send the link — family picks weekends and places.",
+      description: "Share this survey with your family to gather input and preferences.",
       complete: completion.survey,
       content: survey,
     },

@@ -4,8 +4,8 @@ import { CopyButton } from "@/components/CopyButton";
 
 export function ShareLinkCard({
   url,
-  title = "Family plan link",
-  hint,
+  title = "Share link",
+  hint = "Anyone with the link can respond.",
   previewHref,
 }: {
   url: string;
@@ -16,27 +16,20 @@ export function ShareLinkCard({
   return (
     <div className="share-link-card">
       <p className="share-link-card-title">{title}</p>
-      <p className="share-link-card-url" title={url}>
-        {url}
-      </p>
-      <div className="share-link-card-actions">
-        <CopyButton text={url} label="Copy" className="btn-sm" />
-        {previewHref ? (
-          <Link
-            className="btn btn-secondary btn-sm"
-            href={previewHref}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Preview
-          </Link>
-        ) : (
-          <a className="btn btn-secondary btn-sm" href={url} target="_blank" rel="noreferrer">
-            Open
-          </a>
-        )}
+      <div className="share-link-row">
+        <p className="share-link-card-url" title={url}>
+          {url}
+        </p>
+        <CopyButton text={url} label="Copy" className="btn-primary btn-sm share-link-copy" />
       </div>
-      {hint ? <p className="muted share-link-card-hint">{hint}</p> : null}
+      <p className="muted share-link-card-hint">{hint}</p>
+      {previewHref ? (
+        <p style={{ margin: "0.65rem 0 0" }}>
+          <Link href={previewHref} target="_blank" rel="noreferrer">
+            Preview survey
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

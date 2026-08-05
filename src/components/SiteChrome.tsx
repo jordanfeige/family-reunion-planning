@@ -15,12 +15,21 @@ export function SiteChrome({
 }) {
   const pathname = usePathname();
   const isMarketingHome = pathname === "/";
+  const isTripHub = pathname?.startsWith("/t/");
 
   return (
-    <div className={isMarketingHome ? "site-chrome site-chrome--marketing" : "site-chrome"}>
-      <SiteHeader session={session} />
+    <div
+      className={[
+        "site-chrome",
+        isMarketingHome ? "site-chrome--marketing" : "",
+        isTripHub ? "site-chrome--trip-hub" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {isTripHub ? null : <SiteHeader session={session} />}
       <main>{children}</main>
-      {isMarketingHome ? null : (
+      {isMarketingHome || isTripHub ? null : (
         <footer className="shell footer muted">
           {APP_NAME} · {APP_TAGLINE}
         </footer>

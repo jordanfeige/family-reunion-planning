@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState, useTransition } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
 import { useChat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { publishPlacesDraftAction } from "@/app/actions/trips";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
+import { CopyButton } from "@/components/CopyButton";
 import { ManualAddDrawer } from "@/components/ManualAddDrawer";
 import { addLocationOptionAction } from "@/app/actions/trips";
 import {
@@ -58,7 +59,7 @@ function starterMessage(tripName: string): UIMessage {
     parts: [
       {
         type: "text",
-        text: `Any region you want near for “${tripName}”?`,
+        text: `Hi — I’ll help build survey destinations for “${tripName}.” What vibe are we going for?`,
       },
     ],
   };
@@ -70,12 +71,14 @@ export function PlacesConcierge({
   locations,
   initialMessages = [],
   aiEnabled,
+  surveyUrl,
 }: {
   slug: string;
   tripName: string;
   locations: LocationOption[];
   initialMessages?: UIMessage[];
   aiEnabled: boolean;
+  surveyUrl?: string;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -84,10 +87,14 @@ export function PlacesConcierge({
     <div className="places-concierge">
       {locations.length === 0 ? (
         <div className="places-concierge-empty">
-          <p className="places-concierge-empty-title">Choose survey destinations with WandrAI</p>
+          <div className="places-concierge-empty-art" aria-hidden>
+            <span />
+          </div>
+          <p className="places-concierge-empty-title">
+            Choose survey destinations with WandrAI
+          </p>
           <p className="muted places-concierge-empty-copy">
-            A short conversation picks places your family can vote on—then we take you to the
-            survey link.
+            Share a few preferences and WandrAI will suggest places your group can vote on.
           </p>
           <button
             type="button"
@@ -108,40 +115,58 @@ export function PlacesConcierge({
         </div>
       ) : (
         <div className="places-concierge-ready">
-          <div className="places-concierge-ready-header">
-            <div>
-              <p className="places-concierge-ready-count">
-                {locations.length} place{locations.length === 1 ? "" : "s"} on the survey
-              </p>
-              <p className="muted" style={{ margin: "0.25rem 0 0", fontSize: "0.88rem" }}>
-                Family will pick from these on the preference survey.
-              </p>
-            </div>
-            <div className="places-concierge-ready-actions">
-              <button
-                type="button"
-                className="btn btn-berry btn-sm"
-                onClick={() => {
-                  goToTripHubStep(slug, "survey");
-                }}
-              >
-                Go to survey
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setOpen(true)}
-                disabled={!aiEnabled}
-              >
-                Refine with WandrAI
-              </button>
-            </div>
+          <div className="places-published-banner">
+            <p className="places-published-title">Shortlist published</p>
+            <p className="muted" style={{ margin: "0.25rem 0 0" }}>
+              {locations.length} place{locations.length === 1 ? "" : "s"} on the survey — your
+              group can vote.
+            </p>
           </div>
-          <ul className="hub-survey-places places-ready-chips" aria-label="Places">
-            {locations.map((loc) => (
-              <li key={loc.id}>{formatLocationLabel(loc)}</li>
+          <ul className="places-ready-list" aria-label="Places">
+            {locations.map((loc, i) => (
+              <li key={loc.id}>
+                <span className="places-ready-num">{i + 1}</span>
+                <span>
+                  <strong>{formatLocationLabel(loc)}</strong>
+                  {loc.summary ? (
+                    <span className="muted places-ready-summary">{loc.summary}</span>
+                  ) : null}
+                </span>
+              </li>
             ))}
           </ul>
+          <div className="places-concierge-ready-actions">
+            {surveyUrl ? (
+              <CopyButton
+                text={surveyUrl}
+                label="Copy survey link"
+                className="btn-berry"
+              />
+            ) : (
+              <button
+                type="button"
+                className="btn btn-berry"
+                onClick={() => goToTripHubStep(slug, "survey")}
+              >
+                Open survey
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setOpen(true)}
+              disabled={!aiEnabled}
+            >
+              Refine with WandrAI
+            </button>
+          </div>
+          {surveyUrl ? (
+            <p className="places-ready-survey-link">
+              <button type="button" onClick={() => goToTripHubStep(slug, "survey")}>
+                Open survey step
+              </button>
+            </p>
+          ) : null}
           <ManualAddOnly slug={slug} />
         </div>
       )}
@@ -223,6 +248,7 @@ function PlacesConciergeSheet({
   onPublished: () => void;
 }) {
   const titleId = useId();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [draftText, setDraftText] = useState("");
   const [unchecked, setUnchecked] = useState<Record<string, true>>({});
   const [ignoreChatDraft, setIgnoreChatDraft] = useState(false);
@@ -259,6 +285,7 @@ function PlacesConciergeSheet({
   const lastMessage = messages[messages.length - 1];
   const streamingAssistant =
     busy && lastMessage?.role === "assistant" ? lastMessage.id : null;
+  const userTurns = messages.filter((m) => m.role === "user").length;
 
   useEffect(() => {
     if (!open) return;
@@ -273,6 +300,12 @@ function PlacesConciergeSheet({
       document.removeEventListener("keydown", onKey);
     };
   }, [open, onClose]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, streamingAssistant]);
 
   if (!open) return null;
 
@@ -311,15 +344,15 @@ function PlacesConciergeSheet({
         aria-modal="true"
         aria-labelledby={titleId}
       >
-        <header className="create-trip-header">
+        <header className="places-sheet-header">
           <div>
-            <h2 id={titleId} className="create-trip-title">
+            <p className="places-sheet-eyebrow">WandrAI Concierge</p>
+            <h2 id={titleId} className="places-sheet-title">
               Plan places
             </h2>
-            <p className="muted create-trip-sub">One question at a time — then publish to the survey.</p>
           </div>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
-            Close
+          <button type="button" className="places-sheet-close" aria-label="Close" onClick={onClose}>
+            ×
           </button>
         </header>
 
@@ -342,8 +375,8 @@ function PlacesConciergeSheet({
               </div>
             ) : null}
 
-            <div className="plan-chat-pane places-sheet-pane">
-              <div className="plan-chat-scroll">
+            <div className="places-chat-pane">
+              <div className="places-chat-scroll" ref={scrollRef}>
                 {messages.map((message) => (
                   <ChatBubble
                     key={message.id}
@@ -355,9 +388,9 @@ function PlacesConciergeSheet({
               <ChatComposer
                 id={`places-chat-${slug}`}
                 placeholder={
-                  messages.filter((m) => m.role === "user").length === 0
-                    ? "e.g. Midwest, near Chicago"
-                    : "e.g. lake towns, within a day’s drive"
+                  userTurns === 0
+                    ? "e.g. lakes and mountains in the Midwest"
+                    : "Message WandrAI…"
                 }
                 value={draftText}
                 busy={busy || pending}
@@ -375,10 +408,18 @@ function PlacesConciergeSheet({
           </section>
 
           <aside className="places-sheet-draft" aria-label="Survey destinations draft">
-            <p className="create-trip-draft-eyebrow">Survey destinations</p>
+            <div className="places-draft-head">
+              <p className="create-trip-draft-eyebrow">Survey destinations</p>
+              {places.length > 0 ? (
+                <span className="places-draft-live">Live draft</span>
+              ) : null}
+            </div>
+            <p className="muted places-draft-sub">
+              These places will appear in your survey for group feedback.
+            </p>
             {places.length === 0 ? (
-              <p className="muted" style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.5 }}>
-                As you chat, places will show up here. Check the ones to publish.
+              <p className="muted" style={{ margin: "0.75rem 0 0", fontSize: "0.9rem", lineHeight: 1.5 }}>
+                As you chat, places show up here. Check the ones to publish.
               </p>
             ) : (
               <ul className="places-draft-list">
@@ -425,8 +466,7 @@ function PlacesConciergeSheet({
             </button>
             <button
               type="button"
-              className="btn btn-secondary btn-sm"
-              style={{ marginTop: "0.5rem", width: "100%" }}
+              className="btn btn-secondary btn-sm places-restart-btn"
               disabled={busy}
               onClick={() => {
                 setMessages([starterMessage(tripName)]);

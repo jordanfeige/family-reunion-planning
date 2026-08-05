@@ -13,10 +13,17 @@ export function CopyButton({
 }) {
   const [done, setDone] = useState(false);
 
+  const hasTone =
+    className?.includes("btn-primary") ||
+    className?.includes("btn-secondary") ||
+    className?.includes("btn-berry");
+
   return (
     <button
       type="button"
-      className={["btn", "btn-secondary", className].filter(Boolean).join(" ")}
+      className={["btn", hasTone ? null : "btn-secondary", className]
+        .filter(Boolean)
+        .join(" ")}
       onClick={async () => {
         await navigator.clipboard.writeText(text);
         setDone(true);

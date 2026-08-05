@@ -126,7 +126,7 @@ export function WizardShell({
                 <span key={phase.id} className="wizard-quiet-phase-wrap">
                   {i > 0 ? (
                     <span className="wizard-quiet-sep" aria-hidden>
-                      ·
+                      |
                     </span>
                   ) : null}
                   <button

@@ -4,18 +4,21 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
 import { signOutAction } from "@/app/actions/auth";
+import { BrandMark } from "@/components/BrandMark";
 import type { TripOrganizerRole } from "@/lib/tripAccess";
 
 type SheetView = "menu" | "collaborators" | "manage";
 
 export function TripHubMenu({
   tripName,
+  tagline,
   slug,
   role,
   collaborators,
   manage,
 }: {
   tripName: string;
+  tagline?: string | null;
   slug: string;
   role: TripOrganizerRole;
   collaborators: React.ReactNode;
@@ -56,31 +59,33 @@ export function TripHubMenu({
 
   return (
     <>
-      <header className="trip-hub-header-bar">
-        <button
-          type="button"
-          className="trip-hub-menu-btn"
-          aria-expanded={open}
-          aria-controls={menuId}
-          aria-label="Trip menu"
-          onClick={() => {
-            if (open && view !== "menu") {
-              setView("menu");
-              return;
-            }
-            setOpen((o) => !o);
-            if (!open) setView("menu");
-          }}
-        >
-          <span className="trip-hub-menu-icon" aria-hidden />
-        </button>
-        <div className="trip-hub-header-text">
+      <header className="trip-hub-hero">
+        <div className="trip-hub-hero-top">
+          <BrandMark href="/dashboard" variant="compact" />
+          <button
+            type="button"
+            className="trip-hub-menu-btn"
+            aria-expanded={open}
+            aria-controls={menuId}
+            aria-label="Trip menu"
+            onClick={() => {
+              if (open && view !== "menu") {
+                setView("menu");
+                return;
+              }
+              setOpen((o) => !o);
+              if (!open) setView("menu");
+            }}
+          >
+            <span className="trip-hub-menu-icon" aria-hidden />
+          </button>
+        </div>
+        <div className="trip-hub-hero-copy">
           <h1 className="trip-hub-title">{tripName}</h1>
+          {tagline ? <p className="trip-hub-tagline">{tagline}</p> : null}
           {role === "editor" ? (
             <span className="pill trip-hub-role-pill">Co-planner</span>
-          ) : (
-            <span className="muted trip-hub-slug">/{slug}</span>
-          )}
+          ) : null}
         </div>
       </header>
 
@@ -129,7 +134,7 @@ export function TripHubMenu({
                     className="trip-hub-sheet-link"
                     onClick={close}
                   >
-                    Dashboard
+                    All trips
                   </Link>
                   <button
                     type="button"

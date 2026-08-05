@@ -147,6 +147,7 @@ export default async function TripHubPage({
     <div className="shell trip-hub-page">
       <TripHubMenu
         tripName={trip.name}
+        tagline={trip.tagline}
         slug={trip.slug}
         role={role}
         collaborators={
@@ -265,46 +266,49 @@ export default async function TripHubPage({
           locations={locationOptions}
           initialMessages={locationsChatMessages}
           aiEnabled={hasAnthropicApiKey()}
+          surveyUrl={surveyUrl || undefined}
         />
         }
         survey={
         <div className="hub-survey">
           {survey ? (
             <>
-              <div className="hub-survey-hero">
-                <p className="hub-survey-lede">
-                  Your trip is ready to share. Send this link — family picks weekends
-                  and places (not a final RSVP yet).
+              {locationOptions.length > 0 ? (
+                <p className="hub-survey-meta">
+                  {locationOptions.length} place
+                  {locationOptions.length === 1 ? "" : "s"} on this survey
                 </p>
-                {locationOptions.length > 0 ? (
-                  <ul className="hub-survey-places" aria-label="Places on survey">
-                    {locationOptions.map((loc) => (
-                      <li key={loc.id}>{loc.title}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="muted hub-survey-warn">
-                    No places yet — add some in Places before family replies.
-                  </p>
-                )}
-              </div>
+              ) : (
+                <p className="muted hub-survey-warn">
+                  No places yet — add some in Places before family replies.
+                </p>
+              )}
               <ShareLinkCard
                 url={surveyUrl}
-                title="Family survey link"
+                title="Share link"
                 hint={
                   weekendSlots.length === 0
-                    ? "Tip: add weekends under Basics so the survey has date options."
-                    : undefined
+                    ? "Anyone with the link can respond. Tip: add weekends under Basics for date options."
+                    : "Anyone with the link can respond."
                 }
+                previewHref={`/r/${survey.publicToken}`}
               />
               <div className="hub-survey-responses">
-                <h3 className="hub-survey-responses-title">
-                  Responses{responses.length > 0 ? ` (${responses.length})` : ""}
-                </h3>
-                {responses.length === 0 ? (
-                  <p className="muted" style={{ margin: 0 }}>
-                    Waiting for the first replies…
+                <div className="hub-survey-responses-head">
+                  <h3 className="hub-survey-responses-title">Responses</h3>
+                  <p className="muted" style={{ margin: 0, fontSize: "0.88rem" }}>
+                    {responses.length === 0
+                      ? "0 responses so far"
+                      : `${responses.length} household${responses.length === 1 ? "" : "s"} replied`}
                   </p>
+                </div>
+                {responses.length === 0 ? (
+                  <div className="hub-survey-empty">
+                    <p className="hub-survey-empty-title">No responses yet</p>
+                    <p className="muted" style={{ margin: 0 }}>
+                      Replies will appear here as your family completes the survey.
+                    </p>
+                  </div>
                 ) : (
                   <ul className="stack" style={{ listStyle: "none", padding: 0, margin: 0 }}>
                     {responses.map((r) => (
