@@ -33,7 +33,7 @@ export function ChatComposer({
           <textarea
             id={id}
             className="itinerary-block-notes chat-composer-input"
-            style={compact ? { minHeight: "2.75rem" } : { minHeight: "72px" }}
+            style={compact ? { minHeight: "3rem" } : { minHeight: "72px" }}
             rows={compact ? 1 : undefined}
             placeholder={placeholder}
             value={value}

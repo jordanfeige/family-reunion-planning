@@ -489,91 +489,105 @@ function PlacesPhase({
       : "e.g. within a day’s drive, lake towns";
 
   return (
-    <section className="plan-panel places-sheet-grid plan-places-grid">
-      <div className="places-sheet-chat">
-        {error ? (
-          <div className="error-banner">
-            {error.message}
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => clearError()}>
-              Dismiss
-            </button>
-          </div>
-        ) : null}
-        <PlanChatPane
-          messages={messages}
-          streamingAssistantId={streamingAssistant}
-          composerId="plan-places-composer"
-          placeholder={placeholder}
-          draftText={draftText}
-          busy={busy || pending || !aiEnabled}
-          onChange={setDraftText}
-          onSubmit={async () => {
-            const text = draftText.trim();
-            if (!text || busy || !aiEnabled) return;
-            setDraftText("");
-            onUserMessage();
-            await sendMessage({ text });
-          }}
-          footer={
-            <button type="button" className="plan-back-link" onClick={onBack}>
-              ← Back to trip
-            </button>
-          }
-        />
-      </div>
+    <section className="plan-places">
+      <div className="plan-places-sheet">
+        <div className="plan-places-chat">
+          {error ? (
+            <div className="error-banner">
+              {error.message}
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => clearError()}
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+          <PlanChatPane
+            messages={messages}
+            streamingAssistantId={streamingAssistant}
+            composerId="plan-places-composer"
+            placeholder={placeholder}
+            draftText={draftText}
+            busy={busy || pending || !aiEnabled}
+            onChange={setDraftText}
+            onSubmit={async () => {
+              const text = draftText.trim();
+              if (!text || busy || !aiEnabled) return;
+              setDraftText("");
+              onUserMessage();
+              await sendMessage({ text });
+            }}
+            footer={
+              <button type="button" className="plan-back-link" onClick={onBack}>
+                ← Back to trip
+              </button>
+            }
+          />
+        </div>
 
-      <aside className="places-sheet-draft plan-places-aside">
-        <p className="create-trip-draft-eyebrow">Survey destinations</p>
-        {places.length === 0 ? (
-          <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-            Places will appear here as you chat.
+        <aside className="plan-places-draft" aria-label="Survey destinations draft">
+          <div className="places-draft-head">
+            <p className="create-trip-draft-eyebrow">Survey destinations</p>
+            {places.length > 0 ? (
+              <span className="places-draft-live">Live draft</span>
+            ) : null}
+          </div>
+          <p className="muted places-draft-sub">
+            These places will appear in your survey for group feedback.
           </p>
-        ) : (
-          <ul className="places-draft-list">
-            {places.map((place) => {
-              const key = place.title.trim().toLowerCase();
-              const checked = place.selected !== false;
-              return (
-                <li key={place.title}>
-                  <label className="places-draft-item">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        setUnchecked((prev) => {
-                          const next = { ...prev };
-                          if (checked) next[key] = true;
-                          else delete next[key];
-                          return next;
-                        });
-                      }}
-                    />
-                    <span>
-                      <strong>{place.title}</strong>
-                      {place.summary ? (
-                        <span className="muted places-draft-summary">{place.summary}</span>
-                      ) : null}
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <button
-          type="button"
-          className="btn btn-berry places-publish-btn"
-          disabled={pending || selected.length === 0}
-          onClick={() => onSave(places)}
-        >
-          {saveLabel}
-        </button>
-        {capped ? (
-          <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
-            Message limit reached — save to continue.
-          </p>
-        ) : null}
-      </aside>
+          {places.length === 0 ? (
+            <p className="muted" style={{ margin: "0.75rem 0 0", fontSize: "0.9rem" }}>
+              Places will appear here as you chat.
+            </p>
+          ) : (
+            <ul className="places-draft-list">
+              {places.map((place) => {
+                const key = place.title.trim().toLowerCase();
+                const checked = place.selected !== false;
+                return (
+                  <li key={place.title}>
+                    <label className="places-draft-item">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setUnchecked((prev) => {
+                            const next = { ...prev };
+                            if (checked) next[key] = true;
+                            else delete next[key];
+                            return next;
+                          });
+                        }}
+                      />
+                      <span>
+                        <strong>{place.title}</strong>
+                        {place.summary ? (
+                          <span className="muted places-draft-summary">{place.summary}</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <button
+            type="button"
+            className="btn btn-berry places-publish-btn"
+            disabled={pending || selected.length === 0}
+            onClick={() => onSave(places)}
+          >
+            {saveLabel}
+          </button>
+          {capped ? (
+            <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+              Message limit reached — save to continue.
+            </p>
+          ) : null}
+        </aside>
+      </div>
     </section>
   );
 }
