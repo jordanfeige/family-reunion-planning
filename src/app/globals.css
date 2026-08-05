@@ -4510,6 +4510,66 @@ code {
   background: var(--color-fjord);
 }
 
+.trail-map-path.is-next {
+  background: linear-gradient(
+    90deg,
+    var(--color-fjord) 0%,
+    rgba(28, 61, 90, 0.18) 100%
+  );
+}
+
+.trail-map-pulse {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-top: -0.275rem;
+  margin-left: -0.275rem;
+  border-radius: 999px;
+  background: var(--color-berry);
+  box-shadow: 0 0 0 0 rgba(212, 90, 58, 0.45);
+  animation:
+    trail-pulse-travel-x 2.4s ease-in-out infinite,
+    trail-pulse-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes trail-pulse-travel-x {
+  0% {
+    left: 12%;
+    opacity: 0.35;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    left: 88%;
+    opacity: 0.35;
+  }
+}
+
+@keyframes trail-pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(212, 90, 58, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(212, 90, 58, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trail-map-pulse {
+    animation: none;
+    left: 70%;
+    opacity: 0.9;
+    box-shadow: none;
+  }
+}
+
 .trail-map-node {
   position: relative;
   z-index: 1;
@@ -4607,6 +4667,51 @@ code {
     right: auto;
     width: 2px;
     height: calc(100% - 0.2rem);
+  }
+
+  .trail-map-path.is-next {
+    background: linear-gradient(
+      180deg,
+      var(--color-fjord) 0%,
+      rgba(28, 61, 90, 0.18) 100%
+    );
+  }
+
+  .trail-map-pulse {
+    top: 0;
+    left: 50%;
+    margin-top: -0.275rem;
+    margin-left: -0.275rem;
+    animation:
+      trail-pulse-travel-y 2.4s ease-in-out infinite,
+      trail-pulse-glow 1.6s ease-in-out infinite;
+  }
+
+  @keyframes trail-pulse-travel-y {
+    0% {
+      top: 12%;
+      opacity: 0.35;
+    }
+    15% {
+      opacity: 1;
+    }
+    85% {
+      opacity: 1;
+    }
+    100% {
+      top: 88%;
+      opacity: 0.35;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .trail-map-pulse {
+      animation: none;
+      top: 70%;
+      left: 50%;
+      opacity: 0.9;
+      box-shadow: none;
+    }
   }
 
   .trail-map-label {

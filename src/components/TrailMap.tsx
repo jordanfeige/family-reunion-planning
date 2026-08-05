@@ -55,6 +55,8 @@ export function TrailMap({
     0,
     stops.findIndex((s) => s.id === activeId),
   );
+  const nextIndex =
+    activeIndex >= 0 && activeIndex < stops.length - 1 ? activeIndex + 1 : -1;
 
   return (
     <nav className="trail-map" aria-label="Trip trail">
@@ -63,6 +65,7 @@ export function TrailMap({
           const isActive = stop.id === activeId;
           const done = Boolean(stop.complete) && !isActive;
           const ahead = i > activeIndex && !done;
+          const isNextPath = i === nextIndex;
           return (
             <li key={stop.id} className="trail-map-item">
               {i > 0 ? (
@@ -70,11 +73,16 @@ export function TrailMap({
                   className={[
                     "trail-map-path",
                     i <= activeIndex || done ? "is-drawn" : "",
+                    isNextPath ? "is-next" : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
                   aria-hidden
-                />
+                >
+                  {isNextPath ? (
+                    <span className="trail-map-pulse" />
+                  ) : null}
+                </span>
               ) : null}
               <button
                 type="button"
