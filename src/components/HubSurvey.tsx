@@ -59,6 +59,7 @@ export function HubSurvey({
         }
         metaTone={placesCount > 0 ? "ok" : "warn"}
         copyLabel="Copy link"
+        copyClassName="btn-berry"
       />
 
       <section className="hub-survey-responses" aria-label="Survey responses">

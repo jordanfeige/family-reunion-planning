@@ -22,6 +22,7 @@ export function ShareLinkCard({
   meta,
   metaTone = "ok",
   copyLabel = "Copy",
+  copyClassName = "btn-primary",
 }: {
   url: string;
   title?: string;
@@ -30,6 +31,7 @@ export function ShareLinkCard({
   meta?: string;
   metaTone?: "ok" | "warn";
   copyLabel?: string;
+  copyClassName?: string;
 }) {
   return (
     <div className="share-link-card">
@@ -50,7 +52,7 @@ export function ShareLinkCard({
         <CopyButton
           text={url}
           label={copyLabel}
-          className="btn-primary btn-sm share-link-copy"
+          className={`${copyClassName} btn-sm share-link-copy`}
         />
       </div>
       <div className="share-link-card-foot">

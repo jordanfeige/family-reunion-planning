@@ -60,32 +60,35 @@ export function TripHubMenu({
   return (
     <>
       <header className="trip-hub-hero">
-        <div className="trip-hub-hero-top">
-          <BrandMark href="/dashboard" variant="compact" />
-          <button
-            type="button"
-            className="trip-hub-menu-btn"
-            aria-expanded={open}
-            aria-controls={menuId}
-            aria-label="Trip menu"
-            onClick={() => {
-              if (open && view !== "menu") {
-                setView("menu");
-                return;
-              }
-              setOpen((o) => !o);
-              if (!open) setView("menu");
-            }}
-          >
-            <span className="trip-hub-menu-icon" aria-hidden />
-          </button>
-        </div>
-        <div className="trip-hub-hero-copy">
-          <h1 className="trip-hub-title">{tripName}</h1>
-          {tagline ? <p className="trip-hub-tagline">{tagline}</p> : null}
-          {role === "editor" ? (
-            <span className="pill trip-hub-role-pill">Co-planner</span>
-          ) : null}
+        <div className="trip-hub-hero-glow" aria-hidden />
+        <div className="trip-hub-hero-inner">
+          <div className="trip-hub-hero-top">
+            <BrandMark href="/dashboard" variant="on-dark" />
+            <button
+              type="button"
+              className="trip-hub-menu-btn"
+              aria-expanded={open}
+              aria-controls={menuId}
+              aria-label="Trip menu"
+              onClick={() => {
+                if (open && view !== "menu") {
+                  setView("menu");
+                  return;
+                }
+                setOpen((o) => !o);
+                if (!open) setView("menu");
+              }}
+            >
+              <span className="trip-hub-menu-icon" aria-hidden />
+            </button>
+          </div>
+          <div className="trip-hub-hero-copy">
+            <h1 className="trip-hub-title">{tripName}</h1>
+            {tagline ? <p className="trip-hub-tagline">{tagline}</p> : null}
+            {role === "editor" ? (
+              <span className="pill trip-hub-role-pill">Co-planner</span>
+            ) : null}
+          </div>
         </div>
       </header>
 

@@ -142,7 +142,7 @@ export default async function TripHubPage({
   ) as Record<DayKey, UIMessage[]>;
 
   return (
-    <div className="shell trip-hub-page">
+    <div className="trip-hub-page">
       <TripHubMenu
         tripName={trip.name}
         tagline={trip.tagline}
@@ -162,6 +162,7 @@ export default async function TripHubPage({
         }
       />
 
+      <div className="trip-hub-body">
       <TripHubWizard
         slug={trip.slug}
         initialStepId={
@@ -446,7 +447,7 @@ export default async function TripHubPage({
         <TripGallerySection slug={trip.slug} unlocked={galleryUnlocked} gallery={gallery} />
         }
       />
-
+      </div>
     </div>
   );
 }
