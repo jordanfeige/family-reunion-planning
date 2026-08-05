@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useChat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
@@ -80,7 +80,7 @@ const CREATE_STARTER: UIMessage = {
   parts: [
     {
       type: "text",
-      text: "Let’s plan your reunion. Who’s coming, any must-have vibes (lake, mountains, beach), and a rough budget? I’ll draft a trip you can save when you’re ready.",
+      text: "Who’s coming on this reunion?",
     },
   ],
 };
@@ -91,7 +91,7 @@ const PLACES_STARTER: UIMessage = {
   parts: [
     {
       type: "text",
-      text: "Great — now places for the family survey. Any region preferences or max drive time from a hub airport?",
+      text: "Any region you want to stay near?",
     },
   ],
 };
@@ -161,19 +161,23 @@ export function PlanExperience({
 
   return (
     <div className="plan-page">
-      <header className="plan-page-header">
-        <p className="plan-page-eyebrow">Plan a trip</p>
-        <h1 className="plan-page-title">WandrAI</h1>
-        <p className="muted plan-page-sub">
-          {signedIn
-            ? "Same flow as starting fresh — chat, pick places, then open your trip hub."
-            : "No account needed yet — save with Google when you want the survey link."}
-        </p>
+      <header className="plan-page-header plan-page-header--slim">
+        <nav className="plan-phase-rail plan-phase-rail--slim" aria-label="Planning steps">
+          <span className={phase === "create" ? "is-active" : ""}>Trip</span>
+          <span className="plan-phase-sep" aria-hidden>
+            ·
+          </span>
+          <span className={phase === "places" ? "is-active" : ""}>Places</span>
+          <span className="plan-phase-sep" aria-hidden>
+            ·
+          </span>
+          <span className={phase === "save" ? "is-active" : ""}>Save</span>
+        </nav>
         {!signedIn ? (
           <p className="plan-page-quota" aria-live="polite">
             {capped
               ? "Free messages used — save to keep planning"
-              : `${remaining} free message${remaining === 1 ? "" : "s"} left`}
+              : `${remaining} left`}
           </p>
         ) : null}
       </header>
@@ -188,12 +192,6 @@ export function PlanExperience({
       {!aiEnabled ? (
         <p className="error-banner">AI planning needs an API key on the server.</p>
       ) : null}
-
-      <nav className="plan-phase-rail" aria-label="Planning steps">
-        <span className={phase === "create" ? "is-active" : ""}>1 · Trip</span>
-        <span className={phase === "places" ? "is-active" : ""}>2 · Places</span>
-        <span className={phase === "save" ? "is-active" : ""}>3 · Save</span>
-      </nav>
 
       {phase === "create" ? (
         <CreatePhase
@@ -248,9 +246,9 @@ export function PlanExperience({
         <SaveWall
           tripName={localTrip?.name ?? initialPayload.name}
           placesCount={
-            (initialPayload.locationTitles?.length ||
-              localTrip?.locationTitles?.length ||
-              0)
+            initialPayload.locationTitles?.length ||
+            localTrip?.locationTitles?.length ||
+            0
           }
           pending={pending}
           signedIn={signedIn}
@@ -258,6 +256,56 @@ export function PlanExperience({
           onSave={() => goSave(localTrip)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function PlanChatPane({
+  messages,
+  streamingAssistantId,
+  composerId,
+  placeholder,
+  draftText,
+  busy,
+  onChange,
+  onSubmit,
+  footer,
+}: {
+  messages: UIMessage[];
+  streamingAssistantId: string | null;
+  composerId: string;
+  placeholder: string;
+  draftText: string;
+  busy: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void | Promise<void>;
+  footer?: React.ReactNode;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages, streamingAssistantId]);
+
+  return (
+    <div className="plan-chat-pane">
+      <div className="plan-chat-scroll" ref={scrollRef}>
+        {messages.map((m) => (
+          <ChatBubble key={m.id} message={m} streaming={m.id === streamingAssistantId} />
+        ))}
+      </div>
+      <ChatComposer
+        id={composerId}
+        placeholder={placeholder}
+        value={draftText}
+        busy={busy}
+        compact
+        onChange={onChange}
+        onSubmit={onSubmit}
+      />
+      {footer}
     </div>
   );
 }
@@ -310,6 +358,14 @@ function CreatePhase({
   const streamingAssistant =
     busy && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
+  const userTurns = messages.filter((m) => m.role === "user").length;
+  const placeholder =
+    userTurns === 0
+      ? "e.g. my side of the family — about 20 people"
+      : userTurns === 1
+        ? "e.g. lake house vibe, not too far to fly"
+        : "e.g. under $1k per household";
+
   return (
     <section className="plan-panel">
       {error ? (
@@ -321,18 +377,12 @@ function CreatePhase({
         </div>
       ) : null}
 
-      <div className="card chat-thread plan-chat-thread">
-        <div className="chat-scroll chat-thread-scroll">
-          {messages.map((m) => (
-            <ChatBubble key={m.id} message={m} streaming={m.id === streamingAssistant} />
-          ))}
-        </div>
-      </div>
-
-      <ChatComposer
-        id="plan-create-composer"
-        placeholder="e.g. 25 cousins, lake vibe, under $1k per household…"
-        value={draftText}
+      <PlanChatPane
+        messages={messages}
+        streamingAssistantId={streamingAssistant}
+        composerId="plan-create-composer"
+        placeholder={placeholder}
+        draftText={draftText}
         busy={busy || pending || !aiEnabled}
         onChange={setDraftText}
         onSubmit={async () => {
@@ -342,41 +392,38 @@ function CreatePhase({
           onUserMessage();
           await sendMessage({ text });
         }}
+        footer={
+          trip?.name ? (
+            <div className="plan-draft-bar">
+              <div className="plan-draft-bar-main">
+                <span className="plan-draft-bar-label">Draft</span>
+                <strong>{trip.name}</strong>
+                {trip.tagline ? <span className="muted">{trip.tagline}</span> : null}
+              </div>
+              <div className="plan-draft-actions">
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={pending}
+                  onClick={() => onContinue(trip)}
+                >
+                  Continue to places
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-berry btn-sm"
+                  disabled={pending}
+                  onClick={() => onSave(trip)}
+                >
+                  {saveLabel}
+                </button>
+              </div>
+            </div>
+          ) : capped ? (
+            <p className="plan-chat-hint">Message limit reached — save with Google to keep going.</p>
+          ) : null
+        }
       />
-
-      {trip?.name ? (
-        <div className="create-trip-draft plan-draft-card">
-          <div className="create-trip-draft-main">
-            <p className="create-trip-draft-eyebrow">Draft</p>
-            <strong className="create-trip-draft-name">{trip.name}</strong>
-            {trip.tagline ? <p className="muted create-trip-draft-line">{trip.tagline}</p> : null}
-          </div>
-          <div className="plan-draft-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={pending}
-              onClick={() => onContinue(trip)}
-            >
-              Continue to places
-            </button>
-            <button
-              type="button"
-              className="btn btn-berry"
-              disabled={pending}
-              onClick={() => onSave(trip)}
-            >
-              {saveLabel}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {capped ? (
-        <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.9rem" }}>
-          Message limit reached — save with Google to keep going.
-        </p>
-      ) : null}
     </section>
   );
 }
@@ -435,6 +482,12 @@ function PlacesPhase({
   const streamingAssistant =
     busy && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
+  const userTurns = messages.filter((m) => m.role === "user").length;
+  const placeholder =
+    userTurns === 0
+      ? "e.g. Midwest, near Chicago"
+      : "e.g. within a day’s drive, lake towns";
+
   return (
     <section className="plan-panel places-sheet-grid plan-places-grid">
       <div className="places-sheet-chat">
@@ -446,17 +499,12 @@ function PlacesPhase({
             </button>
           </div>
         ) : null}
-        <div className="card chat-thread plan-chat-thread">
-          <div className="chat-scroll chat-thread-scroll">
-            {messages.map((m) => (
-              <ChatBubble key={m.id} message={m} streaming={m.id === streamingAssistant} />
-            ))}
-          </div>
-        </div>
-        <ChatComposer
-          id="plan-places-composer"
-          placeholder="e.g. Prefer the Midwest, within a day’s drive…"
-          value={draftText}
+        <PlanChatPane
+          messages={messages}
+          streamingAssistantId={streamingAssistant}
+          composerId="plan-places-composer"
+          placeholder={placeholder}
+          draftText={draftText}
           busy={busy || pending || !aiEnabled}
           onChange={setDraftText}
           onSubmit={async () => {
@@ -466,13 +514,15 @@ function PlacesPhase({
             onUserMessage();
             await sendMessage({ text });
           }}
+          footer={
+            <button type="button" className="plan-back-link" onClick={onBack}>
+              ← Back to trip
+            </button>
+          }
         />
-        <button type="button" className="btn btn-secondary btn-sm" onClick={onBack}>
-          ← Back to trip
-        </button>
       </div>
 
-      <aside className="places-sheet-draft">
+      <aside className="places-sheet-draft plan-places-aside">
         <p className="create-trip-draft-eyebrow">Survey destinations</p>
         {places.length === 0 ? (
           <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>

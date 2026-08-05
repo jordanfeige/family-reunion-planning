@@ -3868,91 +3868,174 @@ code {
 
 /* —— Anonymous /plan experience —— */
 .plan-shell {
-  max-width: 56rem;
-  padding: 1.5rem 1.25rem calc(3rem + env(safe-area-inset-bottom, 0px));
+  max-width: 40rem;
+  padding: 0.75rem 1.25rem calc(2.5rem + env(safe-area-inset-bottom, 0px));
 }
 
-.plan-page-header {
-  margin-bottom: 1.25rem;
+.plan-page-header--slim {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
 }
 
-.plan-page-eyebrow {
+.plan-phase-rail--slim {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   margin: 0;
-  font-size: 0.72rem;
+  padding: 0;
+  border: none;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--color-slate);
+}
+
+.plan-phase-rail--slim .is-active {
+  color: var(--color-fjord);
+  font-weight: 700;
+}
+
+.plan-phase-sep {
+  opacity: 0.4;
+}
+
+.plan-page-quota {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-slate);
+  flex-shrink: 0;
+}
+
+.plan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.plan-chat-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: min(68vh, 34rem);
+  max-height: min(72vh, 38rem);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(28, 61, 90, 0.1);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.plan-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.15rem 1.15rem 0.75rem;
+  scroll-behavior: smooth;
+}
+
+.plan-chat-pane .chat-composer {
+  border-top: 1px solid rgba(28, 61, 90, 0.08);
+  padding: 0.65rem 0.85rem 0.85rem;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.chat-composer--compact .refine-row {
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-composer--compact .chat-composer-input {
+  resize: none;
+  padding: 0.65rem 0.85rem;
+  line-height: 1.35;
+  border-radius: 999px;
+}
+
+.chat-composer--compact .btn {
+  min-height: 2.75rem;
+  min-width: 4.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.plan-draft-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(28, 61, 90, 0.08);
+  background: rgba(42, 85, 128, 0.04);
+}
+
+.plan-draft-bar-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.plan-draft-bar-label {
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-berry);
 }
 
-.plan-page-title {
-  margin: 0.35rem 0 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.85rem, 5vw, 2.35rem);
-  color: var(--color-fjord);
-  letter-spacing: -0.02em;
-}
-
-.plan-page-sub {
-  margin: 0.45rem 0 0;
-  max-width: 32rem;
-  line-height: 1.5;
-}
-
-.plan-page-quota {
-  margin: 0.65rem 0 0;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--color-fjord);
-}
-
-.plan-phase-rail {
+.plan-draft-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem 1.25rem;
-  margin: 0 0 1.25rem;
-  padding: 0.65rem 0;
-  border-top: 1px solid rgba(28, 61, 90, 0.1);
-  border-bottom: 1px solid rgba(28, 61, 90, 0.1);
+  gap: 0.45rem;
+}
+
+.plan-chat-hint {
+  margin: 0;
+  padding: 0.65rem 1rem 0.85rem;
   font-size: 0.85rem;
   color: var(--color-slate);
 }
 
-.plan-phase-rail .is-active {
+.plan-back-link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-slate);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem 0.85rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.plan-back-link:hover {
   color: var(--color-fjord);
-  font-weight: 700;
-}
-
-.plan-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.plan-chat-thread {
-  min-height: 14rem;
-  max-height: min(42vh, 22rem);
-}
-
-.plan-draft-card {
-  margin-top: 0.25rem;
-}
-
-.plan-draft-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.85rem;
+  text-decoration: underline;
 }
 
 .plan-places-grid {
   align-items: start;
+  max-width: none;
+}
+
+.plan-places-aside {
+  padding: 1rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(28, 61, 90, 0.1);
 }
 
 .plan-save-wall {
-  margin-top: 1.25rem;
-  padding: 1.5rem 1.25rem;
-  border-radius: 12px;
+  margin-top: 0.5rem;
+  padding: 1.35rem 1.2rem;
+  border-radius: 14px;
   background: linear-gradient(
     145deg,
     rgba(212, 90, 58, 0.08) 0%,
@@ -3963,7 +4046,7 @@ code {
 
 .plan-save-wall h2 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   color: var(--color-fjord);
 }
 
@@ -3973,14 +4056,63 @@ code {
   max-width: 36rem;
 }
 
+.topbar--quiet {
+  padding: 0.75rem 0;
+}
+
+.nav-actions--quiet {
+  gap: 0.15rem 0.85rem;
+}
+
+.nav-text-link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-slate);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.4rem 0.15rem;
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.nav-text-link:hover {
+  color: var(--color-fjord);
+  text-decoration: underline;
+}
+
+.nav-text-link--emphasis {
+  color: var(--color-fjord);
+}
+
 @media (max-width: 640px) {
+  .plan-chat-pane {
+    min-height: min(70vh, 32rem);
+    max-height: none;
+    border-radius: 12px;
+  }
+
   .plan-draft-actions .btn {
-    width: 100%;
+    flex: 1;
     min-height: 2.75rem;
   }
 
   .plan-save-wall .btn {
     width: 100%;
     min-height: 2.85rem;
+  }
+
+  .plan-places-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-chat-scroll {
+    scroll-behavior: auto;
   }
 }

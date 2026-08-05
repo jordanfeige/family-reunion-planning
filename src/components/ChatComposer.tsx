@@ -7,6 +7,7 @@ export function ChatComposer({
   busy,
   onChange,
   onSubmit,
+  compact = false,
 }: {
   id: string;
   placeholder: string;
@@ -14,10 +15,11 @@ export function ChatComposer({
   busy: boolean;
   onChange: (value: string) => void;
   onSubmit: () => void | Promise<void>;
+  compact?: boolean;
 }) {
   return (
     <form
-      className="chat-composer"
+      className={`chat-composer${compact ? " chat-composer--compact" : ""}`}
       onSubmit={(e) => {
         e.preventDefault();
         void onSubmit();
@@ -31,7 +33,8 @@ export function ChatComposer({
           <textarea
             id={id}
             className="itinerary-block-notes chat-composer-input"
-            style={{ minHeight: "72px" }}
+            style={compact ? { minHeight: "2.75rem" } : { minHeight: "72px" }}
+            rows={compact ? 1 : undefined}
             placeholder={placeholder}
             value={value}
             disabled={busy}
@@ -44,8 +47,12 @@ export function ChatComposer({
             }}
           />
         </div>
-        <button type="submit" className="btn btn-primary btn-block-sm" disabled={busy}>
-          {busy ? "Thinking…" : "Send"}
+        <button
+          type="submit"
+          className={`btn btn-primary${compact ? "" : " btn-block-sm"}`}
+          disabled={busy}
+        >
+          {busy ? "…" : "Send"}
         </button>
       </div>
     </form>

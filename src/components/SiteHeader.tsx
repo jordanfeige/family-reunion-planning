@@ -12,12 +12,16 @@ export function SiteHeader({ session }: { session: Session | null }) {
   const pathname = usePathname();
   const isTripHub = pathname?.startsWith("/t/");
   const isMarketingHome = pathname === "/";
+  const isPlan = pathname === "/plan" || pathname?.startsWith("/plan/");
+  const isDashboard = pathname === "/dashboard";
+  const quietChrome = isPlan || isDashboard;
 
   const topbarClass = [
     "shell",
     "topbar",
     isTripHub ? "topbar--trip-hub" : "",
     isMarketingHome ? "topbar--marketing" : "",
+    quietChrome ? "topbar--quiet" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -25,30 +29,52 @@ export function SiteHeader({ session }: { session: Session | null }) {
   return (
     <header className={topbarClass}>
       <BrandMark
-        variant={isMarketingHome ? "on-dark" : "default"}
-        showTagline={!isTripHub && !isMarketingHome}
+        variant={isMarketingHome ? "on-dark" : quietChrome ? "compact" : "default"}
+        showTagline={!isTripHub && !isMarketingHome && !quietChrome}
         tagline={APP_TAGLINE}
       />
       {isTripHub ? null : (
-        <nav className="nav-actions">
+        <nav className={`nav-actions${quietChrome ? " nav-actions--quiet" : ""}`}>
           {session?.user ? (
             <>
-              <Link
-                className={isMarketingHome ? "landing-nav-link" : "btn btn-secondary"}
-                href="/plan"
-              >
-                Plan a trip
-              </Link>
-              <Link
-                className={isMarketingHome ? "landing-nav-link" : "btn btn-secondary"}
-                href="/dashboard"
-              >
-                Dashboard
-              </Link>
+              {!isPlan ? (
+                <Link
+                  className={
+                    isMarketingHome
+                      ? "landing-nav-link"
+                      : quietChrome
+                        ? "nav-text-link"
+                        : "btn btn-secondary"
+                  }
+                  href="/plan"
+                >
+                  Plan a trip
+                </Link>
+              ) : null}
+              {!isDashboard ? (
+                <Link
+                  className={
+                    isMarketingHome
+                      ? "landing-nav-link"
+                      : quietChrome
+                        ? "nav-text-link"
+                        : "btn btn-secondary"
+                  }
+                  href="/dashboard"
+                >
+                  Trips
+                </Link>
+              ) : null}
               <form action={signOutAction}>
                 <button
                   type="submit"
-                  className={isMarketingHome ? "landing-nav-link" : "btn btn-secondary"}
+                  className={
+                    isMarketingHome
+                      ? "landing-nav-link"
+                      : quietChrome
+                        ? "nav-text-link"
+                        : "btn btn-secondary"
+                  }
                 >
                   Sign out
                 </button>
@@ -56,14 +82,28 @@ export function SiteHeader({ session }: { session: Session | null }) {
             </>
           ) : (
             <>
+              {!isPlan ? (
+                <Link
+                  className={
+                    isMarketingHome
+                      ? "landing-nav-link"
+                      : quietChrome
+                        ? "nav-text-link"
+                        : "btn btn-secondary"
+                  }
+                  href="/plan"
+                >
+                  Plan a trip
+                </Link>
+              ) : null}
               <Link
-                className={isMarketingHome ? "landing-nav-link" : "btn btn-secondary"}
-                href="/plan"
-              >
-                Plan a trip
-              </Link>
-              <Link
-                className={isMarketingHome ? "landing-nav-link" : "btn btn-primary"}
+                className={
+                  isMarketingHome
+                    ? "landing-nav-link"
+                    : quietChrome
+                      ? "nav-text-link nav-text-link--emphasis"
+                      : "btn btn-primary"
+                }
                 href="/login"
               >
                 Sign in
