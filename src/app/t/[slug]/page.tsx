@@ -2,17 +2,15 @@ import { notFound, redirect } from "next/navigation";
 
 import {
   addTripOptionAction,
-  deleteSurveyResponseAction,
   deleteTripOptionAction,
   getTripBudget,
   updateTripBasicsAction,
 } from "@/app/actions/trips";
 import { auth } from "@/auth";
-import { AvailabilitySnapshot } from "@/components/AvailabilitySnapshot";
-import { FormattedDateTime } from "@/components/FormattedDateTime";
-import { ShareLinkCard } from "@/components/ShareLinkCard";
+import { HubSurvey } from "@/components/HubSurvey";
 import { PlacesConcierge } from "@/components/PlacesConcierge";
 import { PlanConfirmationSnapshot } from "@/components/PlanConfirmationSnapshot";
+import { ShareLinkCard } from "@/components/ShareLinkCard";
 import { TripCollaborators } from "@/components/TripCollaborators";
 import { TripDecisionBar } from "@/components/TripDecisionBar";
 import { TripGallerySection } from "@/components/TripGallerySection";
@@ -48,7 +46,7 @@ import { normalizeVenueOptions } from "@/lib/venues";
 import { DAY_KEYS, itineraryHasContent, normalizeItinerary, type DayKey } from "@/lib/itinerary";
 import { loadChatThread } from "@/lib/supabase/chatHistory";
 import type { UIMessage } from "ai";
-import { partyAdults, partyKids, partyTotal } from "@/lib/partyCount";
+import { partyTotal } from "@/lib/partyCount";
 import { filterValidFridays, formatWeekendLabel } from "@/lib/weekends";
 
 export default async function TripHubPage({
@@ -270,118 +268,20 @@ export default async function TripHubPage({
         />
         }
         survey={
-        <div className="hub-survey">
-          {survey ? (
-            <>
-              {locationOptions.length > 0 ? (
-                <p className="hub-survey-meta">
-                  {locationOptions.length} place
-                  {locationOptions.length === 1 ? "" : "s"} on this survey
-                </p>
-              ) : (
-                <p className="muted hub-survey-warn">
-                  No places yet — add some in Places before family replies.
-                </p>
-              )}
-              <ShareLinkCard
-                url={surveyUrl}
-                title="Share link"
-                hint={
-                  weekendSlots.length === 0
-                    ? "Anyone with the link can respond. Tip: add weekends under Basics for date options."
-                    : "Anyone with the link can respond."
-                }
-                previewHref={`/r/${survey.publicToken}`}
-              />
-              <div className="hub-survey-responses">
-                <div className="hub-survey-responses-head">
-                  <h3 className="hub-survey-responses-title">Responses</h3>
-                  <p className="muted" style={{ margin: 0, fontSize: "0.88rem" }}>
-                    {responses.length === 0
-                      ? "0 responses so far"
-                      : `${responses.length} household${responses.length === 1 ? "" : "s"} replied`}
-                  </p>
-                </div>
-                {responses.length === 0 ? (
-                  <div className="hub-survey-empty">
-                    <p className="hub-survey-empty-title">No responses yet</p>
-                    <p className="muted" style={{ margin: 0 }}>
-                      Replies will appear here as your family completes the survey.
-                    </p>
-                  </div>
-                ) : (
-                  <ul className="stack" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                    {responses.map((r) => (
-                      <li key={r.id} className="hub-survey-response-row">
-                        <div className="row" style={{ justifyContent: "space-between", gap: "0.75rem" }}>
-                          <strong>
-                            {r.respondentName} · {partyAdults(r)} adult
-                            {partyAdults(r) === 1 ? "" : "s"}
-                            {partyKids(r) > 0
-                              ? `, ${partyKids(r)} kid${partyKids(r) === 1 ? "" : "s"}`
-                              : ""}
-                          </strong>
-                          <form action={deleteSurveyResponseAction}>
-                            <input type="hidden" name="slug" value={trip.slug} />
-                            <input type="hidden" name="response_id" value={r.id} />
-                            <button
-                              type="submit"
-                              className="btn btn-secondary"
-                              style={{ fontSize: "0.8rem" }}
-                            >
-                              Delete
-                            </button>
-                          </form>
-                        </div>
-                        {(r.selectedLocations ?? []).length > 0 ? (
-                          <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
-                            Locations:{" "}
-                            {(r.selectedLocations ?? [])
-                              .map((id) => findLocationById(locationOptions, id)?.title ?? id)
-                              .join(" · ")}
-                          </div>
-                        ) : null}
-                        <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
-                          {(r.selectedSlots ?? []).length
-                            ? `Weekends: ${(r.selectedSlots ?? [])
-                                .map((s) => formatWeekendLabel(s))
-                                .join(" · ")}`
-                            : "No weekends selected"}
-                        </div>
-                        {r.notes ? (
-                          <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
-                            Note: {r.notes}
-                          </div>
-                        ) : null}
-                        <FormattedDateTime
-                          value={r.submittedAt}
-                          className="muted"
-                          style={{ fontSize: "0.75rem", marginTop: "0.35rem", display: "block" }}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {responses.length > 0 ? (
-                  <p className="muted" style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
-                    Headcount running total: <strong>{totalAttendees}</strong>
-                  </p>
-                ) : null}
-              </div>
-              {responses.length > 0 ? (
-                <div className="hub-survey-snapshot">
-                  <h3 className="hub-survey-responses-title">Availability</h3>
-                  <p className="muted" style={{ margin: "0 0 0.75rem" }}>
-                    Live rollup from replies — useful when locking a weekend later.
-                  </p>
-                  <AvailabilitySnapshot proposedSlots={weekendSlots} responses={responses} />
-                </div>
-              ) : null}
-            </>
+          survey ? (
+            <HubSurvey
+              slug={trip.slug}
+              surveyUrl={surveyUrl}
+              previewHref={`/r/${survey.publicToken}`}
+              placesCount={locationOptions.length}
+              weekendSlots={weekendSlots}
+              locations={locationOptions}
+              responses={responses}
+              totalAttendees={totalAttendees}
+            />
           ) : (
             <p className="muted">Survey record missing—contact support.</p>
-          )}
-        </div>
+          )
         }
         ballot={
         <div className="stack">

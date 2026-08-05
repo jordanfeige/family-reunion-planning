@@ -2,34 +2,70 @@ import Link from "next/link";
 
 import { CopyButton } from "@/components/CopyButton";
 
+function displayUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const path = `${u.pathname}${u.search}`;
+    if (path.length <= 28) return `${u.host}${path}`;
+    return `${u.host}${path.slice(0, 14)}…${path.slice(-10)}`;
+  } catch {
+    if (url.length <= 42) return url;
+    return `${url.slice(0, 22)}…${url.slice(-12)}`;
+  }
+}
+
 export function ShareLinkCard({
   url,
   title = "Share link",
   hint = "Anyone with the link can respond.",
   previewHref,
+  meta,
+  metaTone = "ok",
+  copyLabel = "Copy",
 }: {
   url: string;
   title?: string;
   hint?: string;
   previewHref?: string;
+  meta?: string;
+  metaTone?: "ok" | "warn";
+  copyLabel?: string;
 }) {
   return (
     <div className="share-link-card">
-      <p className="share-link-card-title">{title}</p>
+      <div className="share-link-card-head">
+        <p className="share-link-card-title">{title}</p>
+        {meta ? (
+          <p
+            className={`share-link-card-meta${metaTone === "warn" ? " is-warn" : ""}`}
+          >
+            {meta}
+          </p>
+        ) : null}
+      </div>
       <div className="share-link-row">
         <p className="share-link-card-url" title={url}>
-          {url}
+          {displayUrl(url)}
         </p>
-        <CopyButton text={url} label="Copy" className="btn-primary btn-sm share-link-copy" />
+        <CopyButton
+          text={url}
+          label={copyLabel}
+          className="btn-primary btn-sm share-link-copy"
+        />
       </div>
-      <p className="muted share-link-card-hint">{hint}</p>
-      {previewHref ? (
-        <p style={{ margin: "0.65rem 0 0" }}>
-          <Link href={previewHref} target="_blank" rel="noreferrer">
+      <div className="share-link-card-foot">
+        <p className="muted share-link-card-hint">{hint}</p>
+        {previewHref ? (
+          <Link
+            href={previewHref}
+            target="_blank"
+            rel="noreferrer"
+            className="share-link-preview"
+          >
             Preview survey
           </Link>
-        </p>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

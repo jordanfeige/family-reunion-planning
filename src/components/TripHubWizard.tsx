@@ -95,7 +95,7 @@ export function TripHubWizard({
       label: "Family survey",
       shortLabel: "Survey",
       icon: "survey",
-      description: "Share this survey with your family to gather input and preferences.",
+      description: "Share the link so family can weigh in.",
       complete: completion.survey,
       content: survey,
     },
