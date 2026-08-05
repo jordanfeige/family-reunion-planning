@@ -19,7 +19,11 @@ export function SiteChrome({
     pathname === "/dashboard" ||
     pathname === "/plan" ||
     pathname?.startsWith("/plan/") ||
-    pathname?.startsWith("/t/");
+    pathname?.startsWith("/t/") ||
+    pathname?.startsWith("/inspiration") ||
+    pathname?.startsWith("/library") ||
+    pathname?.startsWith("/guides") ||
+    pathname?.startsWith("/profile");
 
   return (
     <div

@@ -12,6 +12,7 @@ import {
 import { beginSavePlanDraftAction, savePlanDraftPayloadAction } from "@/app/actions/planDraft";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
+import { LiveShortlist } from "@/components/LiveShortlist";
 import { TrailMap } from "@/components/TrailMap";
 import {
   isMessageCapped,
@@ -635,8 +636,14 @@ function PlacesPhase({
 
   return (
     <section className="plan-places plan-places--trail">
-      <div className="plan-places-sheet">
-        <div className="plan-places-chat">
+      <div className="dest-split">
+        <section className="dest-places-card" aria-label="Places chat">
+          <header className="dest-places-head">
+            <h2 className="dest-places-title">Places</h2>
+            <p className="dest-places-lede">
+              I’ll help you find the right US destinations for the family survey.
+            </p>
+          </header>
           {error ? (
             <div className="error-banner">
               {error.message}
@@ -649,103 +656,64 @@ function PlacesPhase({
               </button>
             </div>
           ) : null}
-          <PlanChatPane
-            messages={messages}
-            streamingAssistantId={streamingAssistant}
-            composerId="plan-places-composer"
-            placeholder={
-              userTurns === 0
-                ? "Or type your own region / vibe…"
-                : "Refine the shortlist with WandrAI…"
-            }
-            draftText={draftText}
-            busy={busy || pending || !aiEnabled}
-            onChange={setDraftText}
-            onSubmit={() => send(draftText)}
-            chips={
-              userTurns === 0 && !busy ? (
+          <div className="dest-chat-pane">
+            <div className="dest-chat-scroll">
+              {messages.map((m) => (
+                <ChatBubble
+                  key={m.id}
+                  message={m}
+                  streaming={m.id === streamingAssistant}
+                />
+              ))}
+              {userTurns === 0 && !busy ? (
                 <SuggestionChips
                   chips={PLACES_CHIPS}
                   disabled={!aiEnabled || pending}
                   onPick={(text) => void send(text)}
                 />
-              ) : null
-            }
-            footer={
-              <button type="button" className="plan-back-link" onClick={onBack}>
-                ← Back to basics
-              </button>
-            }
-          />
-        </div>
-
-        <aside className="plan-places-draft" aria-label="Survey destinations draft">
-          <div className="places-draft-head">
-            <p className="create-trip-draft-eyebrow">Survey destinations</p>
-            {places.length > 0 ? (
-              <span className="places-draft-live">Live draft</span>
-            ) : null}
-          </div>
-          <p className="muted places-draft-sub">
-            Check the ones that feel right — these become the family survey shortlist.
-          </p>
-          {places.length === 0 ? (
-            <div className="plan-places-empty">
-              <p className="plan-places-empty-title">Shortlist appears here</p>
-              <p className="muted" style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.5 }}>
-                Tap a suggestion or tell WandrAI a region. After a round or two, destinations
-                land here with a short why.
-              </p>
+              ) : null}
             </div>
-          ) : (
-            <ul className="places-draft-list">
-              {places.map((place) => {
-                const key = place.title.trim().toLowerCase();
-                const checked = place.selected !== false;
-                return (
-                  <li key={place.title}>
-                    <label className="places-draft-item">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => {
-                          setUnchecked((prev) => {
-                            const next = { ...prev };
-                            if (checked) next[key] = true;
-                            else delete next[key];
-                            return next;
-                          });
-                        }}
-                      />
-                      <span>
-                        <strong>{place.title}</strong>
-                        {place.summary ? (
-                          <span className="muted places-draft-summary">{place.summary}</span>
-                        ) : null}
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          <button
-            type="button"
-            className="btn btn-berry places-publish-btn"
-            disabled={pending || selected.length === 0}
-            onClick={() => onSave(places)}
-          >
-            {selected.length
-              ? `${saveLabel} (${selected.length})`
-              : saveLabel}
+            <ChatComposer
+              id="plan-places-composer"
+              placeholder={
+                userTurns === 0
+                  ? "Or type your own region / vibe…"
+                  : "Refine the shortlist with WandrAI…"
+              }
+              value={draftText}
+              busy={busy || pending || !aiEnabled}
+              compact
+              onChange={setDraftText}
+              onSubmit={() => send(draftText)}
+            />
+          </div>
+          <button type="button" className="plan-back-link" onClick={onBack}>
+            ← Back to basics
           </button>
-          {capped ? (
-            <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
-              Message limit reached — save to continue.
-            </p>
-          ) : null}
-        </aside>
+        </section>
+
+        <LiveShortlist
+          places={places}
+          onToggle={(title) => {
+            const key = title.trim().toLowerCase();
+            setUnchecked((prev) => {
+              const next = { ...prev };
+              if (next[key]) delete next[key];
+              else next[key] = true;
+              return next;
+            });
+          }}
+          onConfirm={() => onSave(places)}
+          confirmLabel={saveLabel}
+          confirmBusy={pending}
+          confirmDisabled={selected.length === 0}
+        />
       </div>
+      {capped ? (
+        <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+          Message limit reached — save to continue.
+        </p>
+      ) : null}
     </section>
   );
 }

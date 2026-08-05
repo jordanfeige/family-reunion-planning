@@ -16,25 +16,31 @@ export function ChatBubble({
   const isUser = message.role === "user";
 
   return (
-    <div className={`chat-bubble chat-bubble--${message.role}`}>
-      <div className="chat-bubble-label">{isUser ? "You" : "WandrAI"}</div>
-      {isUser ? (
-        <p className="chat-bubble-text">{text}</p>
-      ) : (
-        <>
-          {text ? <ChatMarkdown text={text} /> : null}
-          {streaming ? (
-            <p className="chat-bubble-thinking" aria-live="polite">
-              <span className="chat-typing-dots" aria-hidden>
-                <span />
-                <span />
-                <span />
-              </span>
-              Thinking…
-            </p>
-          ) : null}
-        </>
-      )}
+    <div className={`chat-row chat-row--${message.role}`}>
+      {!isUser ? (
+        <span className="chat-avatar" aria-hidden>
+          W
+        </span>
+      ) : null}
+      <div className={`chat-bubble chat-bubble--${message.role}`}>
+        {isUser ? (
+          <p className="chat-bubble-text">{text}</p>
+        ) : (
+          <>
+            {text ? <ChatMarkdown text={text} /> : null}
+            {streaming ? (
+              <p className="chat-bubble-thinking" aria-live="polite">
+                <span className="chat-typing-dots" aria-hidden>
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                Thinking…
+              </p>
+            ) : null}
+          </>
+        )}
+      </div>
     </div>
   );
 }

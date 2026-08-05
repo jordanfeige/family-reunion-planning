@@ -21,6 +21,27 @@ function CheckIcon() {
   );
 }
 
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden fill="none">
+      <path
+        d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="10" r="2.25" fill="currentColor" />
+    </svg>
+  );
+}
+
+function stopIcon(id: string, active: boolean) {
+  if (active && (id === "destinations" || id === "places" || id === "create")) {
+    return <PinIcon />;
+  }
+  return <span className="trail-map-dot" />;
+}
+
 export function TrailMap({
   stops,
   activeId,
@@ -69,7 +90,7 @@ export function TrailMap({
                 aria-label={stop.label}
                 onClick={() => onSelect(stop.id)}
               >
-                {done ? <CheckIcon /> : <span className="trail-map-dot" />}
+                {done ? <CheckIcon /> : stopIcon(stop.id, isActive)}
               </button>
               <span
                 className={[

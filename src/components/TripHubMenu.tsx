@@ -59,7 +59,27 @@ export function TripHubMenu({
       <header className="trip-hub-header">
         <div className="trip-hub-header-row">
           <div>
-            <h1 className="trip-hub-title">{tripName}</h1>
+            <h1 className="trip-hub-title">
+              {tripName}
+              <button
+                type="button"
+                className="trip-hub-edit"
+                aria-label="Edit trip"
+                onClick={() => {
+                  setView(role === "owner" ? "manage" : "menu");
+                  setOpen(true);
+                }}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none">
+                  <path
+                    d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </h1>
             {tagline ? <p className="muted trip-hub-tagline">{tagline}</p> : null}
             {role === "editor" ? (
               <span className="pill trip-hub-role-pill">Co-planner</span>

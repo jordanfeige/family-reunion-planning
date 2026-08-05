@@ -8,14 +8,33 @@ import { signOutAction } from "@/app/actions/auth";
 import { BrandMark } from "@/components/BrandMark";
 import { APP_TAGLINE } from "@/lib/brand";
 
+const APP_LINKS = [
+  { href: "/dashboard", label: "Trips", match: (p: string) => p === "/dashboard" },
+  {
+    href: "/inspiration",
+    label: "Inspiration",
+    match: (p: string) => p.startsWith("/inspiration"),
+  },
+  { href: "/library", label: "Library", match: (p: string) => p.startsWith("/library") },
+  { href: "/guides", label: "Guides", match: (p: string) => p.startsWith("/guides") },
+  { href: "/profile", label: "Profile", match: (p: string) => p.startsWith("/profile") },
+] as const;
+
 export function SiteHeader({ session }: { session: Session | null }) {
-  const pathname = usePathname();
-  const isTripHub = pathname?.startsWith("/t/");
-  const isSurveyLink = pathname?.startsWith("/r/");
+  const pathname = usePathname() ?? "";
+  const isSurveyLink = pathname.startsWith("/r/");
   const isMarketingHome = pathname === "/";
-  const isPlan = pathname === "/plan" || pathname?.startsWith("/plan/");
-  const isDashboard = pathname === "/dashboard";
-  const quietChrome = isPlan || isDashboard || isTripHub;
+  const isPlan = pathname === "/plan" || pathname.startsWith("/plan/");
+  const isTripHub = pathname.startsWith("/t/");
+  const isAppSurface =
+    isPlan ||
+    pathname === "/dashboard" ||
+    isTripHub ||
+    pathname.startsWith("/inspiration") ||
+    pathname.startsWith("/library") ||
+    pathname.startsWith("/guides") ||
+    pathname.startsWith("/profile");
+  const quietChrome = isAppSurface;
 
   const topbarClass = [
     "shell",
@@ -26,6 +45,13 @@ export function SiteHeader({ session }: { session: Session | null }) {
   ]
     .filter(Boolean)
     .join(" ");
+
+  const linkClass = (active: boolean) =>
+    isMarketingHome
+      ? "landing-nav-link"
+      : quietChrome
+        ? `nav-text-link${active ? " nav-text-link--emphasis" : ""}`
+        : "btn btn-secondary";
 
   return (
     <header className={topbarClass}>
@@ -38,45 +64,37 @@ export function SiteHeader({ session }: { session: Session | null }) {
         <nav className={`nav-actions${quietChrome ? " nav-actions--quiet" : ""}`}>
           {session?.user ? (
             <>
-              {!isPlan ? (
+              {APP_LINKS.map((link) => (
                 <Link
-                  className={
-                    isMarketingHome
-                      ? "landing-nav-link"
-                      : quietChrome
-                        ? "nav-text-link"
-                        : "btn btn-secondary"
-                  }
-                  href="/plan"
+                  key={link.href}
+                  className={linkClass(link.match(pathname))}
+                  href={link.href}
+                  aria-current={link.match(pathname) ? "page" : undefined}
                 >
+                  {link.label}
+                </Link>
+              ))}
+              {!isPlan ? (
+                <Link className={linkClass(false)} href="/plan">
                   Plan a trip
                 </Link>
               ) : null}
-              {!isDashboard ? (
-                <Link
-                  className={
-                    isMarketingHome
-                      ? "landing-nav-link"
-                      : quietChrome
-                        ? "nav-text-link"
-                        : "btn btn-secondary"
-                  }
-                  href="/dashboard"
-                >
-                  Trips
+              {session.user.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={session.user.image}
+                  alt=""
+                  className="nav-avatar"
+                  width={32}
+                  height={32}
+                />
+              ) : (
+                <Link className="nav-avatar nav-avatar--fallback" href="/profile" aria-label="Profile">
+                  {(session.user.name ?? session.user.email ?? "?").slice(0, 1).toUpperCase()}
                 </Link>
-              ) : null}
+              )}
               <form action={signOutAction}>
-                <button
-                  type="submit"
-                  className={
-                    isMarketingHome
-                      ? "landing-nav-link"
-                      : quietChrome
-                        ? "nav-text-link"
-                        : "btn btn-secondary"
-                  }
-                >
+                <button type="submit" className={linkClass(false)}>
                   Sign out
                 </button>
               </form>
@@ -84,16 +102,7 @@ export function SiteHeader({ session }: { session: Session | null }) {
           ) : (
             <>
               {!isPlan ? (
-                <Link
-                  className={
-                    isMarketingHome
-                      ? "landing-nav-link"
-                      : quietChrome
-                        ? "nav-text-link"
-                        : "btn btn-secondary"
-                  }
-                  href="/plan"
-                >
+                <Link className={linkClass(false)} href="/plan">
                   Plan a trip
                 </Link>
               ) : null}
