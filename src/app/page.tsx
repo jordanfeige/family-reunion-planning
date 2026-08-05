@@ -34,7 +34,7 @@ export default async function HomePage() {
                     Resume your draft plan
                   </Link>
                 ) : (
-                  <Link className="landing-secondary" href="/dashboard">
+                  <Link className="landing-secondary" href="/plan">
                     Plan a new trip
                   </Link>
                 )}

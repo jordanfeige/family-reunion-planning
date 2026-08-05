@@ -19,11 +19,6 @@ export default async function PlanPage({
   const secret = await readPlanDraftCookieSecret();
   const draft = secret ? await getPlanDraftBySecret(secret) : null;
 
-  // Signed-in users with no draft plan via dashboard create.
-  if (session?.user?.id && !draft) {
-    redirect("/dashboard");
-  }
-
   // Cookie must be set in a Route Handler, not a Server Component.
   if (!draft) {
     const qs = error ? `?error=${encodeURIComponent(error)}` : "";
@@ -37,6 +32,7 @@ export default async function PlanPage({
         initialMessageCount={draft.messageCount}
         aiEnabled={hasAnthropicApiKey()}
         errorCode={error}
+        signedIn={Boolean(session?.user?.id)}
       />
     </div>
   );

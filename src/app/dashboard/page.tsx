@@ -2,14 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { CreateTripLauncher } from "@/components/CreateTripSheet";
 import { TripDashboardManage } from "@/components/TripDashboardManage";
-import { hasAnthropicApiKey } from "@/lib/ai";
 import { APP_TAGLINE } from "@/lib/brand";
+import { organizerTripResume } from "@/lib/organizerTripResume";
 import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
 import { claimGuestSubmissionsForUser } from "@/lib/supabase/guestIdentity";
 import { listGuestTripsForUser } from "@/lib/supabase/guestTrips";
 import { listTripsForUser } from "@/lib/supabase/queries";
+import {
+  getPlanDraftBySecret,
+  readPlanDraftCookieSecret,
+} from "@/lib/supabase/planDrafts";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -29,10 +32,13 @@ export default async function DashboardPage() {
     list.map((t) => t.id),
   );
 
+  const secret = await readPlanDraftCookieSecret();
+  const draft = secret ? await getPlanDraftBySecret(secret) : null;
+  const hasDraft = Boolean(draft);
+
   const isGuestOnly = list.length === 0 && invitations.length > 0;
   const showPlanning = !isGuestOnly;
   const showInvitations = invitations.length > 0;
-  const aiEnabled = hasAnthropicApiKey();
 
   return (
     <div className="shell dashboard-page">
@@ -45,7 +51,16 @@ export default async function DashboardPage() {
             <p className="muted dashboard-subtitle">{APP_TAGLINE}</p>
           </div>
           {showPlanning && list.length > 0 ? (
-            <CreateTripLauncher aiEnabled={aiEnabled} hasTrips />
+            <div className="dashboard-toolbar">
+              {hasDraft ? (
+                <Link className="btn btn-secondary" href="/plan">
+                  Resume draft
+                </Link>
+              ) : null}
+              <Link className="btn btn-berry" href="/plan">
+                + New trip
+              </Link>
+            </div>
           ) : null}
         </div>
         {isGuestOnly ? (
@@ -56,7 +71,7 @@ export default async function DashboardPage() {
           </p>
         ) : list.length > 0 ? (
           <p className="muted dashboard-lede">
-            Open a hub to plan, or start a new trip with WandrAI.
+            Pick up where you left off in the hub, or start a new trip with WandrAI.
           </p>
         ) : null}
       </header>
@@ -107,7 +122,24 @@ export default async function DashboardPage() {
               <h2 id="planning-heading" className="sr-only">
                 Plan a trip
               </h2>
-              <CreateTripLauncher aiEnabled={aiEnabled} hasTrips={false} />
+              <div className="dashboard-toolbar dashboard-toolbar--empty">
+                <div className="dashboard-empty">
+                  <h2 className="dashboard-empty-title">Plan your next reunion</h2>
+                  <p className="muted dashboard-empty-copy">
+                    Chat with WandrAI to shape the trip, pick places, then open your hub
+                    survey link.
+                  </p>
+                  {hasDraft ? (
+                    <Link className="btn btn-berry" href="/plan">
+                      Resume your draft
+                    </Link>
+                  ) : (
+                    <Link className="btn btn-berry" href="/plan">
+                      Start with WandrAI
+                    </Link>
+                  )}
+                </div>
+              </div>
             </>
           ) : (
             <>
@@ -121,31 +153,44 @@ export default async function DashboardPage() {
                 </h2>
               )}
               <ul className="trip-list">
-                {list.map((trip) => (
-                  <li key={trip.id} className="trip-list-row">
-                    <div className="trip-list-main">
-                      <div>
-                        <strong className="trip-list-name">{trip.name}</strong>
-                        {trip.access === "collaborator" ? (
-                          <span className="pill trip-list-pill">Shared</span>
-                        ) : null}
-                        {trip.tagline ? (
-                          <p className="muted trip-list-tagline">{trip.tagline}</p>
-                        ) : null}
+                {list.map((trip) => {
+                  const resume = organizerTripResume({
+                    slug: trip.slug,
+                    locationOptions: trip.locationOptions,
+                    proposedDateSlots: trip.proposedDateSlots,
+                    selectedLocationId: trip.selectedLocationId,
+                    selectedWeekendFriday: trip.selectedWeekendFriday,
+                    ballotStatus: trip.ballotStatus,
+                    publishedItinerary: trip.publishedItinerary,
+                    surveyResponseCount: trip.surveyResponseCount,
+                  });
+                  return (
+                    <li key={trip.id} className="trip-list-row">
+                      <div className="trip-list-main">
+                        <div>
+                          <strong className="trip-list-name">{trip.name}</strong>
+                          {trip.access === "collaborator" ? (
+                            <span className="pill trip-list-pill">Shared</span>
+                          ) : null}
+                          {trip.tagline ? (
+                            <p className="muted trip-list-tagline">{trip.tagline}</p>
+                          ) : null}
+                          <p className="muted trip-list-stage">{resume.stageLabel}</p>
+                        </div>
+                        <div className="trip-list-actions">
+                          <Link className="btn btn-primary btn-sm" href={resume.href}>
+                            {resume.ctaLabel}
+                          </Link>
+                          <TripDashboardManage
+                            slug={trip.slug}
+                            tripName={trip.name}
+                            access={trip.access}
+                          />
+                        </div>
                       </div>
-                      <div className="trip-list-actions">
-                        <Link className="btn btn-primary btn-sm" href={`/t/${trip.slug}`}>
-                          Open hub
-                        </Link>
-                        <TripDashboardManage
-                          slug={trip.slug}
-                          tripName={trip.name}
-                          access={trip.access}
-                        />
-                      </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             </>
           )}

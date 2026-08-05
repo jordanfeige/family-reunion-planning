@@ -61,7 +61,75 @@ export type TripListItem = {
   tagline: string | null;
   createdAt: Date;
   access: "owner" | "collaborator";
+  locationOptions: unknown;
+  proposedDateSlots: string[];
+  selectedLocationId: string | null;
+  selectedWeekendFriday: string | null;
+  ballotStatus: string;
+  publishedItinerary: unknown;
+  surveyResponseCount: number;
 };
+
+const TRIP_LIST_SELECT =
+  "id, name, slug, tagline, created_at, location_options, proposed_date_slots, selected_location_id, selected_weekend_friday, ballot_status, published_itinerary";
+
+function mapTripListRow(
+  row: TripRow,
+  access: "owner" | "collaborator",
+  surveyResponseCount: number,
+): TripListItem {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    tagline: row.tagline,
+    createdAt: new Date(row.created_at),
+    access,
+    locationOptions: row.location_options,
+    proposedDateSlots: row.proposed_date_slots ?? [],
+    selectedLocationId: row.selected_location_id,
+    selectedWeekendFriday: row.selected_weekend_friday,
+    ballotStatus: row.ballot_status ?? "draft",
+    publishedItinerary: row.published_itinerary,
+    surveyResponseCount,
+  };
+}
+
+async function surveyResponseCountsByTripIds(
+  tripIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  if (tripIds.length === 0) return counts;
+
+  const { data: surveys, error: surveyErr } = await supabase()
+    .from("survey")
+    .select("id, trip_id")
+    .in("trip_id", tripIds);
+  if (surveyErr) throwDb(surveyErr, "surveyResponseCounts.surveys");
+
+  const surveyToTrip = new Map<string, string>();
+  for (const s of surveys ?? []) {
+    surveyToTrip.set(
+      (s as { id: string }).id,
+      (s as { trip_id: string }).trip_id,
+    );
+  }
+  const surveyIds = [...surveyToTrip.keys()];
+  if (surveyIds.length === 0) return counts;
+
+  const { data: responses, error: respErr } = await supabase()
+    .from("survey_response")
+    .select("survey_id")
+    .in("survey_id", surveyIds);
+  if (respErr) throwDb(respErr, "surveyResponseCounts.responses");
+
+  for (const r of responses ?? []) {
+    const tripId = surveyToTrip.get((r as { survey_id: string }).survey_id);
+    if (!tripId) continue;
+    counts.set(tripId, (counts.get(tripId) ?? 0) + 1);
+  }
+  return counts;
+}
 
 export type TripMemberWithUser = {
   id: string;
@@ -120,21 +188,14 @@ export async function getTripForOrganizer(
 export async function listTripsForUser(userId: string): Promise<TripListItem[]> {
   const { data: owned, error: ownedError } = await supabase()
     .from("trip")
-    .select("id, name, slug, tagline, created_at")
+    .select(TRIP_LIST_SELECT)
     .eq("owner_id", userId)
     .order("created_at", { ascending: false });
 
   if (ownedError) throwDb(ownedError, "listTripsForUser.owned");
 
-  const ownedIds = new Set((owned ?? []).map((t) => t.id));
-  const items: TripListItem[] = ((owned ?? []) as TripRow[]).map((row) => ({
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    tagline: row.tagline,
-    createdAt: new Date(row.created_at),
-    access: "owner" as const,
-  }));
+  const ownedRows = (owned ?? []) as TripRow[];
+  const ownedIds = new Set(ownedRows.map((t) => t.id));
 
   const { data: memberships, error: memberError } = await supabase()
     .from("trip_member")
@@ -142,7 +203,12 @@ export async function listTripsForUser(userId: string): Promise<TripListItem[]> 
     .eq("user_id", userId);
 
   if (memberError) {
-    if (isMissingTableError(memberError)) return items;
+    if (isMissingTableError(memberError)) {
+      const counts = await surveyResponseCountsByTripIds(ownedRows.map((r) => r.id));
+      return ownedRows.map((row) =>
+        mapTripListRow(row, "owner", counts.get(row.id) ?? 0),
+      );
+    }
     throwDb(memberError, "listTripsForUser.members");
   }
 
@@ -150,26 +216,27 @@ export async function listTripsForUser(userId: string): Promise<TripListItem[]> 
     .map((m) => m.trip_id as string)
     .filter((id) => !ownedIds.has(id));
 
-  if (sharedTripIds.length === 0) return items;
+  let sharedRows: TripRow[] = [];
+  if (sharedTripIds.length > 0) {
+    const { data: shared, error: sharedError } = await supabase()
+      .from("trip")
+      .select(TRIP_LIST_SELECT)
+      .in("id", sharedTripIds)
+      .order("created_at", { ascending: false });
 
-  const { data: shared, error: sharedError } = await supabase()
-    .from("trip")
-    .select("id, name, slug, tagline, created_at")
-    .in("id", sharedTripIds)
-    .order("created_at", { ascending: false });
-
-  if (sharedError) throwDb(sharedError, "listTripsForUser.shared");
-
-  for (const row of (shared ?? []) as TripRow[]) {
-    items.push({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      tagline: row.tagline,
-      createdAt: new Date(row.created_at),
-      access: "collaborator",
-    });
+    if (sharedError) throwDb(sharedError, "listTripsForUser.shared");
+    sharedRows = (shared ?? []) as TripRow[];
   }
+
+  const allIds = [...ownedRows.map((r) => r.id), ...sharedRows.map((r) => r.id)];
+  const counts = await surveyResponseCountsByTripIds(allIds);
+
+  const items: TripListItem[] = [
+    ...ownedRows.map((row) => mapTripListRow(row, "owner", counts.get(row.id) ?? 0)),
+    ...sharedRows.map((row) =>
+      mapTripListRow(row, "collaborator", counts.get(row.id) ?? 0),
+    ),
+  ];
 
   items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   return items;

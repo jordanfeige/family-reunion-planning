@@ -103,11 +103,13 @@ export function PlanExperience({
   initialMessageCount,
   aiEnabled,
   errorCode,
+  signedIn = false,
 }: {
   initialPayload: PlanDraftPayload;
   initialMessageCount: number;
   aiEnabled: boolean;
   errorCode?: string;
+  signedIn?: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>(
     initialPayload.step === "places" || initialPayload.step === "save"
@@ -129,7 +131,7 @@ export function PlanExperience({
   );
   const [unchecked, setUnchecked] = useState<Record<string, true>>({});
 
-  const capped = isMessageCapped(messageCount);
+  const capped = !signedIn && isMessageCapped(messageCount);
   const remaining = messagesRemaining(messageCount);
 
   function goSave(trip?: TripDraft | null, places?: PlacesDraftItem[]) {
@@ -154,19 +156,26 @@ export function PlanExperience({
     });
   }
 
+  const saveLabel = signedIn ? "Create trip hub" : "Save with Google";
+  const saveWallLabel = signedIn ? "Create trip & open hub" : "Continue with Google";
+
   return (
     <div className="plan-page">
       <header className="plan-page-header">
         <p className="plan-page-eyebrow">Plan a trip</p>
         <h1 className="plan-page-title">WandrAI</h1>
         <p className="muted plan-page-sub">
-          No account needed yet — save with Google when you want the survey link.
+          {signedIn
+            ? "Same flow as starting fresh — chat, pick places, then open your trip hub."
+            : "No account needed yet — save with Google when you want the survey link."}
         </p>
-        <p className="plan-page-quota" aria-live="polite">
-          {capped
-            ? "Free messages used — save to keep planning"
-            : `${remaining} free message${remaining === 1 ? "" : "s"} left`}
-        </p>
+        {!signedIn ? (
+          <p className="plan-page-quota" aria-live="polite">
+            {capped
+              ? "Free messages used — save to keep planning"
+              : `${remaining} free message${remaining === 1 ? "" : "s"} left`}
+          </p>
+        ) : null}
       </header>
 
       {errorCode === "expired" ? (
@@ -190,6 +199,7 @@ export function PlanExperience({
         <CreatePhase
           aiEnabled={aiEnabled && !capped}
           capped={capped}
+          saveLabel={saveLabel}
           onTrip={setLocalTrip}
           onUserMessage={() => setMessageCount((c) => c + 1)}
           onContinue={(t) => {
@@ -215,6 +225,7 @@ export function PlanExperience({
         <PlacesPhase
           aiEnabled={aiEnabled && !capped}
           capped={capped}
+          saveLabel={signedIn ? "Create hub & get survey link" : "Save & get survey link"}
           seedPlaces={
             initialPayload.locationTitles?.map((p) => ({
               title: p.title,
@@ -242,6 +253,8 @@ export function PlanExperience({
               0)
           }
           pending={pending}
+          signedIn={signedIn}
+          saveLabel={saveWallLabel}
           onSave={() => goSave(localTrip)}
         />
       ) : null}
@@ -252,6 +265,7 @@ export function PlanExperience({
 function CreatePhase({
   aiEnabled,
   capped,
+  saveLabel,
   onTrip,
   onUserMessage,
   onContinue,
@@ -260,6 +274,7 @@ function CreatePhase({
 }: {
   aiEnabled: boolean;
   capped: boolean;
+  saveLabel: string;
   onTrip: (t: TripDraft) => void;
   onUserMessage: () => void;
   onContinue: (t: TripDraft) => void;
@@ -351,7 +366,7 @@ function CreatePhase({
               disabled={pending}
               onClick={() => onSave(trip)}
             >
-              Save with Google
+              {saveLabel}
             </button>
           </div>
         </div>
@@ -369,6 +384,7 @@ function CreatePhase({
 function PlacesPhase({
   aiEnabled,
   capped,
+  saveLabel,
   seedPlaces,
   unchecked,
   setUnchecked,
@@ -379,6 +395,7 @@ function PlacesPhase({
 }: {
   aiEnabled: boolean;
   capped: boolean;
+  saveLabel: string;
   seedPlaces: PlacesDraftItem[];
   unchecked: Record<string, true>;
   setUnchecked: React.Dispatch<React.SetStateAction<Record<string, true>>>;
@@ -499,7 +516,7 @@ function PlacesPhase({
           disabled={pending || selected.length === 0}
           onClick={() => onSave(places)}
         >
-          Save & get survey link
+          {saveLabel}
         </button>
         {capped ? (
           <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
@@ -515,29 +532,39 @@ function SaveWall({
   tripName,
   placesCount,
   pending,
+  signedIn,
+  saveLabel,
   onSave,
 }: {
   tripName?: string;
   placesCount: number;
   pending: boolean;
+  signedIn: boolean;
+  saveLabel: string;
   onSave: () => void;
 }) {
   return (
     <section className="plan-save-wall">
-      <h2>Save your trip to get the survey link</h2>
+      <h2>
+        {signedIn ? "Create your trip hub" : "Save your trip to get the survey link"}
+      </h2>
       <p className="muted">
         {tripName ? (
           <>
             <strong>{tripName}</strong>
-            {placesCount > 0 ? ` · ${placesCount} places` : null} is ready. Continue with Google
-            to unlock sharing.
+            {placesCount > 0 ? ` · ${placesCount} places` : null} is ready.{" "}
+            {signedIn
+              ? "Create the hub to unlock sharing."
+              : "Continue with Google to unlock sharing."}
           </>
+        ) : signedIn ? (
+          <>Create your hub to keep planning and unlock the family survey link.</>
         ) : (
           <>Continue with Google to save your plan and unlock the family survey link.</>
         )}
       </p>
       <button type="button" className="btn btn-berry" disabled={pending} onClick={onSave}>
-        {pending ? "Continuing…" : "Continue with Google"}
+        {pending ? "Continuing…" : saveLabel}
       </button>
     </section>
   );

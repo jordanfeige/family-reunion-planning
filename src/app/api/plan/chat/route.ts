@@ -6,6 +6,7 @@ import {
   type UIMessage,
 } from "ai";
 
+import { auth } from "@/auth";
 import { hasAnthropicApiKey, plannerModel } from "@/lib/ai";
 import {
   isMessageCapped,
@@ -71,7 +72,10 @@ export async function POST(req: Request) {
     });
   }
 
-  if (isMessageCapped(draft.messageCount)) {
+  const session = await auth();
+  const signedIn = Boolean(session?.user?.id);
+
+  if (!signedIn && isMessageCapped(draft.messageCount)) {
     return new Response(
       JSON.stringify({
         error: "message_cap",
@@ -87,13 +91,10 @@ export async function POST(req: Request) {
   const mode = body.mode === "places" ? "places" : "create";
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
 
-  // Count this user turn
+  // Count this user turn (anonymous quota only)
   const last = rawMessages[rawMessages.length - 1] as { role?: string } | undefined;
-  if (last?.role === "user") {
-    const nextCount = await incrementPlanDraftMessages(draft.id);
-    if (isMessageCapped(nextCount - 1)) {
-      // already capped before this increment path — handled above
-    }
+  if (!signedIn && last?.role === "user") {
+    await incrementPlanDraftMessages(draft.id);
   }
 
   const modelMessages = await convertToModelMessages(
@@ -110,7 +111,7 @@ export async function POST(req: Request) {
     draft.payload.locationTitles?.length
       ? `Places so far: ${draft.payload.locationTitles.map((p) => p.title).join(" | ")}`
       : null,
-    `Anonymous draft — ${PLAN_DRAFT_MESSAGE_LIMIT - draft.messageCount - (last?.role === "user" ? 1 : 0)} messages left before save is required.`,
+    `Anonymous draft — ${signedIn ? "signed-in (no message cap)" : `${Math.max(0, PLAN_DRAFT_MESSAGE_LIMIT - draft.messageCount - (last?.role === "user" ? 1 : 0))} messages left before save is required.`}`,
   ]
     .filter(Boolean)
     .join("\n");

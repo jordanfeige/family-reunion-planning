@@ -35,6 +35,12 @@ export function SiteHeader({ session }: { session: Session | null }) {
             <>
               <Link
                 className={isMarketingHome ? "landing-nav-link" : "btn btn-secondary"}
+                href="/plan"
+              >
+                Plan a trip
+              </Link>
+              <Link
+                className={isMarketingHome ? "landing-nav-link" : "btn btn-secondary"}
                 href="/dashboard"
               >
                 Dashboard

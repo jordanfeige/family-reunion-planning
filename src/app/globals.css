@@ -3644,6 +3644,13 @@ code {
   font-size: 0.9rem;
 }
 
+.trip-list-stage {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-fjord);
+}
+
 .trip-list-actions {
   display: flex;
   flex-wrap: wrap;
