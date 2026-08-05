@@ -12,6 +12,7 @@ import {
 import { beginSavePlanDraftAction, savePlanDraftPayloadAction } from "@/app/actions/planDraft";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
+import { TrailMap } from "@/components/TrailMap";
 import {
   isMessageCapped,
   messagesRemaining,
@@ -80,23 +81,40 @@ const CREATE_STARTER: UIMessage = {
   parts: [
     {
       type: "text",
-      text: "Who’s coming on this reunion?",
+      text: "I’m WandrAI — I’ll help you shape a reunion trip and a destination shortlist your family can vote on.\n\nFirst: who’s coming, and roughly how many people?",
     },
   ],
 };
 
-const PLACES_STARTER: UIMessage = {
-  id: "plan-places-starter",
-  role: "assistant",
-  parts: [
-    {
-      type: "text",
-      text: "Any region you want to stay near?",
-    },
-  ],
-};
+function placesStarter(tripName?: string): UIMessage {
+  const lead = tripName
+    ? `Great — “${tripName}” is on the board. Let’s find destinations for the family survey.`
+    : "Let’s find destinations for the family survey.";
+  return {
+    id: "plan-places-starter",
+    role: "assistant",
+    parts: [
+      {
+        type: "text",
+        text: `${lead}\n\nAny region, drive-time limit, or vibe I should lock onto first?`,
+      },
+    ],
+  };
+}
 
 type Phase = "create" | "places" | "save";
+
+const TRIP_CHIPS = [
+  "About 20 people — my side of the family",
+  "Multi-generation, including kids and grandparents",
+  "Close crew — maybe 10–12 adults",
+];
+
+const PLACES_CHIPS = [
+  "Midwest lakes, within a day’s drive",
+  "Mountain towns people can fly into",
+  "Beach weekend, warm in early fall",
+];
 
 export function PlanExperience({
   initialPayload,
@@ -130,6 +148,7 @@ export function PlanExperience({
       : null,
   );
   const [unchecked, setUnchecked] = useState<Record<string, true>>({});
+  const [hints, setHints] = useState<{ who?: string; vibe?: string }>({});
 
   const capped = !signedIn && isMessageCapped(messageCount);
   const remaining = messagesRemaining(messageCount);
@@ -159,28 +178,56 @@ export function PlanExperience({
   const saveLabel = signedIn ? "Create trip hub" : "Save with Google";
   const saveWallLabel = signedIn ? "Create trip & open hub" : "Continue with Google";
 
+  const trailStops = [
+    { id: "create", label: "Basics", complete: Boolean(localTrip?.name) || phase !== "create" },
+    {
+      id: "places",
+      label: "Destinations",
+      complete:
+        (initialPayload.locationTitles?.length ?? 0) > 0 ||
+        phase === "save",
+    },
+    { id: "save", label: "Save", complete: false },
+  ];
+
   return (
-    <div className="plan-page">
-      <header className="plan-page-header plan-page-header--slim">
-        <nav className="plan-phase-rail plan-phase-rail--slim" aria-label="Planning steps">
-          <span className={phase === "create" ? "is-active" : ""}>Trip</span>
-          <span className="plan-phase-sep" aria-hidden>
-            ·
-          </span>
-          <span className={phase === "places" ? "is-active" : ""}>Places</span>
-          <span className="plan-phase-sep" aria-hidden>
-            ·
-          </span>
-          <span className={phase === "save" ? "is-active" : ""}>Save</span>
-        </nav>
+    <div className="plan-page plan-page--trail">
+      <header className="plan-workspace-head">
+        <div>
+          <p className="plan-workspace-eyebrow">WandrAI concierge</p>
+          <h1 className="plan-workspace-title">
+            {phase === "places"
+              ? "Find destinations together"
+              : phase === "save"
+                ? "Save your trip"
+                : "Start your reunion plan"}
+          </h1>
+          <p className="plan-workspace-lede">
+            {phase === "places"
+              ? "Chat with WandrAI — a live shortlist builds beside you for the family survey."
+              : phase === "save"
+                ? "Lock this draft into a real trip hub so you can share the survey."
+                : "Answer a few questions. I’ll name the trip, then we’ll craft destinations your family can vote on."}
+          </p>
+        </div>
         {!signedIn ? (
           <p className="plan-page-quota" aria-live="polite">
             {capped
               ? "Free messages used — save to keep planning"
-              : `${remaining} left`}
+              : `${remaining} free messages left`}
           </p>
         ) : null}
       </header>
+
+      <TrailMap
+        stops={trailStops}
+        activeId={phase === "save" || capped ? "save" : phase}
+        onSelect={(id) => {
+          if (id === "create") setPhase("create");
+          if (id === "places" && localTrip?.name) setPhase("places");
+          if (id === "save" && localTrip?.name) setPhase("save");
+        }}
+      />
 
       {errorCode === "expired" ? (
         <p className="error-banner">Your draft expired. Let’s start fresh.</p>
@@ -198,6 +245,8 @@ export function PlanExperience({
           aiEnabled={aiEnabled && !capped}
           capped={capped}
           saveLabel={saveLabel}
+          hints={hints}
+          onHint={(patch) => setHints((h) => ({ ...h, ...patch }))}
           onTrip={setLocalTrip}
           onUserMessage={() => setMessageCount((c) => c + 1)}
           onContinue={(t) => {
@@ -221,6 +270,7 @@ export function PlanExperience({
 
       {phase === "places" ? (
         <PlacesPhase
+          tripName={localTrip?.name ?? initialPayload.name}
           aiEnabled={aiEnabled && !capped}
           capped={capped}
           saveLabel={signedIn ? "Create hub & get survey link" : "Save & get survey link"}
@@ -260,6 +310,69 @@ export function PlanExperience({
   );
 }
 
+function SuggestionChips({
+  chips,
+  disabled,
+  onPick,
+}: {
+  chips: string[];
+  disabled?: boolean;
+  onPick: (text: string) => void;
+}) {
+  return (
+    <div className="plan-chips" role="group" aria-label="Suggestions">
+      {chips.map((chip) => (
+        <button
+          key={chip}
+          type="button"
+          className="plan-chip"
+          disabled={disabled}
+          onClick={() => onPick(chip)}
+        >
+          {chip}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LiveTripCard({
+  trip,
+  hints,
+}: {
+  trip: TripDraft | null;
+  hints: { who?: string; vibe?: string };
+}) {
+  const rows = [
+    { label: "Who’s coming", value: hints.who },
+    { label: "Vibe", value: hints.vibe ?? trip?.destinationNotes },
+    { label: "Budget", value: trip?.targetBudget },
+    { label: "Trip name", value: trip?.name },
+  ];
+
+  return (
+    <aside className="plan-live-card" aria-label="Live trip draft">
+      <div className="places-draft-head">
+        <p className="create-trip-draft-eyebrow">Live draft</p>
+        {trip?.name ? <span className="places-draft-live">Ready</span> : null}
+      </div>
+      <p className="muted places-draft-sub">
+        WandrAI fills this in as you chat — nothing is final until you continue.
+      </p>
+      <ul className="plan-live-rows">
+        {rows.map((row) => (
+          <li key={row.label} className={row.value ? "is-filled" : ""}>
+            <span className="plan-live-label">{row.label}</span>
+            <span className="plan-live-value">
+              {row.value?.trim() || "Waiting…"}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
+
 function PlanChatPane({
   messages,
   streamingAssistantId,
@@ -270,6 +383,7 @@ function PlanChatPane({
   onChange,
   onSubmit,
   footer,
+  chips,
 }: {
   messages: UIMessage[];
   streamingAssistantId: string | null;
@@ -280,6 +394,7 @@ function PlanChatPane({
   onChange: (value: string) => void;
   onSubmit: () => void | Promise<void>;
   footer?: React.ReactNode;
+  chips?: React.ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -290,11 +405,12 @@ function PlanChatPane({
   }, [messages, streamingAssistantId]);
 
   return (
-    <div className="plan-chat-pane">
+    <div className="plan-chat-pane plan-chat-pane--rich">
       <div className="plan-chat-scroll" ref={scrollRef}>
         {messages.map((m) => (
           <ChatBubble key={m.id} message={m} streaming={m.id === streamingAssistantId} />
         ))}
+        {chips}
       </div>
       <ChatComposer
         id={composerId}
@@ -314,6 +430,8 @@ function CreatePhase({
   aiEnabled,
   capped,
   saveLabel,
+  hints,
+  onHint,
   onTrip,
   onUserMessage,
   onContinue,
@@ -323,6 +441,8 @@ function CreatePhase({
   aiEnabled: boolean;
   capped: boolean;
   saveLabel: string;
+  hints: { who?: string; vibe?: string };
+  onHint: (patch: { who?: string; vibe?: string }) => void;
   onTrip: (t: TripDraft) => void;
   onUserMessage: () => void;
   onContinue: (t: TripDraft) => void;
@@ -359,15 +479,26 @@ function CreatePhase({
     busy && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
   const userTurns = messages.filter((m) => m.role === "user").length;
+
+  async function send(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || busy || !aiEnabled) return;
+    if (userTurns === 0) onHint({ who: trimmed });
+    else if (userTurns === 1) onHint({ vibe: trimmed });
+    setDraftText("");
+    onUserMessage();
+    await sendMessage({ text: trimmed });
+  }
+
   const placeholder =
     userTurns === 0
-      ? "e.g. my side of the family — about 20 people"
+      ? "Or type your own — who’s coming?"
       : userTurns === 1
         ? "e.g. lake house vibe, not too far to fly"
         : "e.g. under $1k per household";
 
   return (
-    <section className="plan-panel">
+    <section className="plan-panel plan-panel--split">
       {error ? (
         <div className="error-banner">
           {error.message}
@@ -377,58 +508,67 @@ function CreatePhase({
         </div>
       ) : null}
 
-      <PlanChatPane
-        messages={messages}
-        streamingAssistantId={streamingAssistant}
-        composerId="plan-create-composer"
-        placeholder={placeholder}
-        draftText={draftText}
-        busy={busy || pending || !aiEnabled}
-        onChange={setDraftText}
-        onSubmit={async () => {
-          const text = draftText.trim();
-          if (!text || busy || !aiEnabled) return;
-          setDraftText("");
-          onUserMessage();
-          await sendMessage({ text });
-        }}
-        footer={
-          trip?.name ? (
-            <div className="plan-draft-bar">
-              <div className="plan-draft-bar-main">
-                <span className="plan-draft-bar-label">Draft</span>
-                <strong>{trip.name}</strong>
-                {trip.tagline ? <span className="muted">{trip.tagline}</span> : null}
+      <div className="plan-panel-grid">
+        <PlanChatPane
+          messages={messages}
+          streamingAssistantId={streamingAssistant}
+          composerId="plan-create-composer"
+          placeholder={placeholder}
+          draftText={draftText}
+          busy={busy || pending || !aiEnabled}
+          onChange={setDraftText}
+          onSubmit={() => send(draftText)}
+          chips={
+            userTurns === 0 && !busy ? (
+              <SuggestionChips
+                chips={TRIP_CHIPS}
+                disabled={!aiEnabled || pending}
+                onPick={(text) => void send(text)}
+              />
+            ) : null
+          }
+          footer={
+            trip?.name ? (
+              <div className="plan-draft-bar">
+                <div className="plan-draft-bar-main">
+                  <span className="plan-draft-bar-label">Draft ready</span>
+                  <strong>{trip.name}</strong>
+                  {trip.tagline ? <span className="muted">{trip.tagline}</span> : null}
+                </div>
+                <div className="plan-draft-actions">
+                  <button
+                    type="button"
+                    className="btn btn-berry btn-sm"
+                    disabled={pending}
+                    onClick={() => onContinue(trip)}
+                  >
+                    Find destinations →
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={pending}
+                    onClick={() => onSave(trip)}
+                  >
+                    {saveLabel}
+                  </button>
+                </div>
               </div>
-              <div className="plan-draft-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  disabled={pending}
-                  onClick={() => onContinue(trip)}
-                >
-                  Continue to places
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-berry btn-sm"
-                  disabled={pending}
-                  onClick={() => onSave(trip)}
-                >
-                  {saveLabel}
-                </button>
-              </div>
-            </div>
-          ) : capped ? (
-            <p className="plan-chat-hint">Message limit reached — save with Google to keep going.</p>
-          ) : null
-        }
-      />
+            ) : capped ? (
+              <p className="plan-chat-hint">
+                Message limit reached — save with Google to keep going.
+              </p>
+            ) : null
+          }
+        />
+        <LiveTripCard trip={trip} hints={hints} />
+      </div>
     </section>
   );
 }
 
 function PlacesPhase({
+  tripName,
   aiEnabled,
   capped,
   saveLabel,
@@ -440,6 +580,7 @@ function PlacesPhase({
   onSave,
   pending,
 }: {
+  tripName?: string;
   aiEnabled: boolean;
   capped: boolean;
   saveLabel: string;
@@ -466,7 +607,7 @@ function PlacesPhase({
   const { messages, sendMessage, status, error, clearError } = useChat({
     transport,
     id: "plan-places",
-    messages: [PLACES_STARTER],
+    messages: [placesStarter(tripName)],
   });
 
   const busy = status === "submitted" || status === "streaming";
@@ -483,13 +624,17 @@ function PlacesPhase({
     busy && lastMessage?.role === "assistant" ? lastMessage.id : null;
 
   const userTurns = messages.filter((m) => m.role === "user").length;
-  const placeholder =
-    userTurns === 0
-      ? "e.g. Midwest, near Chicago"
-      : "e.g. within a day’s drive, lake towns";
+
+  async function send(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || busy || !aiEnabled) return;
+    setDraftText("");
+    onUserMessage();
+    await sendMessage({ text: trimmed });
+  }
 
   return (
-    <section className="plan-places">
+    <section className="plan-places plan-places--trail">
       <div className="plan-places-sheet">
         <div className="plan-places-chat">
           {error ? (
@@ -508,20 +653,27 @@ function PlacesPhase({
             messages={messages}
             streamingAssistantId={streamingAssistant}
             composerId="plan-places-composer"
-            placeholder={placeholder}
+            placeholder={
+              userTurns === 0
+                ? "Or type your own region / vibe…"
+                : "Refine the shortlist with WandrAI…"
+            }
             draftText={draftText}
             busy={busy || pending || !aiEnabled}
             onChange={setDraftText}
-            onSubmit={async () => {
-              const text = draftText.trim();
-              if (!text || busy || !aiEnabled) return;
-              setDraftText("");
-              onUserMessage();
-              await sendMessage({ text });
-            }}
+            onSubmit={() => send(draftText)}
+            chips={
+              userTurns === 0 && !busy ? (
+                <SuggestionChips
+                  chips={PLACES_CHIPS}
+                  disabled={!aiEnabled || pending}
+                  onPick={(text) => void send(text)}
+                />
+              ) : null
+            }
             footer={
               <button type="button" className="plan-back-link" onClick={onBack}>
-                ← Back to trip
+                ← Back to basics
               </button>
             }
           />
@@ -535,12 +687,16 @@ function PlacesPhase({
             ) : null}
           </div>
           <p className="muted places-draft-sub">
-            These places will appear in your survey for group feedback.
+            Check the ones that feel right — these become the family survey shortlist.
           </p>
           {places.length === 0 ? (
-            <p className="muted" style={{ margin: "0.75rem 0 0", fontSize: "0.9rem" }}>
-              Places will appear here as you chat.
-            </p>
+            <div className="plan-places-empty">
+              <p className="plan-places-empty-title">Shortlist appears here</p>
+              <p className="muted" style={{ margin: 0, fontSize: "0.9rem", lineHeight: 1.5 }}>
+                Tap a suggestion or tell WandrAI a region. After a round or two, destinations
+                land here with a short why.
+              </p>
+            </div>
           ) : (
             <ul className="places-draft-list">
               {places.map((place) => {
@@ -579,7 +735,9 @@ function PlacesPhase({
             disabled={pending || selected.length === 0}
             onClick={() => onSave(places)}
           >
-            {saveLabel}
+            {selected.length
+              ? `${saveLabel} (${selected.length})`
+              : saveLabel}
           </button>
           {capped ? (
             <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
@@ -608,7 +766,8 @@ function SaveWall({
   onSave: () => void;
 }) {
   return (
-    <section className="plan-save-wall">
+    <section className="plan-save-wall plan-save-wall--trail">
+      <p className="plan-workspace-eyebrow">Almost there</p>
       <h2>
         {signedIn ? "Create your trip hub" : "Save your trip to get the survey link"}
       </h2>
@@ -618,8 +777,8 @@ function SaveWall({
             <strong>{tripName}</strong>
             {placesCount > 0 ? ` · ${placesCount} places` : null} is ready.{" "}
             {signedIn
-              ? "Create the hub to unlock sharing."
-              : "Continue with Google to unlock sharing."}
+              ? "Create the hub to unlock sharing on the Trail Map."
+              : "Continue with Google to unlock sharing on the Trail Map."}
           </>
         ) : signedIn ? (
           <>Create your hub to keep planning and unlock the family survey link.</>
