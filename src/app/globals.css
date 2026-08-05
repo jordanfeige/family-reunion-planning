@@ -1182,94 +1182,124 @@ code {
 .wizard-quiet-rail {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.15rem 0 1.25rem;
-  margin-bottom: 0.35rem;
-  border-bottom: 1px solid rgba(28, 61, 90, 0.12);
+  gap: 0.85rem;
+  padding: 0 0 1.25rem;
+  margin-bottom: 0.15rem;
+  border-bottom: 1px solid rgba(28, 61, 90, 0.1);
 }
 
-.wizard-quiet-phases,
-.wizard-quiet-steps {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.1rem;
+.wizard-phase-segment {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: rgba(28, 61, 90, 0.07);
 }
 
-.wizard-quiet-sep {
-  opacity: 0.35;
-  padding: 0 0.2rem;
-  color: var(--color-slate);
-  user-select: none;
-  font-size: 0.78rem;
-}
-
-.wizard-quiet-phase,
-.wizard-quiet-step {
+.wizard-phase-segment-btn {
   appearance: none;
   border: none;
   background: transparent;
   font: inherit;
-  font-size: 0.84rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 0.86rem;
+  font-weight: 650;
   color: var(--color-slate);
-  padding: 0.35rem 0.25rem;
-  cursor: pointer;
-  min-height: 2.35rem;
-}
-
-.wizard-quiet-phase.is-active,
-.wizard-quiet-step.is-active {
-  color: var(--color-fjord);
-  font-weight: 700;
-}
-
-.wizard-quiet-phase.is-done,
-.wizard-quiet-step.is-complete:not(.is-active) {
-  color: rgba(61, 79, 99, 0.6);
-}
-
-.wizard-quiet-phase.is-muted {
-  opacity: 0.4;
-}
-
-.wizard-step-pill {
-  width: min(12.5rem, 100%);
-}
-
-.wizard-step-pill .compact-select-trigger {
-  justify-content: center;
-  gap: 0.55rem;
-  min-height: 2.65rem;
-  padding: 0.45rem 1rem;
+  min-height: 2.55rem;
+  padding: 0.45rem 0.55rem;
   border-radius: 999px;
-  border: 1px solid rgba(28, 61, 90, 0.14);
-  background: rgba(255, 255, 255, 0.82);
-  font-weight: 700;
-  color: var(--color-fjord);
-  box-shadow: 0 8px 22px rgba(28, 61, 90, 0.06);
-}
-
-.wizard-step-pill .compact-select-value {
-  flex: 0 1 auto;
-  text-align: center;
-}
-
-.wizard-step-pill-label {
-  margin: 0;
-  min-height: 2.65rem;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.45rem 1.15rem;
-  border-radius: 999px;
-  border: 1px solid rgba(28, 61, 90, 0.14);
-  background: rgba(255, 255, 255, 0.82);
-  font-weight: 700;
+  gap: 0.3rem;
+}
+
+.wizard-phase-segment-btn.is-active {
+  background: #fff;
   color: var(--color-fjord);
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(28, 61, 90, 0.1);
+}
+
+.wizard-phase-segment-btn.is-done {
+  color: var(--color-spruce, #1f4a3d);
+}
+
+.wizard-phase-segment-btn.is-muted {
+  opacity: 0.45;
+}
+
+.wizard-quiet-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.wizard-quiet-progress-label {
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--color-slate);
+  letter-spacing: 0.01em;
+}
+
+.wizard-quiet-progress-track {
+  flex: 1;
+  min-width: 0;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: rgba(28, 61, 90, 0.1);
+  overflow: hidden;
+}
+
+.wizard-quiet-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-fjord);
+  transition: width 0.25s ease;
+}
+
+.wizard-step-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.wizard-step-chip {
+  appearance: none;
+  border: 1px solid rgba(28, 61, 90, 0.12);
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--color-slate);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.wizard-step-chip.is-active {
+  background: var(--color-fjord);
+  border-color: var(--color-fjord);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(28, 61, 90, 0.18);
+}
+
+.wizard-step-chip.is-complete {
+  background: rgba(31, 74, 61, 0.12);
+  border-color: rgba(31, 74, 61, 0.18);
+  color: var(--color-spruce, #1f4a3d);
+}
+
+.wizard-step-chip-check {
+  flex-shrink: 0;
 }
 
 .hub-step-head {
@@ -1542,32 +1572,33 @@ code {
 .wizard-step-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
   flex-shrink: 0;
   appearance: none;
   border: 1px solid rgba(28, 61, 90, 0.12);
-  background: #fff;
-  color: var(--color-fjord-soft);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--color-slate);
   font: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.4rem 0.7rem;
-  min-height: 2.25rem;
+  font-size: 0.82rem;
+  font-weight: 650;
+  padding: 0.4rem 0.85rem;
+  min-height: 2.35rem;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .wizard-step-chip.is-active {
-  border-color: var(--color-berry);
+  border-color: var(--color-fjord);
   background: var(--color-fjord);
   color: #fff;
+  box-shadow: 0 8px 18px rgba(28, 61, 90, 0.18);
 }
 
 .wizard-step-chip.is-complete:not(.is-active) {
-  border-color: rgba(31, 74, 61, 0.25);
-  color: var(--color-spruce);
-  background: rgba(31, 74, 61, 0.06);
+  border-color: rgba(31, 74, 61, 0.18);
+  color: var(--color-spruce, #1f4a3d);
+  background: rgba(31, 74, 61, 0.12);
 }
 
 .wizard-step-chip.is-locked {

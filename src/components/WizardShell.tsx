@@ -2,7 +2,6 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import { CompactSelect } from "@/components/CompactSelect";
 import { WizardFooter, WizardFooterSentinel } from "@/components/WizardFooter";
 import { useWizardFooterReveal } from "@/components/useWizardFooterReveal";
 import type { WizardIconName } from "@/components/wizard-icons";
@@ -30,6 +29,27 @@ export type WizardPhaseDef = {
   summary?: string;
   muted?: boolean;
 };
+
+function CheckIcon() {
+  return (
+    <svg
+      className="wizard-step-chip-check"
+      viewBox="0 0 16 16"
+      width="12"
+      height="12"
+      aria-hidden
+    >
+      <path
+        d="M3.5 8.2 6.6 11.2 12.5 4.8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function WizardShell({
   storageKey,
@@ -83,6 +103,9 @@ export function WizardShell({
   const activePhase = phases.find((p) => p.id === activePhaseId) ?? phases[0];
   const activePhaseSteps = steps.filter((s) => s.phaseId === activePhaseId);
   const phaseStepIndex = activePhaseSteps.findIndex((s) => s.id === activeId);
+  const phaseStepNumber = Math.max(1, phaseStepIndex + 1);
+  const phaseStepTotal = Math.max(1, activePhaseSteps.length);
+  const phaseProgress = phaseStepNumber / phaseStepTotal;
 
   function goTo(id: string) {
     if (!steps.some((s) => s.id === id)) return;
@@ -111,11 +134,7 @@ export function WizardShell({
 
   if (!activeStep || !activePhase) return null;
 
-  const progressLabel = `${activePhase.label} · ${phaseStepIndex + 1} of ${activePhaseSteps.length}`;
-  const stepPillOptions = activePhaseSteps.map((step) => ({
-    value: step.id,
-    label: step.shortLabel ?? step.label,
-  }));
+  const progressLabel = `${activePhase.label} · ${phaseStepNumber} of ${activePhaseSteps.length}`;
 
   return (
     <div className={`wizard${quiet ? " wizard--quiet" : ""}`}>
@@ -123,52 +142,81 @@ export function WizardShell({
 
       {quiet ? (
         <nav className="wizard-quiet-rail" aria-label="Planning steps">
-          <div className="wizard-quiet-phases" role="tablist" aria-label="Phases">
-            {phases.map((phase, i) => {
+          <div className="wizard-phase-segment" role="tablist" aria-label="Phases">
+            {phases.map((phase) => {
               const isActive = phase.id === activePhaseId;
               const done = phaseComplete(phase.id);
               return (
-                <span key={phase.id} className="wizard-quiet-phase-wrap">
-                  {i > 0 ? (
-                    <span className="wizard-quiet-sep" aria-hidden>
-                      |
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    className={[
-                      "wizard-quiet-phase",
-                      isActive ? "is-active" : "",
-                      done && !isActive ? "is-done" : "",
-                      phase.muted && !isActive ? "is-muted" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={() => goToPhase(phase.id)}
-                  >
-                    {phase.label}
-                  </button>
-                </span>
+                <button
+                  key={phase.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={[
+                    "wizard-phase-segment-btn",
+                    isActive ? "is-active" : "",
+                    done && !isActive ? "is-done" : "",
+                    phase.muted && !isActive ? "is-muted" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => goToPhase(phase.id)}
+                >
+                  {done && !isActive ? <CheckIcon /> : null}
+                  {phase.label}
+                </button>
               );
             })}
           </div>
 
-          {stepPillOptions.length > 1 ? (
-            <div className="wizard-step-pill">
-              <CompactSelect
-                value={activeId}
-                options={stepPillOptions}
-                onChange={goTo}
-                aria-label={`${activePhase.label} step`}
+          <div className="wizard-quiet-progress">
+            <p className="wizard-quiet-progress-label">
+              {activePhase.label} · {phaseStepNumber}/{phaseStepTotal}
+            </p>
+            <div
+              className="wizard-quiet-progress-track"
+              role="progressbar"
+              aria-valuenow={phaseStepNumber}
+              aria-valuemin={1}
+              aria-valuemax={phaseStepTotal}
+              aria-label={`${activePhase.label} progress`}
+            >
+              <span
+                className="wizard-quiet-progress-fill"
+                style={{ width: `${Math.round(phaseProgress * 100)}%` }}
               />
             </div>
-          ) : (
-            <p className="wizard-step-pill-label">
-              {activeStep.shortLabel ?? activeStep.label}
-            </p>
-          )}
+          </div>
+
+          <div
+            className="wizard-step-chips"
+            role="tablist"
+            aria-label={`${activePhase.label} steps`}
+          >
+            {activePhaseSteps.map((step) => {
+              const isActive = step.id === activeId;
+              const done = Boolean(step.complete) && !isActive;
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={[
+                    "wizard-step-chip",
+                    isActive ? "is-active" : "",
+                    done ? "is-complete" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => goTo(step.id)}
+                >
+                  {done ? <CheckIcon /> : null}
+                  {step.shortLabel ?? step.label}
+                </button>
+              );
+            })}
+          </div>
         </nav>
       ) : (
         <div className="wizard-rail wizard-rail--compact">
