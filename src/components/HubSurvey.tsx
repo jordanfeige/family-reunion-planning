@@ -47,48 +47,62 @@ export function HubSurvey({
 
   return (
     <div className="hub-survey">
-      <header className="hub-step-head">
-        <h2 className="hub-step-title">Family survey</h2>
-        <p className="hub-step-lede">
-          Share this link so your family can weigh in on places
-          {weekendSlots.length > 0 ? " and weekends" : ""}.
-        </p>
+      <header className="hub-workspace-head">
+        <div>
+          <h2 className="hub-workspace-title">Family survey</h2>
+          <p className="hub-workspace-lede">
+            Share this survey with your family to gather input and preferences.
+          </p>
+        </div>
         {placesCount > 0 ? (
-          <p className="hub-step-meta">
-            {placesCount} place{placesCount === 1 ? "" : "s"} ready
+          <p className="hub-workspace-meta">
+            {placesCount} place{placesCount === 1 ? "" : "s"} on survey
           </p>
         ) : (
-          <p className="hub-step-meta is-warn">Add places in Places first</p>
+          <p className="hub-workspace-meta is-warn">Add places first</p>
         )}
       </header>
 
-      <ShareLinkCard
-        url={surveyUrl}
-        hint="Anyone with the link can respond · Private to your trip"
-        previewHref={previewHref}
-        copyLabel="Copy link"
-        copyClassName="btn-berry"
-        bare
-      />
+      <div className="hub-survey-grid">
+        <ShareLinkCard
+          url={surveyUrl}
+          title="Share link"
+          hint="Anyone with the link can respond."
+          previewHref={previewHref}
+          copyLabel="Copy link"
+          copyClassName="btn-primary"
+          status={
+            responses.length > 0
+              ? `${responses.length} household${responses.length === 1 ? "" : "s"} replied`
+              : "Ready to send to family"
+          }
+        />
 
-      <section className="hub-survey-responses" aria-label="Survey responses">
-        <div className="hub-survey-responses-head">
-          <h3 className="hub-survey-responses-title">Responses</h3>
-          <p className="hub-survey-count">
-            {responses.length === 0
-              ? "None yet"
-              : `${responses.length} household${responses.length === 1 ? "" : "s"}`}
-          </p>
-        </div>
-
-        {responses.length === 0 ? (
-          <div className="hub-survey-empty">
-            <p className="muted hub-survey-empty-copy">
-              Replies appear here when family finishes the survey.
-            </p>
+        <section className="hub-panel" aria-label="Survey responses">
+          <div className="hub-panel-head">
+            <div>
+              <h3 className="hub-panel-title">Responses</h3>
+              <p className="hub-panel-sub">
+                {responses.length === 0
+                  ? "0 responses so far"
+                  : `${responses.length} household${responses.length === 1 ? "" : "s"} · ${totalAttendees} people`}
+              </p>
+            </div>
           </div>
-        ) : (
-          <>
+
+          {responses.length === 0 ? (
+            <div className="hub-survey-empty">
+              <div className="hub-survey-empty-art" aria-hidden>
+                <span />
+                <span />
+                <span />
+              </div>
+              <p className="hub-survey-empty-title">No responses yet</p>
+              <p className="muted hub-survey-empty-copy">
+                Responses will appear here as your family completes the survey.
+              </p>
+            </div>
+          ) : (
             <ul className="hub-survey-list">
               {responses.map((r) => {
                 const placeTitles = (r.selectedLocations ?? [])
@@ -103,7 +117,7 @@ export function HubSurvey({
                     <div className="hub-survey-response-body">
                       <div className="hub-survey-response-top">
                         <p className="hub-survey-response-name">{r.respondentName}</p>
-                        <span className="hub-survey-status">Done</span>
+                        <span className="hub-survey-status">Completed</span>
                       </div>
                       <p className="hub-survey-response-meta">{partyLabel(r)}</p>
                       {placeTitles.length > 0 ? (
@@ -111,9 +125,6 @@ export function HubSurvey({
                       ) : null}
                       {weekends.length > 0 ? (
                         <p className="hub-survey-response-detail">{weekends.join(" · ")}</p>
-                      ) : null}
-                      {r.notes ? (
-                        <p className="hub-survey-response-detail">“{r.notes}”</p>
                       ) : null}
                       <FormattedDateTime
                         value={r.submittedAt}
@@ -131,16 +142,13 @@ export function HubSurvey({
                 );
               })}
             </ul>
-            <p className="hub-survey-headcount">
-              Headcount <strong>{totalAttendees}</strong>
-            </p>
-          </>
-        )}
-      </section>
+          )}
+        </section>
+      </div>
 
       {showAvailability ? (
-        <section className="hub-survey-snapshot" aria-label="Weekend availability">
-          <h3 className="hub-survey-responses-title">Availability</h3>
+        <section className="hub-panel hub-survey-snapshot" aria-label="Weekend availability">
+          <h3 className="hub-panel-title">Availability</h3>
           <AvailabilitySnapshot proposedSlots={weekendSlots} responses={responses} />
         </section>
       ) : null}

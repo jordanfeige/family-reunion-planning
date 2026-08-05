@@ -6,11 +6,11 @@ function displayUrl(url: string) {
   try {
     const u = new URL(url);
     const path = `${u.pathname}${u.search}`;
-    if (path.length <= 28) return `${u.host}${path}`;
-    return `${u.host}${path.slice(0, 14)}…${path.slice(-10)}`;
+    if (path.length <= 36) return `${u.host}${path}`;
+    return `${u.host}${path.slice(0, 18)}…${path.slice(-12)}`;
   } catch {
-    if (url.length <= 42) return url;
-    return `${url.slice(0, 22)}…${url.slice(-12)}`;
+    if (url.length <= 48) return url;
+    return `${url.slice(0, 26)}…${url.slice(-14)}`;
   }
 }
 
@@ -24,6 +24,7 @@ export function ShareLinkCard({
   copyLabel = "Copy",
   copyClassName = "btn-primary",
   bare = false,
+  status,
 }: {
   url: string;
   title?: string;
@@ -33,14 +34,19 @@ export function ShareLinkCard({
   metaTone?: "ok" | "warn";
   copyLabel?: string;
   copyClassName?: string;
-  /** Hide the card title — page already has a step heading. */
   bare?: boolean;
+  status?: string;
 }) {
   return (
-    <div className={`share-link-card${bare ? " share-link-card--bare" : ""}`}>
+    <div
+      className={`share-link-card hub-panel${bare ? " share-link-card--bare" : ""}`}
+    >
       {!bare ? (
         <div className="share-link-card-head">
-          <p className="share-link-card-title">{title}</p>
+          <div>
+            <p className="share-link-card-title">{title}</p>
+            <p className="muted share-link-card-hint">{hint}</p>
+          </div>
           {meta ? (
             <p
               className={`share-link-card-meta${metaTone === "warn" ? " is-warn" : ""}`}
@@ -61,7 +67,7 @@ export function ShareLinkCard({
         />
       </div>
       <div className="share-link-card-foot">
-        <p className="muted share-link-card-hint">{hint}</p>
+        {status ? <p className="share-link-status">{status}</p> : null}
         {previewHref ? (
           <Link
             href={previewHref}
@@ -69,7 +75,7 @@ export function ShareLinkCard({
             rel="noreferrer"
             className="share-link-preview"
           >
-            Preview
+            Preview survey
           </Link>
         ) : null}
       </div>
