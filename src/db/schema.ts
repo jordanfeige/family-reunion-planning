@@ -20,6 +20,8 @@ export const users = pgTable("user", {
   email: text("email").unique(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
+  homeCity: text("home_city"),
+  homeState: text("home_state"),
 });
 
 export const accounts = pgTable(
@@ -136,10 +138,14 @@ export const trips = pgTable("trip", {
         dateIso?: string;
         blocks: {
           id: string;
+          startTime?: string;
           time?: string;
           title: string;
           type: string;
+          tag?: string;
           notes?: string;
+          costUsd?: number;
+          photoUrl?: string;
           bookingUrl?: string;
           status: string;
         }[];
@@ -155,10 +161,14 @@ export const trips = pgTable("trip", {
       dateIso?: string;
       blocks: {
         id: string;
+        startTime?: string;
         time?: string;
         title: string;
         type: string;
+        tag?: string;
         notes?: string;
+        costUsd?: number;
+        photoUrl?: string;
         bookingUrl?: string;
         status: string;
       }[];
@@ -170,6 +180,7 @@ export const trips = pgTable("trip", {
     publishedAt?: string;
   } | null>(),
   shareOptionsToken: text("share_options_token").notNull().unique(),
+  originMetro: text("origin_metro").notNull().default("Sioux Falls, SD"),
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -253,6 +264,8 @@ export const surveyResponses = pgTable("survey_response", {
   /** @deprecated Use adultCount + kidCount; kept in sync on insert for legacy reads */
   attendeeCount: integer("attendee_count").notNull().default(1),
   notes: text("notes"),
+  homeCity: text("home_city"),
+  homeState: text("home_state"),
   submittedAt: timestamp("submitted_at", { mode: "date" }).notNull().defaultNow(),
 });
 

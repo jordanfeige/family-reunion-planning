@@ -39,6 +39,7 @@ export type Trip = {
   itinerary: TripItinerary;
   publishedItinerary: PublishedItinerary | null;
   shareOptionsToken: string;
+  originMetro: string;
   ownerId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -64,6 +65,8 @@ export type SurveyResponse = {
   kidCount: number;
   attendeeCount: number;
   notes: string | null;
+  homeCity: string | null;
+  homeState: string | null;
   submittedAt: Date;
 };
 
@@ -157,6 +160,7 @@ export function mapTrip(row: TripRow): Trip {
     itinerary: (row.itinerary ?? { days: [] }) as TripItinerary,
     publishedItinerary: row.published_itinerary as PublishedItinerary | null,
     shareOptionsToken: row.share_options_token,
+    originMetro: row.origin_metro ?? "Sioux Falls, SD",
     ownerId: row.owner_id,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -186,6 +190,8 @@ export function mapSurveyResponse(row: SurveyResponseRow): SurveyResponse {
     kidCount: row.kid_count,
     attendeeCount: row.attendee_count,
     notes: row.notes,
+    homeCity: row.home_city ?? null,
+    homeState: row.home_state ?? null,
     submittedAt: new Date(row.submitted_at),
   };
 }

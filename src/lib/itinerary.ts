@@ -1,27 +1,52 @@
 import { z } from "zod";
 
 import { formatTimeOfDay } from "@/lib/datetime";
+import { formatUsd } from "@/lib/units";
 import { parseFridayIso, sundayFromFriday } from "@/lib/weekends";
 
 export const BLOCK_TYPES = ["activity", "meal", "lodging", "travel"] as const;
 export const BLOCK_STATUSES = ["idea", "to_book", "booked"] as const;
+export const BLOCK_TAGS = ["drive", "stay", "water", "hike", "food"] as const;
 export const DAY_KEYS = ["friday", "saturday", "sunday"] as const;
 
 export type BlockType = (typeof BLOCK_TYPES)[number];
 export type BlockStatus = (typeof BLOCK_STATUSES)[number];
+export type BlockTag = (typeof BLOCK_TAGS)[number];
 export type DayKey = (typeof DAY_KEYS)[number];
 
 export type ItineraryBlock = {
   id: string;
+  /** 24h storage, e.g. "14:30" — render with formatTimeOfDay */
+  startTime?: string;
+  /** @deprecated Use startTime */
   time?: string;
   title: string;
   type: BlockType;
+  tag?: BlockTag;
   notes?: string;
+  costUsd?: number;
+  photoUrl?: string;
   plannerNotes?: string;
   bookingUrl?: string;
   status: BlockStatus;
   assignedToUserId?: string;
 };
+
+const TYPE_TO_TAG: Record<BlockType, BlockTag> = {
+  travel: "drive",
+  lodging: "stay",
+  meal: "food",
+  activity: "hike",
+};
+
+export function blockStartTime(block: ItineraryBlock): string | undefined {
+  return block.startTime?.trim() || block.time?.trim() || undefined;
+}
+
+export function blockTagLabel(block: ItineraryBlock): BlockTag {
+  if (block.tag && BLOCK_TAGS.includes(block.tag)) return block.tag;
+  return TYPE_TO_TAG[block.type] ?? "hike";
+}
 
 export type ItineraryDay = {
   key: DayKey;
@@ -47,10 +72,14 @@ export function itineraryHasContent(itinerary: TripItinerary): boolean {
 }
 
 export const itineraryBlockSchema = z.object({
+  startTime: z.string().optional(),
   time: z.string().optional(),
   title: z.string(),
   type: z.enum(["activity", "meal", "lodging", "travel"]),
+  tag: z.enum(["drive", "stay", "water", "hike", "food"]).optional(),
   notes: z.string().optional(),
+  costUsd: z.number().optional(),
+  photoUrl: z.string().optional(),
   plannerNotes: z.string().optional(),
   bookingUrl: z.string().optional(),
   status: z.enum(["idea", "to_book", "booked"]),
@@ -79,11 +108,10 @@ function addDays(isoFriday: string, offset: number): string {
 }
 
 export function defaultDayLabels(fridayIso: string): ItineraryDay[] {
-  const fri = parseFridayIso(fridayIso);
   const fmt = (iso: string) => {
     const d = parseFridayIso(iso);
     if (!d) return iso;
-    return d.toLocaleDateString(undefined, {
+    return d.toLocaleDateString("en-US", {
       weekday: "long",
       month: "short",
       day: "numeric",
@@ -125,19 +153,31 @@ export function normalizeItinerary(
     const key = (DAY_KEYS.includes(day.key as DayKey)
       ? day.key
       : DAY_KEYS[i] ?? "friday") as DayKey;
-    const blocks: ItineraryBlock[] = (day.blocks ?? []).map((b) => ({
-      id: b.id || crypto.randomUUID(),
-      time: b.time?.trim() ? formatTimeOfDay(b.time.trim()) : undefined,
-      title: String(b.title ?? "").trim() || "Untitled",
-      type: BLOCK_TYPES.includes(b.type as BlockType) ? (b.type as BlockType) : "activity",
-      notes: b.notes?.trim() || undefined,
-      plannerNotes: b.plannerNotes?.trim() || undefined,
-      bookingUrl: b.bookingUrl?.trim() || undefined,
-      status: BLOCK_STATUSES.includes(b.status as BlockStatus)
-        ? (b.status as BlockStatus)
-        : "idea",
-      assignedToUserId: b.assignedToUserId?.trim() || undefined,
-    }));
+    const blocks: ItineraryBlock[] = (day.blocks ?? []).map((b) => {
+      const rawTime = (b.startTime ?? b.time)?.trim();
+      const cost =
+        typeof b.costUsd === "number" && Number.isFinite(b.costUsd)
+          ? b.costUsd
+          : undefined;
+      return {
+        id: b.id || crypto.randomUUID(),
+        startTime: rawTime || undefined,
+        title: String(b.title ?? "").trim() || "Untitled",
+        type: BLOCK_TYPES.includes(b.type as BlockType)
+          ? (b.type as BlockType)
+          : "activity",
+        tag: BLOCK_TAGS.includes(b.tag as BlockTag) ? (b.tag as BlockTag) : undefined,
+        notes: b.notes?.trim() || undefined,
+        costUsd: cost,
+        photoUrl: b.photoUrl?.trim() || undefined,
+        plannerNotes: b.plannerNotes?.trim() || undefined,
+        bookingUrl: b.bookingUrl?.trim() || undefined,
+        status: BLOCK_STATUSES.includes(b.status as BlockStatus)
+          ? (b.status as BlockStatus)
+          : "idea",
+        assignedToUserId: b.assignedToUserId?.trim() || undefined,
+      };
+    });
     return {
       key,
       label: day.label || key,
@@ -165,10 +205,16 @@ export function itineraryFromGenerated(
       dateIso: def.dateIso,
       blocks: gen.blocks.map((b) => ({
         id: crypto.randomUUID(),
-        time: b.time?.trim() ? formatTimeOfDay(b.time.trim()) : undefined,
+        startTime: (b.startTime ?? b.time)?.trim() || undefined,
         title: b.title.trim(),
         type: b.type,
+        tag: b.tag,
         notes: b.notes?.trim() || undefined,
+        costUsd:
+          typeof b.costUsd === "number" && Number.isFinite(b.costUsd)
+            ? b.costUsd
+            : undefined,
+        photoUrl: b.photoUrl?.trim() || undefined,
         bookingUrl: b.bookingUrl?.trim() || undefined,
         status: b.status,
       })),
@@ -204,10 +250,13 @@ export function formatItineraryForPrompt(itinerary: TripItinerary): string {
   return itinerary.days
     .map((day) => {
       const blocks = day.blocks
-        .map(
-          (b) =>
-            `  - ${b.time ? `${b.time} ` : ""}${b.title} [${b.type}, ${b.status}]${b.notes ? `: ${b.notes}` : ""}`,
-        )
+        .map((b) => {
+          const t = blockStartTime(b);
+          const timeLabel = t ? `${formatTimeOfDay(t)} ` : "";
+          const cost =
+            b.costUsd !== undefined ? ` (${formatUsd(b.costUsd)})` : "";
+          return `  - ${timeLabel}${b.title} [${blockTagLabel(b)}, ${b.status}]${cost}${b.notes ? `: ${b.notes}` : ""}`;
+        })
         .join("\n");
       return `${day.label}:\n${blocks || "  (empty)"}`;
     })
@@ -219,6 +268,6 @@ export function weekendDateRangeLabel(fridayIso: string): string {
   const fri = parseFridayIso(fridayIso);
   if (!fri || !sun) return fridayIso;
   const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return `${fmt(fri)} – ${fmt(sun)}`;
 }

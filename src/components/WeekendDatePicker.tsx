@@ -13,9 +13,11 @@ import {
 export function WeekendDatePicker({
   name = "proposed_weekends",
   defaultSelected = [],
+  onChange,
 }: {
   name?: string;
   defaultSelected?: string[];
+  onChange?: (selected: string[]) => void;
 }) {
   const initial = filterValidFridays(defaultSelected);
   const [selected, setSelected] = useState<string[]>(initial);
@@ -28,7 +30,7 @@ export function WeekendDatePicker({
   const month = viewDate.getMonth();
   const monthFridays = useMemo(() => getFridaysInMonth(year, month), [year, month]);
 
-  const monthLabel = viewDate.toLocaleDateString(undefined, {
+  const monthLabel = viewDate.toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   });
@@ -36,9 +38,12 @@ export function WeekendDatePicker({
   const sortedSelected = filterValidFridays(selected);
 
   function toggleFriday(iso: string) {
-    setSelected((prev) =>
-      prev.includes(iso) ? prev.filter((s) => s !== iso) : [...prev, iso],
-    );
+    setSelected((prev) => {
+      const next = prev.includes(iso) ? prev.filter((s) => s !== iso) : [...prev, iso];
+      const sorted = filterValidFridays(next);
+      onChange?.(sorted);
+      return next;
+    });
   }
 
   return (

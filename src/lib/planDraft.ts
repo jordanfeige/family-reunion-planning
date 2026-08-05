@@ -21,7 +21,19 @@ export const planDraftPayloadSchema = z.object({
       }),
     )
     .optional(),
-  step: z.enum(["create", "places", "save"]).optional(),
+  step: z.enum(["create", "places", "survey", "save"]).optional(),
+  surveyPrefs: z
+    .object({
+      pace: z.enum(["easy", "balanced", "full"]).optional(),
+      lodging: z.enum(["rental", "hotel", "cabins"]).optional(),
+      mustHave: z.enum(["swimming", "walks", "dinner"]).optional(),
+      budget: z.enum(["lean", "middle", "comfortable"]).optional(),
+      travel: z.enum(["driving", "mixed", "flying"]).optional(),
+      homeCity: z.string().optional(),
+      homeState: z.string().optional(),
+      proposedWeekends: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
 
 export type PlanDraftPayload = z.infer<typeof planDraftPayloadSchema>;

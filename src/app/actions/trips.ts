@@ -56,11 +56,13 @@ import {
   insertTripInvite,
   listTripInvites,
   listTripMembers,
+  updateUserHome,
 } from "@/lib/supabase/collaborators";
 import { canManageCollaborators, canRemoveMembers } from "@/lib/tripAccess";
 import { getSurveyNextSteps } from "@/lib/surveyNextSteps";
 import type { SurveySummaryInput } from "@/lib/surveySummary";
 import { filterValidFridays, formatWeekendLabel, isValidFridayIso, parseProposedWeekends } from "@/lib/weekends";
+import { abbreviateState, formatCityState } from "@/lib/units";
 import { newSecretToken, newTripSlug } from "@/lib/tokens";
 import {
   countTripOptions,
@@ -116,6 +118,16 @@ async function requireSessionUserId() {
   const id = session?.user?.id;
   if (!id) redirect("/login?callbackUrl=/dashboard");
   return id;
+}
+
+/** Gate for post-auth actions — throws instead of redirecting. */
+async function requireAuthOrThrow() {
+  const session = await auth();
+  const id = session?.user?.id;
+  if (!id) {
+    throw new Error("Sign in required.");
+  }
+  return { userId: id, session };
 }
 
 async function getGuestSessionForPublicSubmit() {
@@ -246,6 +258,61 @@ export async function updateTripBasicsAction(formData: FormData) {
   revalidatePath(`/t/${slug}`);
 }
 
+export async function sendSurveyToFamilyAction(input: {
+  slug: string;
+  pace?: string;
+  lodging?: string;
+  mustHave?: string;
+  budget?: string;
+  travel?: string;
+  homeCity: string;
+  homeState: string;
+  proposedWeekends: string[];
+}) {
+  const { userId } = await requireAuthOrThrow();
+  const slug = input.slug.trim();
+  if (!slug) throw new Error("Missing trip.");
+
+  const homeCity = input.homeCity.trim();
+  const homeState = abbreviateState(input.homeState);
+  if (!homeCity || !homeState) {
+    throw new Error("Enter your home city and state before sending.");
+  }
+
+  const proposedWeekends = filterValidFridays(input.proposedWeekends ?? []);
+  if (proposedWeekends.length === 0) {
+    throw new Error("Pick at least one weekend for the survey.");
+  }
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const originMetro = formatCityState(homeCity, homeState);
+
+  await updateTripById(trip.id, {
+    proposedDateSlots: proposedWeekends,
+    originMetro,
+    targetBudget:
+      input.budget === "lean"
+        ? "Under $800 per household"
+        : input.budget === "comfortable"
+          ? "$1,500+ per household"
+          : trip.targetBudget ?? "$800 – $1,500 per household",
+    destinationNotes: [
+      trip.destinationNotes,
+      input.pace ? `Pace: ${input.pace}` : null,
+      input.lodging ? `Lodging: ${input.lodging}` : null,
+      input.mustHave ? `Must-have: ${input.mustHave}` : null,
+      input.travel ? `Travel: ${input.travel}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null,
+  });
+
+  await updateUserHome(userId, homeCity, homeState);
+
+  revalidatePath(`/t/${slug}`);
+  return { ok: true as const };
+}
+
 function parseOptionalDate(value: FormDataEntryValue | null) {
   const s = String(value ?? "").trim();
   if (!s) return null;
@@ -338,10 +405,15 @@ export async function submitSurveyResponseAction(formData: FormData) {
   }
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const respondentEmail = String(formData.get("email") ?? "").trim() || null;
+  const homeCity = String(formData.get("home_city") ?? "").trim();
+  const homeState = String(formData.get("home_state") ?? "").trim();
   const sendEmailCopy = formData.get("send_email_copy") === "1";
 
   if (!token || !respondentName) {
     throw new Error("Please add your name.");
+  }
+  if (!homeCity || !homeState) {
+    throw new Error("Enter your home city and state so we can show drive times.");
   }
 
   const selected = formData.getAll("slot") as string[];
@@ -374,6 +446,7 @@ export async function submitSurveyResponseAction(formData: FormData) {
   }
 
   const guest = await getGuestSessionForPublicSubmit();
+  const normalizedState = abbreviateState(homeState);
 
   if (guest) {
     const lockedEmail = guest.email.trim().toLowerCase();
@@ -388,7 +461,10 @@ export async function submitSurveyResponseAction(formData: FormData) {
       kidCount,
       attendeeCount,
       notes,
+      homeCity,
+      homeState: normalizedState,
     });
+    await updateUserHome(guest.userId, homeCity, normalizedState);
   } else {
     await insertSurveyResponse({
       surveyId: surveyRow.survey.id,
@@ -400,6 +476,8 @@ export async function submitSurveyResponseAction(formData: FormData) {
       kidCount,
       attendeeCount,
       notes,
+      homeCity,
+      homeState: normalizedState,
     });
   }
 
@@ -449,7 +527,7 @@ export async function submitSurveyResponseAction(formData: FormData) {
 }
 
 export async function deleteSurveyResponseAction(formData: FormData) {
-  const userId = await requireSessionUserId();
+  const { userId } = await requireAuthOrThrow();
   const slug = String(formData.get("slug") ?? "").trim();
   const responseId = String(formData.get("response_id") ?? "").trim();
   if (!slug || !responseId) throw new Error("Missing fields.");
@@ -569,13 +647,30 @@ export async function publishLocationsFromChatAction(
 /** Concierge publish: set survey locations from the draft (keeps ids when titles match). */
 export async function publishPlacesDraftAction(
   slug: string,
-  places: { title: string; summary?: string }[],
+  places: {
+    title: string;
+    summary?: string;
+    state?: string;
+    driveMinutesFromOrigin?: number;
+    originMetro?: string;
+    nearestAirportCode?: string;
+    avgHighF?: number;
+    crowdLevel?: "quiet" | "moderate" | "busy";
+    typicalLodgingUsd?: number;
+  }[],
 ) {
   const userId = await requireSessionUserId();
   const cleaned = places
     .map((p) => ({
       title: p.title.trim(),
       summary: p.summary?.trim() || undefined,
+      state: p.state?.trim() || undefined,
+      driveMinutesFromOrigin: p.driveMinutesFromOrigin,
+      originMetro: p.originMetro?.trim() || undefined,
+      nearestAirportCode: p.nearestAirportCode?.trim() || undefined,
+      avgHighF: p.avgHighF,
+      crowdLevel: p.crowdLevel,
+      typicalLodgingUsd: p.typicalLodgingUsd,
     }))
     .filter((p) => p.title.length > 0);
   if (cleaned.length === 0) {
@@ -599,12 +694,26 @@ export async function publishPlacesDraftAction(
       next.push({
         ...prev,
         summary: p.summary ?? prev.summary,
+        state: p.state ?? prev.state,
+        driveMinutesFromOrigin: p.driveMinutesFromOrigin ?? prev.driveMinutesFromOrigin,
+        originMetro: p.originMetro ?? prev.originMetro,
+        nearestAirportCode: p.nearestAirportCode ?? prev.nearestAirportCode,
+        avgHighF: p.avgHighF ?? prev.avgHighF,
+        crowdLevel: p.crowdLevel ?? prev.crowdLevel,
+        typicalLodgingUsd: p.typicalLodgingUsd ?? prev.typicalLodgingUsd,
       });
     } else {
       next.push({
         id: crypto.randomUUID(),
         title: p.title,
         summary: p.summary,
+        state: p.state,
+        driveMinutesFromOrigin: p.driveMinutesFromOrigin,
+        originMetro: p.originMetro,
+        nearestAirportCode: p.nearestAirportCode,
+        avgHighF: p.avgHighF,
+        crowdLevel: p.crowdLevel,
+        typicalLodgingUsd: p.typicalLodgingUsd,
       });
     }
   }

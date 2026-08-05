@@ -24,12 +24,14 @@ export function WizardShell({
   storageKey,
   steps,
   header,
+  trailAside,
   lastStepLabel = "Back to start",
   initialStepId,
 }: {
   storageKey: string;
   steps: WizardStepDef[];
   header?: React.ReactNode;
+  trailAside?: React.ReactNode;
   lastStepLabel?: string;
   initialStepId?: string;
 }) {
@@ -94,6 +96,7 @@ export function WizardShell({
           activeId={activeId}
           onSelect={goTo}
         />
+        {trailAside ? <div className="trail-aside-slot">{trailAside}</div> : null}
 
         <section
           key={activeStep.id}

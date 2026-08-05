@@ -11,6 +11,7 @@ import type { WizardIconName } from "@/components/wizard-icons";
 import { formatLocationLabel, type LocationOption } from "@/lib/locations";
 import type { GuestSession } from "@/lib/guestSession";
 import type { SurveyNextStep } from "@/lib/surveyNextSteps";
+import { US_STATE_ABBR } from "@/lib/units";
 import { formatWeekendLabel } from "@/lib/weekends";
 
 type SurveyInitial = {
@@ -21,6 +22,8 @@ type SurveyInitial = {
   notes: string | null;
   selectedLocations: string[];
   selectedSlots: string[];
+  homeCity?: string;
+  homeState?: string;
 };
 
 type SurveyStep = "party" | "locations" | "weekends" | "notes";
@@ -68,6 +71,8 @@ export function PublicSurveyForm({
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(
     () => new Set(initialResponse?.selectedSlots ?? []),
   );
+  const [homeCity, setHomeCity] = useState(initialResponse?.homeCity ?? "");
+  const [homeState, setHomeState] = useState(initialResponse?.homeState ?? "");
   const [sendEmailCopy, setSendEmailCopy] = useState(false);
 
   const steps = useMemo(() => {
@@ -103,6 +108,14 @@ export function PublicSurveyForm({
     }
     if (adultCount + kidCount < 1) {
       setError("Please enter at least one adult or kid in your party.");
+      return false;
+    }
+    if (!homeCity.trim()) {
+      setError("Enter your home city so we can show drive times.");
+      return false;
+    }
+    if (!homeState.trim()) {
+      setError("Enter your home state so we can show drive times.");
       return false;
     }
     return true;
@@ -198,6 +211,8 @@ export function PublicSurveyForm({
       <input type="hidden" name="adult_count" value={adultCount} />
       <input type="hidden" name="kid_count" value={kidCount} />
       <input type="hidden" name="notes" value={notes} />
+      <input type="hidden" name="home_city" value={homeCity} />
+      <input type="hidden" name="home_state" value={homeState} />
       {Array.from(selectedLocations).map((id) => (
         <input key={`loc-${id}`} type="hidden" name="location" value={id} />
       ))}
@@ -296,6 +311,51 @@ export function PublicSurveyForm({
                 />
               </div>
             </div>
+            <fieldset className="field" style={{ border: "none", padding: 0, margin: 0 }}>
+              <legend className="survey-segment-legend" style={{ marginBottom: "0.35rem" }}>
+                Where you&apos;re coming from
+              </legend>
+              <p className="survey-home-helper">
+                So we can show everyone their own drive time.
+              </p>
+              <div className="grid-2">
+                <div className="field">
+                  <label htmlFor="home_city">City *</label>
+                  <input
+                    id="home_city"
+                    required
+                    placeholder="Portland"
+                    autoComplete="address-level2"
+                    value={homeCity}
+                    onChange={(e) => {
+                      setHomeCity(e.target.value);
+                      setError(null);
+                    }}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="home_state">State *</label>
+                  <input
+                    id="home_state"
+                    list="us-states"
+                    required
+                    placeholder="OR"
+                    maxLength={2}
+                    autoComplete="address-level1"
+                    value={homeState}
+                    onChange={(e) => {
+                      setHomeState(e.target.value.toUpperCase().slice(0, 2));
+                      setError(null);
+                    }}
+                  />
+                  <datalist id="us-states">
+                    {Object.values(US_STATE_ABBR).map((abbr) => (
+                      <option key={abbr} value={abbr} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+            </fieldset>
           </div>
         ) : null}
 

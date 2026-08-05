@@ -1,6 +1,6 @@
 /** Format an instant in the viewer's local timezone (12-hour clock). */
 export function formatDateTimeLocal(date: Date): string {
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
     hour12: true,
@@ -9,7 +9,7 @@ export function formatDateTimeLocal(date: Date): string {
 
 /** Date only in the viewer's locale (no time). */
 export function formatDateLocal(date: Date): string {
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",

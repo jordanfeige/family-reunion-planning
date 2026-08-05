@@ -46,7 +46,7 @@ export function formatWeekendLabel(fridayIso: string): string {
   if (!sun) return fridayIso;
 
   const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, {
+    d.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
@@ -113,7 +113,7 @@ export function formatWeekendLabelShort(fridayIso: string): string {
   const sun = sundayFromFriday(fridayIso);
   if (!sun) return fridayIso;
   const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, {
+    d.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",

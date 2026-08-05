@@ -25,7 +25,18 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+const US_SCOPE = `Scope: United States only. Never suggest a non-US destination unless the user explicitly names one.
+Units: miles, Fahrenheit, USD, MM/DD/YYYY dates, 12-hour times. Never metric, never Celsius.
+Name places as "Place, ST" (e.g. "Lake Okoboji, IA"). The family is scattered across the US: the
+organizer's default origin is Sioux Falls, SD, but never assume everyone drives from there. When you
+give a drive time, say which origin it is from, and prefer framing like "about 4 hr from Sioux Falls,
+longer for anyone coming from the coasts." Do not compute per-household drive times or averages —
+the app does that from survey answers. Never invent live prices, availability, or booking links —
+give typical ranges and say they're estimates.`;
+
 const CREATE_SYSTEM = `You are WandrAI, a warm, sharp trip co-planner helping someone start a U.S. family reunion (unless they specify elsewhere).
+
+${US_SCOPE}
 
 You feel like a helpful concierge — not a form. Keep momentum.
 
@@ -44,17 +55,21 @@ Rules:
 - No emoji unless they use them.`;
 
 const PLACES_SYSTEM = `You are WandrAI, helping pick U.S. destinations for a family reunion survey (unless they specify elsewhere).
+
+${US_SCOPE}
+
 You are a destination concierge: interview briefly, then deliver a concrete shortlist with photos on the right.
 
 Flow:
 1. Ask exactly one clarifying question per turn (region, drive time, vibe — not all at once).
 2. Offer 2 example directions when the question is open-ended.
 3. After 1–2 answers, propose 3–6 distinct US places. Call update_places_draft with:
-   - title: place name only
-   - summary: start with US state/region, then a short why (e.g. "Michigan · Classic lake towns, driveable")
+   - title: "Place, ST" (e.g. "Door County, WI")
+   - summary: short why — vibe, season, drive/flight fit
+   - state, driveMinutesFromOrigin, originMetro, nearestAirportCode, avgHighF, crowdLevel, typicalLodgingUsd when you can estimate them
 4. Invite them to refine and remind them saving unlocks the real survey.
 
-Rules: concise, no emoji unless they use them, no fake booking links. Use the draft context (trip name / notes) when present. Stay US-focused.`;
+Rules: concise, no emoji unless they use them, no fake booking links. Use the draft context (trip name / notes) when present.`;
 
 export async function POST(req: Request) {
   if (!hasAnthropicApiKey()) {
@@ -133,7 +148,8 @@ export async function POST(req: Request) {
       mode === "places"
         ? {
             update_places_draft: tool({
-              description: "Update survey destinations draft.",
+              description:
+                "Update survey destinations draft. For each place use title 'Place, ST' and fill US meta when known: state, driveMinutesFromOrigin, originMetro, nearestAirportCode, avgHighF, crowdLevel, typicalLodgingUsd (estimates only).",
               inputSchema: placesDraftSchema,
               execute: async (input) => {
                 const places = input.places.map((p) => ({

@@ -22,12 +22,21 @@ import {
   normalizeItinerary,
   type DayKey,
 } from "@/lib/itinerary";
+import { formatDateRangeUS } from "@/lib/units";
+import { parseFridayIso, sundayFromFriday } from "@/lib/weekends";
 import { goToTripHubStep } from "@/lib/wizardNav";
+
+const DAY_TAB_LABELS: Record<DayKey, string> = {
+  friday: "Fri",
+  saturday: "Sat",
+  sunday: "Sun",
+};
 
 export function TripItineraryPanel({
   slug,
   tripName,
   shareUrl,
+  locationTitle,
   itineraryRaw,
   selectedWeekendFriday,
   hasPlanContext,
@@ -39,6 +48,7 @@ export function TripItineraryPanel({
   slug: string;
   tripName: string;
   shareUrl: string;
+  locationTitle?: string | null;
   itineraryRaw: unknown;
   selectedWeekendFriday: string | null;
   hasPlanContext: boolean;
@@ -59,6 +69,20 @@ export function TripItineraryPanel({
   const currentDay = itinerary.days.find((d) => d.key === activeDay);
   const bookingItems = getBookingBlocks(itinerary);
   const hasBlocks = itinerary.days.some((d) => d.blocks.length > 0);
+
+  const fri = selectedWeekendFriday ? parseFridayIso(selectedWeekendFriday) : null;
+  const sun = selectedWeekendFriday ? sundayFromFriday(selectedWeekendFriday) : null;
+  const headerTitle =
+    locationTitle && fri && sun
+      ? `${locationTitle}, ${formatDateRangeUS(fri, sun)}`
+      : locationTitle ?? tripName;
+
+  const saturdayCount =
+    itinerary.days.find((d) => d.key === "saturday")?.blocks.length ?? 0;
+  const sundayCount =
+    itinerary.days.find((d) => d.key === "sunday")?.blocks.length ?? 0;
+  const showSaturdayNudge =
+    hasBlocks && saturdayCount > sundayCount && saturdayCount >= 3;
 
   async function generate() {
     setBusy(true);
@@ -100,83 +124,31 @@ export function TripItineraryPanel({
   }
 
   return (
-    <div className={`stack${hasBlocks ? " itinerary-reveal" : ""}`}>
+    <div className={`weekend-itinerary${hasBlocks ? " itinerary-reveal" : ""}`}>
       {lockedChip ? (
         <p className="trail-locked-chip" aria-label="Locked plan context">
           {lockedChip}
         </p>
       ) : null}
-      <div className="action-stack" aria-label="Itinerary actions">
-        <p className="action-stack-caption">Itinerary</p>
-        <button
-          type="button"
-          className="btn btn-berry"
-          disabled={busy}
-          onClick={() => generate()}
-        >
-          {busy ? "Generating…" : hasBlocks ? "Regenerate itinerary" : "Generate itinerary"}
-        </button>
-        {hasBlocks ? (
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setStatus(null);
-              try {
-                await publishItineraryAction(slug);
-                if (!isPublished) {
-                  queueTrailBeat(slug, "plan");
-                  goToTripHubStep(slug, "share");
-                } else {
-                  setStatus("Published plan updated.");
-                }
-                router.refresh();
-              } catch (err) {
-                setStatus(err instanceof Error ? err.message : "Could not publish.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {busy ? "Publishing…" : isPublished ? "Update published plan" : "Publish to family"}
-          </button>
-        ) : null}
-        {isPublished ? (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setStatus(null);
-              try {
-                await unpublishItineraryAction(slug);
-                setStatus("Unpublished—the share link no longer shows the itinerary.");
-                router.refresh();
-              } catch (err) {
-                setStatus(err instanceof Error ? err.message : "Could not unpublish.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Unpublish
-          </button>
-        ) : null}
-      </div>
 
-      {isPublished ? (
-        <ShareLinkCard
-          url={shareUrl}
-          title="Live for family"
-          hint="Same link as Share. Re-publish after edits to update what they see."
-        />
-      ) : hasBlocks ? (
-        <p className="muted" style={{ margin: 0, fontSize: "0.9rem" }}>
-          When ready, publish so family can view the day-by-day plan at your share link.
+      <header className="weekend-itinerary-head">
+        <h2 className="weekend-itinerary-title">{headerTitle}</h2>
+        <p className="weekend-itinerary-lede">
+          A loose plan — drag anything, or ask me to swap it.
         </p>
+      </header>
+
+      {!hasBlocks ? (
+        <div className="action-stack" aria-label="Itinerary actions">
+          <button
+            type="button"
+            className="btn btn-berry"
+            disabled={busy}
+            onClick={() => generate()}
+          >
+            {busy ? "Generating…" : "Generate itinerary"}
+          </button>
+        </div>
       ) : null}
 
       {status ? (
@@ -190,27 +162,27 @@ export function TripItineraryPanel({
 
       {hasBlocks ? (
         <>
-          <div className="day-tabs">
+          <div className="weekend-day-tabs" role="tablist" aria-label="Weekend days">
             {itinerary.days.map((day) => (
               <button
                 key={day.key}
                 type="button"
-                className={activeDay === day.key ? "btn btn-primary" : "btn btn-secondary"}
-                style={{ fontSize: "0.85rem" }}
+                role="tab"
+                aria-selected={activeDay === day.key}
+                className={`weekend-day-tab${activeDay === day.key ? " is-active" : ""}`}
                 onClick={() => setActiveDay(day.key)}
               >
-                {day.label.split(",")[0]}
+                {DAY_TAB_LABELS[day.key]}
               </button>
             ))}
           </div>
 
           {currentDay ? (
-            <div className="stack" style={{ gap: "0.75rem" }}>
-              <h3 style={{ margin: 0, color: "var(--color-fjord)" }}>{currentDay.label}</h3>
+            <div className="weekend-timeline-wrap">
               {currentDay.blocks.length === 0 ? (
-                <p className="muted">Nothing planned this day yet.</p>
+                <p className="muted weekend-timeline-empty">Nothing planned this day yet.</p>
               ) : (
-                <ul className="itinerary-block-list">
+                <ul className="weekend-timeline">
                   {currentDay.blocks.map((block) => (
                     <ItineraryBlockCard
                       key={block.id}
@@ -218,18 +190,37 @@ export function TripItineraryPanel({
                       dayKey={currentDay.key}
                       block={block}
                       planners={planners}
+                      timeline
                     />
                   ))}
                 </ul>
               )}
 
+              <button type="button" className="weekend-ghost-row">
+                + Add a stop, or ask WandrAI for an idea
+              </button>
 
-              <div className="card" style={{ padding: "1rem", background: "#fff" }}>
-                <p className="muted" style={{ margin: "0 0 0.5rem", fontSize: "0.9rem" }}>
-                  Refine this day with AI
-                </p>
-                <div className="refine-row">
-                  <div className="field" style={{ flex: 1, marginBottom: 0, minWidth: 0 }}>
+              <details className="weekend-block-details">
+                <summary>Edit stops &amp; booking status</summary>
+                <ul className="itinerary-block-list">
+                  {currentDay.blocks.map((block) => (
+                    <ItineraryBlockCard
+                      key={`edit-${block.id}`}
+                      slug={slug}
+                      dayKey={currentDay.key}
+                      block={block}
+                      planners={planners}
+                    />
+                  ))}
+                </ul>
+              </details>
+
+              <details className="itinerary-chat-details">
+                <summary className="itinerary-chat-details-summary">
+                  Ask WandrAI about this plan
+                </summary>
+                <div className="itinerary-chat-details-body">
+                  <div className="field" style={{ marginBottom: "0.75rem" }}>
                     <label htmlFor={`refine-${activeDay}`} className="sr-only">
                       Refine day
                     </label>
@@ -240,23 +231,16 @@ export function TripItineraryPanel({
                       value={refineDraft}
                       onChange={(e) => setRefineDraft(e.target.value)}
                     />
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-block-sm"
+                      disabled={busy}
+                      style={{ marginTop: "0.5rem" }}
+                      onClick={() => refineDay()}
+                    >
+                      Update day
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-block-sm"
-                    disabled={busy}
-                    onClick={() => refineDay()}
-                  >
-                    Update day
-                  </button>
-                </div>
-              </div>
-
-              <details className="itinerary-chat-details">
-                <summary className="itinerary-chat-details-summary">
-                  Ask WandrAI about this plan
-                </summary>
-                <div className="itinerary-chat-details-body">
                   <TripItineraryChat
                     key={activeDay}
                     slug={slug}
@@ -271,30 +255,96 @@ export function TripItineraryPanel({
             </div>
           ) : null}
 
+          <div className="weekend-itinerary-foot">
+            <button
+              type="button"
+              className="btn btn-berry weekend-share-cta"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setStatus(null);
+                try {
+                  await publishItineraryAction(slug);
+                  if (!isPublished) {
+                    queueTrailBeat(slug, "plan");
+                    goToTripHubStep(slug, "share");
+                  } else {
+                    setStatus("Published plan updated.");
+                  }
+                  router.refresh();
+                } catch (err) {
+                  setStatus(err instanceof Error ? err.message : "Could not publish.");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "Publishing…" : "Share with the family →"}
+            </button>
+
+            <div className="weekend-itinerary-actions-secondary">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={busy}
+                onClick={() => generate()}
+              >
+                Regenerate
+              </button>
+              {isPublished ? (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setStatus(null);
+                    try {
+                      await unpublishItineraryAction(slug);
+                      setStatus("Unpublished—the share link no longer shows the itinerary.");
+                      router.refresh();
+                    } catch (err) {
+                      setStatus(err instanceof Error ? err.message : "Could not unpublish.");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Unpublish
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {showSaturdayNudge ? (
+            <p className="weekend-itinerary-nudge">
+              Saturday is the fullest day. Say the word and I&apos;ll move the hike to
+              Sunday.
+            </p>
+          ) : null}
+
+          {isPublished ? (
+            <ShareLinkCard
+              url={shareUrl}
+              title="Live for family"
+              hint="Same link as Share. Re-publish after edits to update what they see."
+              bare
+            />
+          ) : null}
+
           {bookingItems.length > 0 ? (
-            <div>
-              <h3 style={{ margin: "1rem 0 0.5rem" }}>Booking checklist</h3>
-              <ul style={{ listStyle: "none", padding: 0, margin: 0 }} className="stack">
+            <details className="weekend-block-details">
+              <summary>Booking checklist ({bookingItems.length})</summary>
+              <ul className="stack" style={{ listStyle: "none", padding: 0, margin: "0.75rem 0 0" }}>
                 {bookingItems.map((item) => (
-                  <li
-                    key={item.id}
-                    style={{
-                      border: "1px solid rgba(28,61,90,0.1)",
-                      borderRadius: "var(--radius-md)",
-                      padding: "0.65rem 0.85rem",
-                      background: "rgba(94, 234, 212, 0.08)",
-                      fontSize: "0.9rem",
-                    }}
-                  >
+                  <li key={item.id} className="weekend-booking-row">
                     <strong>{item.title}</strong>
                     <span className="muted"> · {item.dayLabel}</span>
-                    <span className="pill" style={{ marginLeft: "0.5rem", fontSize: "0.7rem" }}>
-                      {item.status.replace("_", " ")}
-                    </span>
+                    <span className="pill">{item.status.replace("_", " ")}</span>
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           ) : null}
         </>
       ) : (

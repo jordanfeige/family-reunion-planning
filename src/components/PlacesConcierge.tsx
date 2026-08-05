@@ -70,9 +70,9 @@ function starterMessage(tripName: string): UIMessage {
 }
 
 const PLACE_CHIPS = [
-  "Midwest lakes, within a day’s drive",
-  "Mountain towns we can fly into",
-  "Beach weekend, warm in early fall",
+  "Under 3 hr",
+  "Up to 6 hr",
+  "Anywhere we can fly",
 ];
 
 export function PlacesConcierge({
@@ -83,6 +83,7 @@ export function PlacesConcierge({
   aiEnabled,
   surveyUrl,
   basicsSlot,
+  nudgeSlot,
 }: {
   slug: string;
   tripName: string;
@@ -91,6 +92,7 @@ export function PlacesConcierge({
   aiEnabled: boolean;
   surveyUrl?: string;
   basicsSlot?: React.ReactNode;
+  nudgeSlot?: React.ReactNode;
 }) {
   const router = useRouter();
   const [refining, setRefining] = useState(locations.length === 0 && aiEnabled);
@@ -147,6 +149,7 @@ export function PlacesConcierge({
 
   return (
     <div className="dest-workspace">
+      {nudgeSlot ? <div className="dest-nudge-callout">{nudgeSlot}</div> : null}
       {basicsSlot}
       {!aiEnabled ? (
         <p className="muted" style={{ marginBottom: "1rem" }}>
@@ -288,10 +291,7 @@ function PlacesFullPlanner({
     setPublishError(null);
     startTransition(async () => {
       try {
-        await publishPlacesDraftAction(
-          slug,
-          selected.map((p) => ({ title: p.title, summary: p.summary })),
-        );
+        await publishPlacesDraftAction(slug, selected);
         onPublished(selected.map((p) => p.title));
       } catch (err) {
         setPublishError(err instanceof Error ? err.message : "Could not publish places.");
@@ -407,6 +407,7 @@ function PlacesFullPlanner({
         }}
         onConfirm={publish}
         confirmBusy={pending}
+        onDifferentIdeas={() => void send("Show me different ideas")}
       />
     </div>
   );

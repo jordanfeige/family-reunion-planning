@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { TripDashboardManage } from "@/components/TripDashboardManage";
 import { APP_TAGLINE } from "@/lib/brand";
-import { organizerTripResume } from "@/lib/organizerTripResume";
+import { dashboardTripCardMeta } from "@/lib/dashboardTripCard";
 import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
 import { claimGuestSubmissionsForUser } from "@/lib/supabase/guestIdentity";
 import { listGuestTripsForUser } from "@/lib/supabase/guestTrips";
@@ -152,9 +152,9 @@ export default async function DashboardPage() {
                   Active trips
                 </h2>
               )}
-              <ul className="trip-list">
+              <ul className="dashboard-card-grid">
                 {list.map((trip) => {
-                  const resume = organizerTripResume({
+                  const card = dashboardTripCardMeta({
                     slug: trip.slug,
                     locationOptions: trip.locationOptions,
                     proposedDateSlots: trip.proposedDateSlots,
@@ -165,32 +165,61 @@ export default async function DashboardPage() {
                     surveyResponseCount: trip.surveyResponseCount,
                   });
                   return (
-                    <li key={trip.id} className="trip-list-row">
-                      <div className="trip-list-main">
-                        <div>
-                          <strong className="trip-list-name">{trip.name}</strong>
-                          {trip.access === "collaborator" ? (
-                            <span className="pill trip-list-pill">Shared</span>
-                          ) : null}
-                          {trip.tagline ? (
-                            <p className="muted trip-list-tagline">{trip.tagline}</p>
-                          ) : null}
-                          <p className="muted trip-list-stage">{resume.stageLabel}</p>
-                        </div>
-                        <div className="trip-list-actions">
-                          <Link className="btn btn-primary btn-sm" href={resume.href}>
-                            {resume.ctaLabel}
-                          </Link>
-                          <TripDashboardManage
-                            slug={trip.slug}
-                            tripName={trip.name}
-                            access={trip.access}
+                    <li key={trip.id} className="dashboard-card">
+                      <Link href={card.href} className="dashboard-card-link">
+                        <div className="dashboard-card-photo-wrap">
+                          <img
+                            src={card.photoUrl}
+                            alt=""
+                            className="dashboard-card-photo"
+                            loading="lazy"
                           />
+                          <span className="dashboard-card-status-chip">
+                            {card.statusPrimary} · {card.statusSecondary}
+                          </span>
                         </div>
+                        <div className="dashboard-card-body">
+                          <h3 className="dashboard-card-name">{trip.name}</h3>
+                          {trip.access === "collaborator" ? (
+                            <span className="pill dashboard-card-pill">Shared</span>
+                          ) : null}
+                          <p className="dashboard-card-meta muted">
+                            {[card.dateRangeLabel, card.householdLabel]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                          <div
+                            className="dashboard-card-progress"
+                            aria-label={`${card.filledSegments} of 5 steps complete`}
+                          >
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <span
+                                key={i}
+                                className={`dashboard-card-progress-seg${i < card.filledSegments ? " is-filled" : ""}`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </Link>
+                      <div className="dashboard-card-foot">
+                        <Link className="btn btn-primary btn-sm" href={card.href}>
+                          {card.ctaLabel}
+                        </Link>
+                        <TripDashboardManage
+                          slug={trip.slug}
+                          tripName={trip.name}
+                          access={trip.access}
+                        />
                       </div>
                     </li>
                   );
                 })}
+                <li className="dashboard-card dashboard-card--new">
+                  <Link href="/plan" className="dashboard-card-new-link">
+                    <span className="dashboard-card-new-title">Start something new</span>
+                    <span className="muted dashboard-card-new-copy">A prompt is enough</span>
+                  </Link>
+                </li>
               </ul>
             </>
           )}

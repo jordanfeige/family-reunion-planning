@@ -21,10 +21,12 @@ export function ShareLinkCard({
   previewHref,
   meta,
   metaTone = "ok",
-  copyLabel = "Copy",
+  copyLabel = "Copy link",
   copyClassName = "btn-primary",
   bare = false,
   status,
+  inviteByEmailHref,
+  onInviteByEmail,
 }: {
   url: string;
   title?: string;
@@ -36,7 +38,11 @@ export function ShareLinkCard({
   copyClassName?: string;
   bare?: boolean;
   status?: string;
+  inviteByEmailHref?: string;
+  onInviteByEmail?: () => void;
 }) {
+  const showInvite = Boolean(inviteByEmailHref || onInviteByEmail);
+
   return (
     <div
       className={`share-link-card hub-panel${bare ? " share-link-card--bare" : ""}`}
@@ -57,14 +63,31 @@ export function ShareLinkCard({
         </div>
       ) : null}
       <div className="share-link-row">
-        <p className="share-link-card-url" title={url}>
+        <p className="share-link-card-url mono" title={url}>
           {displayUrl(url)}
         </p>
-        <CopyButton
-          text={url}
-          label={copyLabel}
-          className={`${copyClassName} btn-sm share-link-copy`}
-        />
+        <div className="share-link-row-actions">
+          <CopyButton
+            text={url}
+            label={copyLabel}
+            className={`${copyClassName} btn-sm share-link-copy`}
+          />
+          {showInvite ? (
+            inviteByEmailHref ? (
+              <Link href={inviteByEmailHref} className="btn btn-berry btn-sm">
+                Invite by email
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-berry btn-sm"
+                onClick={onInviteByEmail}
+              >
+                Invite by email
+              </button>
+            )
+          ) : null}
+        </div>
       </div>
       <div className="share-link-card-foot">
         {status ? <p className="share-link-status">{status}</p> : null}
@@ -75,7 +98,7 @@ export function ShareLinkCard({
             rel="noreferrer"
             className="share-link-preview"
           >
-            Preview survey
+            Preview plan
           </Link>
         ) : null}
       </div>

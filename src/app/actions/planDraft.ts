@@ -35,6 +35,25 @@ export async function savePlanDraftPayloadAction(payload: PlanDraftPayload) {
   return { ok: true as const };
 }
 
+/** Guest-safe: persist survey composition to the plan draft cookie. */
+export async function savePlanSurveyDraftAction(payload: {
+  surveyPrefs?: PlanDraftPayload["surveyPrefs"];
+  step?: PlanDraftPayload["step"];
+}) {
+  const secret = await readPlanDraftCookieSecret();
+  if (!secret) throw new Error("No active plan draft.");
+  const draft = await getPlanDraftBySecret(secret);
+  if (!draft) throw new Error("Plan draft expired. Start again from the home page.");
+
+  const parsed = planDraftPayloadSchema.parse({
+    ...draft.payload,
+    ...payload,
+    step: payload.step ?? "survey",
+  });
+  await updatePlanDraftPayload(draft.id, parsed);
+  return { ok: true as const };
+}
+
 /** Persist draft + send user to Google (or claim immediately if already signed in). */
 export async function beginSavePlanDraftAction(payload?: PlanDraftPayload) {
   const draft = await ensurePlanDraft();
@@ -59,10 +78,7 @@ export async function beginSavePlanDraftAction(payload?: PlanDraftPayload) {
   redirect(`/login?intent=signup&callbackUrl=${encodeURIComponent("/api/plan/claim")}`);
 }
 
-/**
- * After Google sign-in: turn cookie draft into a real owned trip.
- * Call from /plan/claim only when authenticated.
- */
+/** After Google sign-in: turn cookie draft into a real owned trip. Call from /api/plan/claim only when authenticated. */
 export async function claimPlanDraftForUser(): Promise<{ slug: string } | { error: string }> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -113,6 +129,20 @@ export async function claimPlanDraftForUser(): Promise<{ slug: string } | { erro
         title: p.title.trim(),
         summary: p.summary?.trim() || undefined,
       })),
+    });
+  }
+
+  const surveyPrefs = draft.payload.surveyPrefs;
+  if (surveyPrefs?.proposedWeekends?.length) {
+    const homeCity = surveyPrefs.homeCity?.trim();
+    const homeState = surveyPrefs.homeState?.trim();
+    await updateTripById(trip.id, {
+      proposedDateSlots: surveyPrefs.proposedWeekends,
+      ...(homeCity && homeState
+        ? {
+            originMetro: `${homeCity}, ${homeState.toUpperCase().slice(0, 2)}`,
+          }
+        : {}),
     });
   }
 

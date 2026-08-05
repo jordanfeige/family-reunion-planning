@@ -14,6 +14,7 @@ export function TripHubWizard({
   slug,
   completion,
   initialStepId,
+  trailAside,
   destinations,
   survey,
   decision,
@@ -23,6 +24,7 @@ export function TripHubWizard({
   slug: string;
   completion: TripHubCompletion;
   initialStepId?: string;
+  trailAside?: React.ReactNode;
   destinations: React.ReactNode;
   survey: React.ReactNode;
   decision: React.ReactNode;
@@ -77,6 +79,7 @@ export function TripHubWizard({
       storageKey={`trip-hub-step-${slug}`}
       steps={steps}
       initialStepId={initialStepId}
+      trailAside={trailAside}
       lastStepLabel="Back to start"
     />
   );

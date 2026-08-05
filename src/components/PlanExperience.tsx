@@ -9,9 +9,10 @@ import {
   type UIMessage,
 } from "ai";
 
-import { beginSavePlanDraftAction, savePlanDraftPayloadAction } from "@/app/actions/planDraft";
+import { savePlanDraftPayloadAction } from "@/app/actions/planDraft";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
+import { HubSurveyComposer } from "@/components/HubSurveyComposer";
 import { LiveShortlist } from "@/components/LiveShortlist";
 import { TrailMap } from "@/components/TrailMap";
 import {
@@ -103,7 +104,7 @@ function placesStarter(tripName?: string): UIMessage {
   };
 }
 
-type Phase = "create" | "places" | "save";
+type Phase = "create" | "places" | "survey";
 
 const TRIP_CHIPS = [
   "About 20 people — my side of the family",
@@ -112,9 +113,9 @@ const TRIP_CHIPS = [
 ];
 
 const PLACES_CHIPS = [
-  "Midwest lakes, within a day’s drive",
-  "Mountain towns people can fly into",
-  "Beach weekend, warm in early fall",
+  "Under 3 hr",
+  "Up to 6 hr",
+  "Anywhere we can fly",
 ];
 
 export function PlanExperience({
@@ -131,8 +132,12 @@ export function PlanExperience({
   signedIn?: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>(
-    initialPayload.step === "places" || initialPayload.step === "save"
-      ? initialPayload.step
+    initialPayload.step === "places" ||
+    initialPayload.step === "survey" ||
+    initialPayload.step === "save"
+      ? initialPayload.step === "save"
+        ? "survey"
+        : initialPayload.step
       : "create",
   );
   const [messageCount, setMessageCount] = useState(initialMessageCount);
@@ -154,7 +159,7 @@ export function PlanExperience({
   const capped = !signedIn && isMessageCapped(messageCount);
   const remaining = messagesRemaining(messageCount);
 
-  function goSave(trip?: TripDraft | null, places?: PlacesDraftItem[]) {
+  function goSurvey(trip?: TripDraft | null, places?: PlacesDraftItem[]) {
     const payload: PlanDraftPayload = {
       name: trip?.name ?? localTrip?.name ?? initialPayload.name,
       tagline: trip?.tagline ?? localTrip?.tagline ?? initialPayload.tagline,
@@ -169,15 +174,24 @@ export function PlanExperience({
           ?.filter((p) => p.selected !== false)
           .map((p) => ({ title: p.title, summary: p.summary })) ??
         initialPayload.locationTitles,
-      step: "save",
+      surveyPrefs: initialPayload.surveyPrefs,
+      step: "survey",
     };
     startTransition(async () => {
-      await beginSavePlanDraftAction(payload);
+      await savePlanDraftPayloadAction(payload);
+      setPhase("survey");
     });
   }
 
-  const saveLabel = signedIn ? "Create trip hub" : "Save with Google";
-  const saveWallLabel = signedIn ? "Create trip & open hub" : "Continue with Google";
+  const draftLocations = useMemo(
+    () =>
+      (initialPayload.locationTitles ?? []).map((p) => ({
+        id: p.title,
+        title: p.title,
+        summary: p.summary,
+      })),
+    [initialPayload.locationTitles],
+  );
 
   const trailStops = [
     { id: "create", label: "Basics", complete: Boolean(localTrip?.name) || phase !== "create" },
@@ -185,10 +199,9 @@ export function PlanExperience({
       id: "places",
       label: "Destinations",
       complete:
-        (initialPayload.locationTitles?.length ?? 0) > 0 ||
-        phase === "save",
+        (initialPayload.locationTitles?.length ?? 0) > 0 || phase === "survey",
     },
-    { id: "save", label: "Save", complete: false },
+    { id: "survey", label: "Survey", complete: false },
   ];
 
   return (
@@ -199,16 +212,16 @@ export function PlanExperience({
           <h1 className="plan-workspace-title">
             {phase === "places"
               ? "Find destinations together"
-              : phase === "save"
-                ? "Save your trip"
+              : phase === "survey"
+                ? "Ask the family"
                 : "Start your reunion plan"}
           </h1>
           <p className="plan-workspace-lede">
             {phase === "places"
               ? "Chat with WandrAI — a live shortlist builds beside you for the family survey."
-              : phase === "save"
-                ? "Lock this draft into a real trip hub so you can share the survey."
-                : "Answer a few questions. I’ll name the trip, then we’ll craft destinations your family can vote on."}
+              : phase === "survey"
+                ? "Six questions, two minutes. You'll see answers land here once you send."
+                : "Answer a few questions. I'll name the trip, then we'll craft destinations your family can vote on."}
           </p>
         </div>
         {!signedIn ? (
@@ -222,11 +235,11 @@ export function PlanExperience({
 
       <TrailMap
         stops={trailStops}
-        activeId={phase === "save" || capped ? "save" : phase}
+        activeId={phase}
         onSelect={(id) => {
           if (id === "create") setPhase("create");
           if (id === "places" && localTrip?.name) setPhase("places");
-          if (id === "save" && localTrip?.name) setPhase("save");
+          if (id === "survey" && localTrip?.name) setPhase("survey");
         }}
       />
 
@@ -245,7 +258,7 @@ export function PlanExperience({
         <CreatePhase
           aiEnabled={aiEnabled && !capped}
           capped={capped}
-          saveLabel={saveLabel}
+          saveLabel="Continue to survey →"
           hints={hints}
           onHint={(patch) => setHints((h) => ({ ...h, ...patch }))}
           onTrip={setLocalTrip}
@@ -264,7 +277,7 @@ export function PlanExperience({
               setPhase("places");
             });
           }}
-          onSave={(t) => goSave(t)}
+          onSave={(t) => goSurvey(t)}
           pending={pending}
         />
       ) : null}
@@ -274,7 +287,7 @@ export function PlanExperience({
           tripName={localTrip?.name ?? initialPayload.name}
           aiEnabled={aiEnabled && !capped}
           capped={capped}
-          saveLabel={signedIn ? "Create hub & get survey link" : "Save & get survey link"}
+          saveLabel="Continue to survey →"
           seedPlaces={
             initialPayload.locationTitles?.map((p) => ({
               title: p.title,
@@ -288,24 +301,21 @@ export function PlanExperience({
           setUnchecked={setUnchecked}
           onUserMessage={() => setMessageCount((c) => c + 1)}
           onBack={() => setPhase("create")}
-          onSave={(places) => goSave(localTrip, places)}
+          onSave={(places) => goSurvey(localTrip, places)}
           pending={pending}
         />
       ) : null}
 
-      {phase === "save" || capped ? (
-        <SaveWall
-          tripName={localTrip?.name ?? initialPayload.name}
-          placesCount={
-            initialPayload.locationTitles?.length ||
-            localTrip?.locationTitles?.length ||
-            0
-          }
-          pending={pending}
-          signedIn={signedIn}
-          saveLabel={saveWallLabel}
-          onSave={() => goSave(localTrip)}
-        />
+      {phase === "survey" ? (
+        <section className="plan-panel">
+          <HubSurveyComposer
+            signedIn={signedIn}
+            locations={draftLocations}
+            initialPrefs={initialPayload.surveyPrefs}
+            initialWeekends={initialPayload.surveyPrefs?.proposedWeekends ?? []}
+            planDraftMode
+          />
+        </section>
       ) : null}
     </div>
   );
@@ -618,7 +628,6 @@ function PlacesPhase({
     ...p,
     selected: !unchecked[p.title.trim().toLowerCase()],
   }));
-  const selected = places.filter((p) => p.selected !== false);
 
   const lastMessage = messages[messages.length - 1];
   const streamingAssistant =
@@ -704,59 +713,15 @@ function PlacesPhase({
             });
           }}
           onConfirm={() => onSave(places)}
-          confirmLabel={saveLabel}
           confirmBusy={pending}
-          confirmDisabled={selected.length === 0}
+          onDifferentIdeas={() => void send("Show me different ideas")}
         />
       </div>
       {capped ? (
         <p className="muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
-          Message limit reached — save to continue.
+          Message limit reached — you can still compose the survey.
         </p>
       ) : null}
-    </section>
-  );
-}
-
-function SaveWall({
-  tripName,
-  placesCount,
-  pending,
-  signedIn,
-  saveLabel,
-  onSave,
-}: {
-  tripName?: string;
-  placesCount: number;
-  pending: boolean;
-  signedIn: boolean;
-  saveLabel: string;
-  onSave: () => void;
-}) {
-  return (
-    <section className="plan-save-wall plan-save-wall--trail">
-      <p className="plan-workspace-eyebrow">Almost there</p>
-      <h2>
-        {signedIn ? "Create your trip hub" : "Save your trip to get the survey link"}
-      </h2>
-      <p className="muted">
-        {tripName ? (
-          <>
-            <strong>{tripName}</strong>
-            {placesCount > 0 ? ` · ${placesCount} places` : null} is ready.{" "}
-            {signedIn
-              ? "Create the hub to unlock sharing on the Trail Map."
-              : "Continue with Google to unlock sharing on the Trail Map."}
-          </>
-        ) : signedIn ? (
-          <>Create your hub to keep planning and unlock the family survey link.</>
-        ) : (
-          <>Continue with Google to save your plan and unlock the family survey link.</>
-        )}
-      </p>
-      <button type="button" className="btn btn-berry" disabled={pending} onClick={onSave}>
-        {pending ? "Continuing…" : saveLabel}
-      </button>
     </section>
   );
 }

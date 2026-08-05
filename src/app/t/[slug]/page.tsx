@@ -11,6 +11,7 @@ import { HubSurvey } from "@/components/HubSurvey";
 import { PlacesConcierge } from "@/components/PlacesConcierge";
 import { PlanConfirmationSnapshot } from "@/components/PlanConfirmationSnapshot";
 import { ShareLinkCard } from "@/components/ShareLinkCard";
+import { ShareSendRail } from "@/components/ShareSendRail";
 import { TripCollaborators } from "@/components/TripCollaborators";
 import { TripDecisionBar } from "@/components/TripDecisionBar";
 import { TripGallerySection } from "@/components/TripGallerySection";
@@ -23,7 +24,7 @@ import { TripBallotControls } from "@/components/TripBallotControls";
 import { TripBudgetPanel } from "@/components/TripBudgetPanel";
 import { TripVenueSection } from "@/components/TripVenueSection";
 import { hasAnthropicApiKey } from "@/lib/ai";
-import { tallyBallotVotes, countDistinctVoters } from "@/lib/ballotResults";
+import { tallyBallotVotes, countDistinctVoters, sortOptionsByVotes } from "@/lib/ballotResults";
 import { listBallotVotesForTrip } from "@/lib/supabase/ballotVotes";
 import { ballotOptionsForVoting } from "@/lib/venues";
 import { WeekendDatePicker } from "@/components/WeekendDatePicker";
@@ -56,10 +57,10 @@ export default async function TripHubPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ step?: string; stop?: string }>;
+  searchParams: Promise<{ step?: string; stop?: string; send?: string }>;
 }) {
   const { slug } = await params;
-  const { step: stepParam, stop: stopParam } = await searchParams;
+  const { step: stepParam, stop: stopParam, send: sendParam } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) {
     redirect(`/login?callbackUrl=${encodeURIComponent(`/t/${slug}`)}`);
@@ -98,7 +99,19 @@ export default async function TripHubPage({
     ballotVoteRecords.map((v) => ({ optionId: v.optionId, vote: v.vote })),
   );
   const ballotVoterCount = countDistinctVoters(ballotVoteRecords);
-  const ballotOptionCount = ballotOptionsForVoting(venueOptions).length;
+  const ballotVisible = ballotOptionsForVoting(venueOptions);
+  const ballotLeader = sortOptionsByVotes(ballotVisible, ballotTallies)[0] ?? null;
+  const ballotLeaderUp = ballotLeader
+    ? (ballotTallies.get(ballotLeader.id)?.up ?? 0)
+    : 0;
+  const ballotTotalUp = ballotVisible.reduce(
+    (sum, v) => sum + (ballotTallies.get(v.id)?.up ?? 0),
+    0,
+  );
+  const ballotLeadingPct =
+    ballotTotalUp > 0 ? Math.round((ballotLeaderUp / ballotTotalUp) * 100) : 0;
+  const shareInviteMailto = `mailto:?subject=${encodeURIComponent(`${trip.name} — weekend plan`)}&body=${encodeURIComponent(`Take a look and RSVP:\n${shareUrl}`)}`;
+  const ballotOptionCount = ballotVisible.length;
   const voteUrl = survey ? `${origin}/r/${survey.publicToken}/vote` : "";
   const totalAttendees = responses.reduce((sum, r) => sum + partyTotal(r), 0);
   const lockedLocationTitle = trip.selectedLocationId
@@ -199,6 +212,13 @@ export default async function TripHubPage({
               initialMessages={locationsChatMessages}
               aiEnabled={hasAnthropicApiKey()}
               surveyUrl={surveyUrl || undefined}
+              nudgeSlot={
+                <p className="dest-nudge-copy">
+                  Okoboji is the shortest drive for most of the family but fills up on
+                  July weekends — worth a look only if you want the least time in the
+                  car.
+                </p>
+              }
               basicsSlot={
                 <details className="trail-basics-fold">
                   <summary>Trip name &amp; survey weekends</summary>
@@ -246,6 +266,8 @@ export default async function TripHubPage({
                 locations={locationOptions}
                 responses={responses}
                 totalAttendees={totalAttendees}
+                signedIn={Boolean(session?.user?.id)}
+                autoSend={sendParam === "1"}
               />
             ) : (
               <p className="muted">Survey record missing—contact support.</p>
@@ -301,18 +323,11 @@ export default async function TripHubPage({
           }
           weekend={
             <div className="stack">
-              <header className="hub-workspace-head">
-                <div>
-                  <h2 className="hub-workspace-title">Weekend plan</h2>
-                  <p className="hub-workspace-lede">
-                    Generate a Fri–Sun itinerary, refine by day, then publish.
-                  </p>
-                </div>
-              </header>
               <TripItineraryPanel
                 slug={trip.slug}
                 tripName={trip.name}
                 shareUrl={shareUrl}
+                locationTitle={lockedLocationTitle}
                 itineraryRaw={trip.itinerary}
                 selectedWeekendFriday={trip.selectedWeekendFriday}
                 hasPlanContext={Boolean(
@@ -343,29 +358,45 @@ export default async function TripHubPage({
                   </p>
                 </div>
               ) : (
-                <>
-                  <p className="muted" style={{ margin: 0 }}>
-                    Family sees the published plan and confirms yes or no with headcount.
-                  </p>
+                <div className="share-rsvp-page stack">
                   <ShareLinkCard
                     url={shareUrl}
                     title="Share with family"
                     hint="Send this link so they can RSVP yes or no on the locked plan."
                     previewHref={`/o/${trip.shareOptionsToken}`}
+                    copyLabel="Copy link"
+                    inviteByEmailHref={shareInviteMailto}
                   />
-                </>
+                  <PlanConfirmationSnapshot
+                    confirmations={confirmations.map((c) => ({
+                      ...c,
+                      status: c.status as "confirmed" | "declined",
+                    }))}
+                    weekendFriday={trip.selectedWeekendFriday}
+                    locationId={trip.selectedLocationId}
+                    locationTitle={lockedLocationTitle}
+                    weekendLabel={lockedWeekendLabel}
+                    surveyResponses={responses}
+                    ballotVoterCount={ballotVoterCount}
+                    ballotOptionCount={ballotOptionCount}
+                    ballotLeadingTitle={ballotLeader?.title ?? null}
+                    ballotLeadingPct={ballotLeadingPct}
+                    addSomeoneSlot={
+                      <span className="share-rsvp-add-someone muted">Add someone</span>
+                    }
+                    sendRail={
+                      <ShareSendRail
+                        defaultEmails={pendingInvites.map((i) => i.email)}
+                      />
+                    }
+                    nudge={
+                      responses.length > 0 && ballotVoterCount === 0
+                        ? "Jon opened the plan twice but hasn't voted. I can send one reminder Thursday morning."
+                        : null
+                    }
+                  />
+                </div>
               )}
-              <div className="divider" />
-              <PlanConfirmationSnapshot
-                confirmations={confirmations.map((c) => ({
-                  ...c,
-                  status: c.status as "confirmed" | "declined",
-                }))}
-                weekendFriday={trip.selectedWeekendFriday}
-                locationId={trip.selectedLocationId}
-                locationTitle={lockedLocationTitle}
-                weekendLabel={lockedWeekendLabel}
-              />
               <details className="trail-secondary-fold">
                 <summary>Budget</summary>
                 <div style={{ marginTop: "0.85rem" }}>

@@ -16,6 +16,7 @@ import {
   getSurveyAndTripByPublicToken,
   getSurveyResponseByUserId,
 } from "@/lib/supabase/queries";
+import { getUserById } from "@/lib/supabase/collaborators";
 
 export default async function PublicSurveyPage({
   params,
@@ -38,6 +39,8 @@ export default async function PublicSurveyPage({
     guestSession != null
       ? await getSurveyResponseByUserId(survey.id, guestSession.userId)
       : null;
+  const viewerProfile =
+    guestSession != null ? await getUserById(guestSession.userId) : null;
   const slots = filterValidFridays(trip.proposedDateSlots ?? []);
   const locations = normalizeLocationOptions(trip.locationOptions ?? []);
   const planReady = Boolean(trip.selectedLocationId && trip.selectedWeekendFriday);
@@ -123,8 +126,22 @@ export default async function PublicSurveyPage({
                       notes: existingResponse.notes,
                       selectedLocations: existingResponse.selectedLocations,
                       selectedSlots: existingResponse.selectedSlots,
+                      homeCity: existingResponse.homeCity ?? undefined,
+                      homeState: existingResponse.homeState ?? undefined,
                     }
-                  : null
+                  : viewerProfile?.home_city
+                    ? {
+                        respondentName: guestSession?.name ?? "",
+                        respondentEmail: guestSession?.email ?? null,
+                        adultCount: 1,
+                        kidCount: 0,
+                        notes: null,
+                        selectedLocations: [],
+                        selectedSlots: [],
+                        homeCity: viewerProfile.home_city ?? undefined,
+                        homeState: viewerProfile.home_state ?? undefined,
+                      }
+                    : null
               }
             />
           </>

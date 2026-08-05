@@ -175,6 +175,7 @@ export async function updateTripById(
     tripStart?: Date | null;
     tripEnd?: Date | null;
     proposedDateSlots?: string[];
+    originMetro?: string;
     locationOptions?: LocationOption[];
     selectedLocationId?: string | null;
     selectedWeekendFriday?: string | null;
@@ -202,6 +203,7 @@ export async function updateTripById(
       trip_end:
         patch.tripEnd !== undefined ? patch.tripEnd?.toISOString() ?? null : undefined,
       proposed_date_slots: patch.proposedDateSlots,
+      origin_metro: patch.originMetro,
       location_options: patch.locationOptions,
       selected_location_id: patch.selectedLocationId,
       selected_weekend_friday: patch.selectedWeekendFriday,
@@ -274,6 +276,8 @@ export async function insertSurveyResponse(input: {
   kidCount: number;
   attendeeCount: number;
   notes: string | null;
+  homeCity?: string | null;
+  homeState?: string | null;
 }) {
   const { error } = await supabase().from("survey_response").insert({
     id: newId(),
@@ -287,6 +291,8 @@ export async function insertSurveyResponse(input: {
     kid_count: input.kidCount,
     attendee_count: input.attendeeCount,
     notes: input.notes,
+    home_city: input.homeCity ?? null,
+    home_state: input.homeState ?? null,
   });
 
   if (error) throwDb(error, "insertSurveyResponse");
@@ -303,6 +309,8 @@ export async function upsertSurveyResponseForUser(input: {
   kidCount: number;
   attendeeCount: number;
   notes: string | null;
+  homeCity?: string | null;
+  homeState?: string | null;
 }): Promise<SurveyResponse> {
   const existing = await getSurveyResponseByUserId(input.surveyId, input.userId);
   const row = {
@@ -316,6 +324,8 @@ export async function upsertSurveyResponseForUser(input: {
     kid_count: input.kidCount,
     attendee_count: input.attendeeCount,
     notes: input.notes,
+    home_city: input.homeCity ?? null,
+    home_state: input.homeState ?? null,
     submitted_at: new Date().toISOString(),
   };
 

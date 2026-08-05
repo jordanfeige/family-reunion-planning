@@ -36,6 +36,7 @@ export type Database = {
           itinerary: Json;
           published_itinerary: Json | null;
           share_options_token: string;
+          origin_metro: string;
           owner_id: string;
           created_at: string;
           updated_at: string;
@@ -62,6 +63,7 @@ export type Database = {
           itinerary?: Json;
           published_itinerary?: Json | null;
           share_options_token: string;
+          origin_metro?: string;
           owner_id: string;
           created_at?: string;
           updated_at?: string;
@@ -125,6 +127,8 @@ export type Database = {
           kid_count: number;
           attendee_count: number;
           notes: string | null;
+          home_city: string | null;
+          home_state: string | null;
           submitted_at: string;
         };
         Insert: {
@@ -139,6 +143,8 @@ export type Database = {
           kid_count?: number;
           attendee_count?: number;
           notes?: string | null;
+          home_city?: string | null;
+          home_state?: string | null;
           submitted_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["survey_response"]["Insert"]>;

@@ -26,6 +26,8 @@ type UserRow = {
   id: string;
   email: string | null;
   name: string | null;
+  home_city?: string | null;
+  home_state?: string | null;
 };
 
 function supabase() {
@@ -257,12 +259,28 @@ export async function getUserByEmail(email: string): Promise<UserRow | null> {
 export async function getUserById(userId: string): Promise<UserRow | null> {
   const { data, error } = await supabase()
     .from("user")
-    .select("id, email, name")
+    .select("id, email, name, home_city, home_state")
     .eq("id", userId)
     .maybeSingle();
 
   if (error) throwDb(error, "getUserById");
   return data as UserRow | null;
+}
+
+export async function updateUserHome(
+  userId: string,
+  homeCity: string,
+  homeState: string,
+) {
+  const { error } = await supabase()
+    .from("user")
+    .update({
+      home_city: homeCity.trim() || null,
+      home_state: homeState.trim().toUpperCase().slice(0, 2) || null,
+    })
+    .eq("id", userId);
+
+  if (error) throwDb(error, "updateUserHome");
 }
 
 export async function listTripMembers(tripId: string): Promise<TripMemberWithUser[]> {

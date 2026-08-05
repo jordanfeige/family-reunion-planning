@@ -6,14 +6,14 @@ import { useEffect, useState } from "react";
 import { updateItineraryBlockAction } from "@/app/actions/trips";
 import { CompactSelect } from "@/components/CompactSelect";
 import { FormattedTimeOfDay } from "@/components/FormattedTimeOfDay";
-import type { BlockStatus, DayKey, ItineraryBlock } from "@/lib/itinerary";
-
-const TYPE_LABELS: Record<string, string> = {
-  activity: "Activity",
-  meal: "Meal",
-  lodging: "Lodging",
-  travel: "Travel",
-};
+import {
+  blockStartTime,
+  blockTagLabel,
+  type BlockStatus,
+  type DayKey,
+  type ItineraryBlock,
+} from "@/lib/itinerary";
+import { formatUsd } from "@/lib/units";
 
 const STATUS_OPTIONS: { value: BlockStatus; label: string }[] = [
   { value: "idea", label: "Idea" },
@@ -31,15 +31,19 @@ export function ItineraryBlockCard({
   dayKey,
   block,
   planners,
+  timeline = false,
 }: {
   slug: string;
   dayKey: DayKey;
   block: ItineraryBlock;
   planners: PlannerOption[];
+  timeline?: boolean;
 }) {
   const router = useRouter();
   const [notesDraft, setNotesDraft] = useState(block.plannerNotes ?? "");
   const [savingNotes, setSavingNotes] = useState(false);
+  const startTime = blockStartTime(block);
+  const tag = blockTagLabel(block);
 
   useEffect(() => {
     setNotesDraft(block.plannerNotes ?? "");
@@ -68,15 +72,51 @@ export function ItineraryBlockCard({
     }
   }
 
+  if (timeline) {
+    return (
+      <li className="weekend-timeline-row">
+        <div className="weekend-timeline-gutter">
+          {startTime ? (
+            <FormattedTimeOfDay value={startTime} className="weekend-timeline-time" />
+          ) : (
+            <span className="weekend-timeline-time is-empty">—</span>
+          )}
+          <span className="weekend-timeline-connector" aria-hidden="true">
+            <span className="weekend-timeline-dot" />
+          </span>
+        </div>
+        <article className="weekend-timeline-card">
+          <div className="weekend-timeline-card-head">
+            <strong className="weekend-timeline-title">{block.title}</strong>
+            <span className={`weekend-tag-chip is-${tag}`}>{tag}</span>
+          </div>
+          {block.notes || block.costUsd !== undefined ? (
+            <p className="weekend-timeline-note">
+              {block.notes}
+              {block.notes && block.costUsd !== undefined ? " · " : null}
+              {block.costUsd !== undefined ? formatUsd(block.costUsd) : null}
+            </p>
+          ) : null}
+          {block.photoUrl ? (
+            <img
+              src={block.photoUrl}
+              alt=""
+              className="weekend-timeline-photo"
+              loading="lazy"
+            />
+          ) : null}
+        </article>
+      </li>
+    );
+  }
+
   return (
     <li className="itinerary-block-card">
       <div className="itinerary-block-card-top">
         <div className="itinerary-block-meta">
-          <span className="pill itinerary-block-type">
-            {TYPE_LABELS[block.type] ?? block.type}
-          </span>
-          {block.time ? (
-            <FormattedTimeOfDay value={block.time} className="muted itinerary-block-time" />
+          <span className={`weekend-tag-chip is-${tag}`}>{tag}</span>
+          {startTime ? (
+            <FormattedTimeOfDay value={startTime} className="muted itinerary-block-time" />
           ) : null}
         </div>
       </div>
@@ -85,6 +125,10 @@ export function ItineraryBlockCard({
 
       {block.notes ? (
         <p className="muted itinerary-block-ai-notes">{block.notes}</p>
+      ) : null}
+
+      {block.costUsd !== undefined ? (
+        <p className="itinerary-block-cost">{formatUsd(block.costUsd)}</p>
       ) : null}
 
       {block.bookingUrl ? (
@@ -141,7 +185,7 @@ export function ItineraryBlockCard({
             id={`notes-${block.id}`}
             className="itinerary-block-notes"
             rows={2}
-            placeholder="Who’s booking this, dietary needs, links…"
+            placeholder="Who's booking this, dietary needs, links…"
             value={notesDraft}
             onChange={(e) => setNotesDraft(e.target.value)}
             onBlur={() => void saveNotes()}

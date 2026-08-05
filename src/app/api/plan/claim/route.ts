@@ -20,7 +20,11 @@ export async function GET(request: Request) {
   const result = await claimPlanDraftForUser();
 
   if ("slug" in result) {
-    return NextResponse.redirect(new URL(`/t/${result.slug}?step=survey`, origin));
+    const send = new URL(request.url).searchParams.get("send");
+    const dest = new URL(`/t/${result.slug}`, origin);
+    dest.searchParams.set("stop", "survey");
+    if (send === "1") dest.searchParams.set("send", "1");
+    return NextResponse.redirect(dest);
   }
 
   if (result.error === "no_draft") {

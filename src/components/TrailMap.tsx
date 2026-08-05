@@ -8,7 +8,7 @@ export type TrailMapStop = {
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden>
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden>
       <path
         d="M3.5 8.2 6.6 11.2 12.5 4.8"
         fill="none"
@@ -35,11 +35,26 @@ function PinIcon() {
   );
 }
 
-function stopIcon(id: string, active: boolean) {
-  if (active && (id === "destinations" || id === "places" || id === "create")) {
+/** True when all prior stops are complete (or index is 0). */
+function isStopUnlocked(stops: TrailMapStop[], index: number) {
+  if (index <= 0) return true;
+  return stops.slice(0, index).every((s) => Boolean(s.complete));
+}
+
+function nodeGlyph(
+  stop: TrailMapStop,
+  index: number,
+  isActive: boolean,
+  done: boolean,
+) {
+  if (done) return <CheckIcon />;
+  if (
+    isActive &&
+    (stop.id === "destinations" || stop.id === "places" || stop.id === "create")
+  ) {
     return <PinIcon />;
   }
-  return <span className="trail-map-dot" />;
+  return <span className="trail-map-step-num">{index + 1}</span>;
 }
 
 export function TrailMap({
@@ -57,15 +72,26 @@ export function TrailMap({
   );
   const nextIndex =
     activeIndex >= 0 && activeIndex < stops.length - 1 ? activeIndex + 1 : -1;
+  const activeStop = stops[activeIndex];
+  const stepCaption = activeStop
+    ? `Step ${activeIndex + 1} of ${stops.length} · ${activeStop.label}`
+    : null;
 
   return (
     <nav className="trail-map" aria-label="Trip trail">
+      {stepCaption ? (
+        <p className="trail-map-caption" aria-live="polite">
+          {stepCaption}
+        </p>
+      ) : null}
       <ol className="trail-map-list">
         {stops.map((stop, i) => {
           const isActive = stop.id === activeId;
           const done = Boolean(stop.complete) && !isActive;
-          const ahead = i > activeIndex && !done;
+          const unlocked = isStopUnlocked(stops, i);
+          const upcoming = !done && !isActive && !unlocked;
           const isNextPath = i === nextIndex;
+
           return (
             <li key={stop.id} className="trail-map-item">
               {i > 0 ? (
@@ -79,9 +105,7 @@ export function TrailMap({
                     .join(" ")}
                   aria-hidden
                 >
-                  {isNextPath ? (
-                    <span className="trail-map-pulse" />
-                  ) : null}
+                  {isNextPath ? <span className="trail-map-pulse" /> : null}
                 </span>
               ) : null}
               <button
@@ -90,21 +114,28 @@ export function TrailMap({
                   "trail-map-node",
                   isActive ? "is-active" : "",
                   done ? "is-complete" : "",
-                  ahead ? "is-ahead" : "",
+                  upcoming ? "is-upcoming" : "",
+                  !upcoming && !done && !isActive ? "is-ready" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 aria-current={isActive ? "step" : undefined}
                 aria-label={stop.label}
-                onClick={() => onSelect(stop.id)}
+                aria-disabled={upcoming || undefined}
+                onClick={() => {
+                  if (upcoming) return;
+                  if (!unlocked && !done && !isActive) return;
+                  onSelect(stop.id);
+                }}
               >
-                {done ? <CheckIcon /> : stopIcon(stop.id, isActive)}
+                {nodeGlyph(stop, i, isActive, done)}
               </button>
               <span
                 className={[
                   "trail-map-label",
                   isActive ? "is-active" : "",
                   done ? "is-complete" : "",
+                  upcoming ? "is-upcoming" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}

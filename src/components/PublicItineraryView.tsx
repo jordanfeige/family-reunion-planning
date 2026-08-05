@@ -4,17 +4,13 @@ import { useState } from "react";
 
 import { FormattedTimeOfDay } from "@/components/FormattedTimeOfDay";
 import {
+  blockStartTime,
+  blockTagLabel,
   normalizeItinerary,
   type DayKey,
   type PublishedItinerary,
 } from "@/lib/itinerary";
-
-const TYPE_LABELS: Record<string, string> = {
-  activity: "Activity",
-  meal: "Meal",
-  lodging: "Lodging",
-  travel: "Travel",
-};
+import { formatUsd } from "@/lib/units";
 
 export function PublicItineraryView({
   published,
@@ -74,7 +70,10 @@ export function PublicItineraryView({
             <p className="muted">Nothing scheduled this day.</p>
           ) : (
             <ul style={{ listStyle: "none", padding: 0, margin: 0 }} className="stack">
-              {currentDay.blocks.map((block) => (
+              {currentDay.blocks.map((block) => {
+                const startTime = blockStartTime(block);
+                const tag = blockTagLabel(block);
+                return (
                 <li
                   key={block.id}
                   style={{
@@ -83,9 +82,9 @@ export function PublicItineraryView({
                   }}
                 >
                   <div style={{ display: "flex", gap: "0.5rem", alignItems: "baseline", flexWrap: "wrap" }}>
-                    {block.time ? (
+                    {startTime ? (
                       <FormattedTimeOfDay
-                        value={block.time}
+                        value={startTime}
                         style={{
                           fontWeight: 600,
                           fontSize: "0.85rem",
@@ -94,14 +93,14 @@ export function PublicItineraryView({
                         }}
                       />
                     ) : null}
-                    <span className="pill" style={{ fontSize: "0.7rem" }}>
-                      {TYPE_LABELS[block.type] ?? block.type}
-                    </span>
+                    <span className={`weekend-tag-chip is-${tag}`}>{tag}</span>
                   </div>
                   <strong style={{ display: "block", marginTop: "0.25rem" }}>{block.title}</strong>
-                  {block.notes ? (
+                  {block.notes || block.costUsd !== undefined ? (
                     <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.9rem" }}>
                       {block.notes}
+                      {block.notes && block.costUsd !== undefined ? " · " : null}
+                      {block.costUsd !== undefined ? formatUsd(block.costUsd) : null}
                     </p>
                   ) : null}
                   {block.bookingUrl ? (
@@ -112,7 +111,8 @@ export function PublicItineraryView({
                     </p>
                   ) : null}
                 </li>
-              ))}
+              );
+              })}
             </ul>
           )}
         </article>

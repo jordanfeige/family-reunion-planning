@@ -2,6 +2,13 @@ export type LocationOption = {
   id: string;
   title: string;
   summary?: string;
+  state?: string;
+  driveMinutesFromOrigin?: number;
+  originMetro?: string;
+  nearestAirportCode?: string;
+  avgHighF?: number;
+  crowdLevel?: "quiet" | "moderate" | "busy";
+  typicalLodgingUsd?: number;
 };
 
 export function normalizeLocationOptions(raw: unknown): LocationOption[] {
@@ -18,7 +25,39 @@ export function normalizeLocationOptions(raw: unknown): LocationOption[] {
     if (seen.has(key)) continue;
     seen.add(key);
     const summary = String(o.summary ?? "").trim() || undefined;
-    out.push({ id, title, summary });
+    const state = String(o.state ?? "").trim() || undefined;
+    const originMetro = String(o.originMetro ?? "").trim() || undefined;
+    const nearestAirportCode = String(o.nearestAirportCode ?? "").trim() || undefined;
+    const driveMinutesFromOrigin =
+      typeof o.driveMinutesFromOrigin === "number" &&
+      Number.isFinite(o.driveMinutesFromOrigin)
+        ? Math.round(o.driveMinutesFromOrigin)
+        : undefined;
+    const avgHighF =
+      typeof o.avgHighF === "number" && Number.isFinite(o.avgHighF)
+        ? Math.round(o.avgHighF)
+        : undefined;
+    const typicalLodgingUsd =
+      typeof o.typicalLodgingUsd === "number" && Number.isFinite(o.typicalLodgingUsd)
+        ? Math.round(o.typicalLodgingUsd)
+        : undefined;
+    const crowdRaw = String(o.crowdLevel ?? "").trim();
+    const crowdLevel =
+      crowdRaw === "quiet" || crowdRaw === "moderate" || crowdRaw === "busy"
+        ? crowdRaw
+        : undefined;
+    out.push({
+      id,
+      title,
+      summary,
+      state: state?.length === 2 ? state.toUpperCase() : state,
+      driveMinutesFromOrigin,
+      originMetro,
+      nearestAirportCode,
+      avgHighF,
+      crowdLevel,
+      typicalLodgingUsd,
+    });
   }
   return out;
 }
