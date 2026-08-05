@@ -11,8 +11,6 @@ import {
   writeWizardStep,
 } from "@/lib/wizardNav";
 
-export { tripHubStepKey } from "@/lib/wizardNav";
-
 export type WizardStepDef = {
   id: string;
   label: string;
@@ -20,15 +18,6 @@ export type WizardStepDef = {
   description?: string;
   complete?: boolean;
   content: React.ReactNode;
-  /** @deprecated Trail Map ignores phases; kept for type compatibility. */
-  phaseId?: string;
-};
-
-export type WizardPhaseDef = {
-  id: string;
-  label: string;
-  summary?: string;
-  muted?: boolean;
 };
 
 export function WizardShell({
@@ -39,12 +28,10 @@ export function WizardShell({
   initialStepId,
 }: {
   storageKey: string;
-  phases?: WizardPhaseDef[];
   steps: WizardStepDef[];
   header?: React.ReactNode;
   lastStepLabel?: string;
   initialStepId?: string;
-  quiet?: boolean;
 }) {
   const getSnapshot = useCallback(() => {
     const ids = steps.map((s) => s.id);

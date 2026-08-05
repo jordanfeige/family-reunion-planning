@@ -331,7 +331,7 @@ function PlacesFullPlanner({
       ) : null}
 
       <div className="places-fullpage-grid">
-        <section className="places-sheet-chat" aria-label="WandrAI chat">
+        <section className="places-fullpage-chat" aria-label="WandrAI chat">
           <div className="places-chat-pane places-chat-pane--embedded">
             <div className="places-chat-scroll" ref={scrollRef}>
               {messages.map((message) => (
@@ -364,7 +364,7 @@ function PlacesFullPlanner({
           </div>
         </section>
 
-        <aside className="places-sheet-draft places-sheet-draft--embedded" aria-label="Survey destinations draft">
+        <aside className="places-fullpage-draft" aria-label="Survey destinations draft">
           <div className="places-draft-head">
             <p className="create-trip-draft-eyebrow">Survey destinations</p>
             {places.length > 0 ? (
