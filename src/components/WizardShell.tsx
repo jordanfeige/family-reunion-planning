@@ -5,7 +5,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { WizardFooter, WizardFooterSentinel } from "@/components/WizardFooter";
 import { WizardStepper, type WizardStepperItem } from "@/components/WizardStepper";
 import { useWizardFooterReveal } from "@/components/useWizardFooterReveal";
-import { WizardIcon, type WizardIconName } from "@/components/wizard-icons";
+import type { WizardIconName } from "@/components/wizard-icons";
 
 export type WizardStepDef = {
   id: string;
@@ -221,21 +221,16 @@ export function WizardShell({
         role="tabpanel"
         aria-labelledby={`step-${activeStep.id}`}
       >
-        <div className="wizard-panel-intro wizard-panel-intro--compact">
-          {activeStep.icon ? (
-            <div className="wizard-panel-icon" aria-hidden>
-              <WizardIcon name={activeStep.icon} className="wizard-panel-icon-svg" />
-            </div>
+        <div className="wizard-panel-intro wizard-panel-intro--quiet">
+          <p className="wizard-panel-step-meta">
+            {activePhase.label} · {activeStep.shortLabel ?? activeStep.label}
+          </p>
+          <h2 id={`step-${activeStep.id}`} className="wizard-panel-title-quiet">
+            {activeStep.label}
+          </h2>
+          {activeStep.description ? (
+            <p className="muted wizard-panel-desc">{activeStep.description}</p>
           ) : null}
-          <div className="wizard-panel-intro-text">
-            <p className="wizard-panel-step-meta">
-              {activePhase.label} · Step {phaseStepIndex + 1} of {activePhaseSteps.length}
-            </p>
-            <h2 id={`step-${activeStep.id}`}>{activeStep.label}</h2>
-            {activeStep.description ? (
-              <p className="muted wizard-panel-desc">{activeStep.description}</p>
-            ) : null}
-          </div>
         </div>
 
         <div className="wizard-panel-body">
@@ -244,8 +239,6 @@ export function WizardShell({
         </div>
 
         <WizardFooter
-          stepCount={steps.length}
-          activeIndex={Math.max(activeIndex, 0)}
           revealed={revealed}
           isFirst={isFirst}
           isLast={isLast}
@@ -253,6 +246,7 @@ export function WizardShell({
           onContinue={isLast ? () => goTo(steps[0].id) : goNext}
           lastStepLabel={lastStepLabel}
           lastStepClassName="btn btn-secondary"
+          phaseLabel={progressLabel}
         />
       </section>
     </div>

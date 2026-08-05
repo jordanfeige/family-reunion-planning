@@ -153,6 +153,58 @@ export async function createTripAction(formData: FormData) {
   redirect(`/t/${slug}#planner`);
 }
 
+export async function createTripFromDraftAction(raw: {
+  name: string;
+  tagline?: string;
+  destinationNotes?: string;
+  targetBudget?: string;
+  locationTitles?: string[];
+}) {
+  const userId = await requireSessionUserId();
+  const { normalizeTripDraft } = await import("@/lib/tripDraft");
+  const draft = normalizeTripDraft({
+    name: raw.name,
+    tagline: raw.tagline,
+    destinationNotes: raw.destinationNotes,
+    targetBudget: raw.targetBudget,
+    locationTitles: raw.locationTitles,
+  });
+
+  if (!draft.name) {
+    throw new Error("Give your gathering a name.");
+  }
+
+  const slug = newTripSlug();
+  const shareOptionsToken = newSecretToken();
+  const surveyToken = newSecretToken();
+
+  const trip = await createTrip({
+    slug,
+    name: draft.name,
+    tagline: draft.tagline ?? null,
+    destinationNotes: draft.destinationNotes ?? null,
+    targetBudget: draft.targetBudget ?? null,
+    shareOptionsToken,
+    ownerId: userId,
+  });
+
+  await createSurvey({
+    tripId: trip.id,
+    publicToken: surveyToken,
+    title: "When can your crew join?",
+  });
+
+  if (draft.locationTitles?.length) {
+    const locationOptions = draft.locationTitles.map((title) => ({
+      id: crypto.randomUUID(),
+      title,
+    }));
+    await updateTripById(trip.id, { locationOptions });
+  }
+
+  redirect(`/t/${slug}`);
+}
+
 async function loadTripForOrganizer(slug: string, userId: string) {
   const access = await getTripForOrganizer(slug, userId);
   if (!access) throw new Error("Trip not found.");

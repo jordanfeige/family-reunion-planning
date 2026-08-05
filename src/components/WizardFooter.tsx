@@ -1,8 +1,6 @@
 "use client";
 
 type WizardFooterProps = {
-  stepCount: number;
-  activeIndex: number;
   revealed: boolean;
   isFirst: boolean;
   isLast: boolean;
@@ -12,11 +10,10 @@ type WizardFooterProps = {
   lastStepLabel?: string;
   lastStepType?: "button" | "submit";
   lastStepClassName?: string;
+  phaseLabel?: string;
 };
 
 export function WizardFooter({
-  stepCount,
-  activeIndex,
   revealed,
   isFirst,
   isLast,
@@ -26,6 +23,7 @@ export function WizardFooter({
   lastStepLabel = "Finish",
   lastStepType = "button",
   lastStepClassName = "btn btn-primary",
+  phaseLabel,
 }: WizardFooterProps) {
   return (
     <footer
@@ -38,19 +36,11 @@ export function WizardFooter({
       ) : null}
 
       <div className="wizard-footer-inner" hidden={!revealed}>
-        <div className="wizard-footer-progress" aria-label={`Step ${activeIndex + 1} of ${stepCount}`}>
-          <span className="wizard-footer-dots" aria-hidden>
-            {Array.from({ length: stepCount }, (_, i) => (
-              <span
-                key={i}
-                className={`wizard-footer-dot${i === activeIndex ? " is-active" : ""}${i < activeIndex ? " is-done" : ""}`}
-              />
-            ))}
-          </span>
-          <span className="wizard-footer-step-label">
-            Step {activeIndex + 1} of {stepCount}
-          </span>
-        </div>
+        {phaseLabel ? (
+          <p className="wizard-footer-phase muted">{phaseLabel}</p>
+        ) : (
+          <span />
+        )}
 
         <div className="wizard-footer-actions">
           {!isFirst && onBack ? (

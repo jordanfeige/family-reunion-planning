@@ -397,8 +397,6 @@ export function PublicSurveyForm({
       {error ? <p className="error-banner" style={{ margin: 0 }}>{error}</p> : null}
 
       <WizardFooter
-        stepCount={steps.length}
-        activeIndex={stepIndex}
         revealed={revealed}
         isFirst={isFirst}
         isLast={isLast}
@@ -407,6 +405,7 @@ export function PublicSurveyForm({
         lastStepLabel="Send RSVP"
         lastStepType="submit"
         lastStepClassName="btn btn-berry"
+        phaseLabel={`Step ${stepIndex + 1} of ${steps.length}`}
       />
     </form>
   );
