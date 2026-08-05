@@ -24,6 +24,7 @@ export function TripHubWizard({
   completion,
   galleryUnlocked,
   phaseSummaries,
+  initialStepId,
   basics,
   locations,
   survey,
@@ -37,6 +38,7 @@ export function TripHubWizard({
   completion: TripHubCompletion;
   galleryUnlocked: boolean;
   phaseSummaries?: TripHubPhaseSummaries;
+  initialStepId?: string;
   basics: React.ReactNode;
   locations: React.ReactNode;
   survey: React.ReactNode;
@@ -73,29 +75,27 @@ export function TripHubWizard({
       shortLabel: "Basics",
       icon: "basics",
       description:
-        "Name your reunion and pick candidate Fri–Sun weekends—these become options on the family survey.",
+        "Pick Fri–Sun weekends for the family survey.",
       complete: completion.basics,
       content: basics,
     },
     {
       id: "locations",
       phaseId: "decide",
-      label: "Locations",
+      label: "Places",
       shortLabel: "Places",
       icon: "locations",
-      description:
-        "Open WandrAI to pick destinations, publish them to the survey, then share the link.",
+      description: "Destinations your family can vote on.",
       complete: completion.locations,
       content: locations,
     },
     {
       id: "survey",
       phaseId: "decide",
-      label: "Family survey",
+      label: "Survey",
       shortLabel: "Survey",
       icon: "survey",
-      description:
-        "Share the preference survey—family picks weekends and places (not a final commitment yet).",
+      description: "Send the link — family picks weekends and places.",
       complete: completion.survey,
       content: survey,
     },
@@ -163,6 +163,8 @@ export function TripHubWizard({
       storageKey={`trip-hub-step-${slug}`}
       phases={phases}
       steps={steps}
+      initialStepId={initialStepId}
+      quiet
       lastStepLabel="Back to start"
     />
   );

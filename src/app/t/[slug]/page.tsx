@@ -53,10 +53,13 @@ import { filterValidFridays, formatWeekendLabel } from "@/lib/weekends";
 
 export default async function TripHubPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ step?: string }>;
 }) {
   const { slug } = await params;
+  const { step: stepParam } = await searchParams;
   const session = await auth();
   if (!session?.user?.id) {
     redirect(`/login?callbackUrl=${encodeURIComponent(`/t/${slug}`)}`);
@@ -162,6 +165,23 @@ export default async function TripHubPage({
 
       <TripHubWizard
         slug={trip.slug}
+        initialStepId={
+          stepParam &&
+          [
+            "basics",
+            "locations",
+            "survey",
+            "ballot",
+            "blueprint",
+            "budget",
+            "confirmations",
+            "gallery",
+          ].includes(stepParam)
+            ? stepParam
+            : locationOptions.length > 0 && responses.length === 0
+              ? "survey"
+              : undefined
+        }
         galleryUnlocked={galleryUnlocked}
         phaseSummaries={{
           decide:
@@ -248,100 +268,115 @@ export default async function TripHubPage({
         />
         }
         survey={
-        <div className="stack">
-          <p className="muted" style={{ margin: 0 }}>
-            Share the preference survey—family picks weekends and places. This is not
-            their final yes/no yet.
-          </p>
+        <div className="hub-survey">
           {survey ? (
             <>
+              <div className="hub-survey-hero">
+                <p className="hub-survey-lede">
+                  Your trip is ready to share. Send this link — family picks weekends
+                  and places (not a final RSVP yet).
+                </p>
+                {locationOptions.length > 0 ? (
+                  <ul className="hub-survey-places" aria-label="Places on survey">
+                    {locationOptions.map((loc) => (
+                      <li key={loc.id}>{loc.title}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted hub-survey-warn">
+                    No places yet — add some in Places before family replies.
+                  </p>
+                )}
+              </div>
               <ShareLinkCard
                 url={surveyUrl}
                 title="Family survey link"
                 hint={
-                  locationOptions.length
-                    ? `${locationOptions.length} place${locationOptions.length === 1 ? "" : "s"} on this survey.`
-                    : "Add places in the Places step so family has destinations to choose."
+                  weekendSlots.length === 0
+                    ? "Tip: add weekends under Basics so the survey has date options."
+                    : undefined
                 }
               />
-              <div className="divider" />
-              <h3 style={{ marginTop: 0 }}>Responses ({responses.length})</h3>
-              {responses.length === 0 ? (
-                <p className="muted">Waiting for the first replies…</p>
-              ) : (
-                <ul className="stack" style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                  {responses.map((r) => (
-                    <li
-                      key={r.id}
-                      style={{
-                        border: "1px solid rgba(28,61,90,0.1)",
-                        borderRadius: "var(--radius-md)",
-                        padding: "0.75rem 1rem",
-                      }}
-                    >
-                      <div className="row" style={{ justifyContent: "space-between", gap: "0.75rem" }}>
-                        <strong>
-                          {r.respondentName} · {partyAdults(r)} adult
-                          {partyAdults(r) === 1 ? "" : "s"}
-                          {partyKids(r) > 0
-                            ? `, ${partyKids(r)} kid${partyKids(r) === 1 ? "" : "s"}`
-                            : ""}
-                        </strong>
-                        <form action={deleteSurveyResponseAction}>
-                          <input type="hidden" name="slug" value={trip.slug} />
-                          <input type="hidden" name="response_id" value={r.id} />
-                          <button
-                            type="submit"
-                            className="btn btn-secondary"
-                            style={{ fontSize: "0.8rem" }}
-                          >
-                            Delete
-                          </button>
-                        </form>
-                      </div>
-                      {(r.selectedLocations ?? []).length > 0 ? (
-                        <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
-                          Locations:{" "}
-                          {(r.selectedLocations ?? [])
-                            .map((id) => findLocationById(locationOptions, id)?.title ?? id)
-                            .join(" · ")}
+              <div className="hub-survey-responses">
+                <h3 className="hub-survey-responses-title">
+                  Responses{responses.length > 0 ? ` (${responses.length})` : ""}
+                </h3>
+                {responses.length === 0 ? (
+                  <p className="muted" style={{ margin: 0 }}>
+                    Waiting for the first replies…
+                  </p>
+                ) : (
+                  <ul className="stack" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                    {responses.map((r) => (
+                      <li key={r.id} className="hub-survey-response-row">
+                        <div className="row" style={{ justifyContent: "space-between", gap: "0.75rem" }}>
+                          <strong>
+                            {r.respondentName} · {partyAdults(r)} adult
+                            {partyAdults(r) === 1 ? "" : "s"}
+                            {partyKids(r) > 0
+                              ? `, ${partyKids(r)} kid${partyKids(r) === 1 ? "" : "s"}`
+                              : ""}
+                          </strong>
+                          <form action={deleteSurveyResponseAction}>
+                            <input type="hidden" name="slug" value={trip.slug} />
+                            <input type="hidden" name="response_id" value={r.id} />
+                            <button
+                              type="submit"
+                              className="btn btn-secondary"
+                              style={{ fontSize: "0.8rem" }}
+                            >
+                              Delete
+                            </button>
+                          </form>
                         </div>
-                      ) : null}
-                      <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
-                        {(r.selectedSlots ?? []).length
-                          ? `Weekends: ${(r.selectedSlots ?? [])
-                              .map((s) => formatWeekendLabel(s))
-                              .join(" · ")}`
-                          : "No weekends selected"}
-                      </div>
-                      {r.notes ? (
+                        {(r.selectedLocations ?? []).length > 0 ? (
+                          <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
+                            Locations:{" "}
+                            {(r.selectedLocations ?? [])
+                              .map((id) => findLocationById(locationOptions, id)?.title ?? id)
+                              .join(" · ")}
+                          </div>
+                        ) : null}
                         <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
-                          Note: {r.notes}
+                          {(r.selectedSlots ?? []).length
+                            ? `Weekends: ${(r.selectedSlots ?? [])
+                                .map((s) => formatWeekendLabel(s))
+                                .join(" · ")}`
+                            : "No weekends selected"}
                         </div>
-                      ) : null}
-                      <FormattedDateTime
-                        value={r.submittedAt}
-                        className="muted"
-                        style={{ fontSize: "0.75rem", marginTop: "0.35rem", display: "block" }}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="muted" style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
-                Headcount running total (self-reported):{" "}
-                <strong>{totalAttendees}</strong>
-              </p>
+                        {r.notes ? (
+                          <div className="muted" style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
+                            Note: {r.notes}
+                          </div>
+                        ) : null}
+                        <FormattedDateTime
+                          value={r.submittedAt}
+                          className="muted"
+                          style={{ fontSize: "0.75rem", marginTop: "0.35rem", display: "block" }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {responses.length > 0 ? (
+                  <p className="muted" style={{ marginTop: "1rem", fontSize: "0.9rem" }}>
+                    Headcount running total: <strong>{totalAttendees}</strong>
+                  </p>
+                ) : null}
+              </div>
+              {responses.length > 0 ? (
+                <div className="hub-survey-snapshot">
+                  <h3 className="hub-survey-responses-title">Availability</h3>
+                  <p className="muted" style={{ margin: "0 0 0.75rem" }}>
+                    Live rollup from replies — useful when locking a weekend later.
+                  </p>
+                  <AvailabilitySnapshot proposedSlots={weekendSlots} responses={responses} />
+                </div>
+              ) : null}
             </>
           ) : (
             <p className="muted">Survey record missing—contact support.</p>
           )}
-          <div className="divider" />
-          <h3 style={{ marginTop: 0, color: "var(--color-fjord)" }}>Availability snapshot</h3>
-          <p className="muted" style={{ margin: "0 0 0.75rem" }}>
-            Live rollup from replies—use when locking a weekend in the group vote step.
-          </p>
-          <AvailabilitySnapshot proposedSlots={weekendSlots} responses={responses} />
         </div>
         }
         ballot={

@@ -23,7 +23,6 @@ import {
 import { goToTripHubStep } from "@/lib/wizardNav";
 import type { LocationOption } from "@/lib/locations";
 import { formatLocationLabel } from "@/lib/locations";
-import { deleteLocationOptionAction } from "@/app/actions/trips";
 
 function placesFromMessages(messages: UIMessage[]): PlacesDraftItem[] | null {
   let latest: PlacesDraftItem[] | null = null;
@@ -59,7 +58,7 @@ function starterMessage(tripName: string): UIMessage {
     parts: [
       {
         type: "text",
-        text: `Let’s pick places for “${tripName}.” Roughly how many people, and any must-haves—lake, mountains, beach, or max drive time from a hub airport?`,
+        text: `Any region you want near for “${tripName}”?`,
       },
     ],
   };
@@ -121,7 +120,7 @@ export function PlacesConcierge({
             <div className="places-concierge-ready-actions">
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-berry btn-sm"
                 onClick={() => {
                   goToTripHubStep(slug, "survey");
                 }}
@@ -130,7 +129,7 @@ export function PlacesConcierge({
               </button>
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn btn-secondary btn-sm"
                 onClick={() => setOpen(true)}
                 disabled={!aiEnabled}
               >
@@ -138,25 +137,9 @@ export function PlacesConcierge({
               </button>
             </div>
           </div>
-          <ul className="places-summary-list">
+          <ul className="hub-survey-places places-ready-chips" aria-label="Places">
             {locations.map((loc) => (
-              <li key={loc.id} className="places-summary-row">
-                <div>
-                  <strong>{formatLocationLabel(loc)}</strong>
-                  {loc.summary ? (
-                    <p className="muted" style={{ margin: "0.2rem 0 0", fontSize: "0.85rem" }}>
-                      {loc.summary}
-                    </p>
-                  ) : null}
-                </div>
-                <form action={deleteLocationOptionAction}>
-                  <input type="hidden" name="slug" value={slug} />
-                  <input type="hidden" name="location_id" value={loc.id} />
-                  <button type="submit" className="btn btn-secondary btn-sm">
-                    Remove
-                  </button>
-                </form>
-              </li>
+              <li key={loc.id}>{formatLocationLabel(loc)}</li>
             ))}
           </ul>
           <ManualAddOnly slug={slug} />
@@ -333,9 +316,7 @@ function PlacesConciergeSheet({
             <h2 id={titleId} className="create-trip-title">
               Plan places
             </h2>
-            <p className="muted create-trip-sub">
-              Chat with WandrAI—we’ll draft destinations for the family survey.
-            </p>
+            <p className="muted create-trip-sub">One question at a time — then publish to the survey.</p>
           </div>
           <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
             Close
@@ -361,8 +342,8 @@ function PlacesConciergeSheet({
               </div>
             ) : null}
 
-            <div className="card chat-thread create-trip-thread places-sheet-thread">
-              <div className="chat-scroll chat-thread-scroll">
+            <div className="plan-chat-pane places-sheet-pane">
+              <div className="plan-chat-scroll">
                 {messages.map((message) => (
                   <ChatBubble
                     key={message.id}
@@ -371,22 +352,26 @@ function PlacesConciergeSheet({
                   />
                 ))}
               </div>
+              <ChatComposer
+                id={`places-chat-${slug}`}
+                placeholder={
+                  messages.filter((m) => m.role === "user").length === 0
+                    ? "e.g. Midwest, near Chicago"
+                    : "e.g. lake towns, within a day’s drive"
+                }
+                value={draftText}
+                busy={busy || pending}
+                compact
+                onChange={setDraftText}
+                onSubmit={async () => {
+                  const text = draftText.trim();
+                  if (!text || busy) return;
+                  setDraftText("");
+                  setIgnoreChatDraft(false);
+                  await sendMessage({ text });
+                }}
+              />
             </div>
-
-            <ChatComposer
-              id={`places-chat-${slug}`}
-              placeholder="e.g. About 25 people, prefer lakes within a day’s drive of Chicago…"
-              value={draftText}
-              busy={busy || pending}
-              onChange={setDraftText}
-              onSubmit={async () => {
-                const text = draftText.trim();
-                if (!text || busy) return;
-                setDraftText("");
-                setIgnoreChatDraft(false);
-                await sendMessage({ text });
-              }}
-            />
           </section>
 
           <aside className="places-sheet-draft" aria-label="Survey destinations draft">
