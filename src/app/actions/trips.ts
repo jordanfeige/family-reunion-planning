@@ -504,7 +504,7 @@ async function extractLocationsFromAssistantText(
   const { object } = await generateObject({
     model: plannerModel(),
     schema: locationSuggestionsSchema,
-    prompt: `Extract distinct trip destination or area options from this family reunion planning message. Return 2–6 clear choices families could vote on in a survey. Use concise titles (e.g. "Bergen & fjords", "Lofoten islands").\n\nMessage:\n${text}`,
+    prompt: `Extract distinct trip destination or area options from this family reunion planning message. Return 2–6 clear choices families could vote on in a survey. Use concise titles (e.g. "Lake Tahoe", "Finger Lakes, NY", "Outer Banks").\n\nMessage:\n${text}`,
   });
 
   return object.locations
@@ -564,6 +564,54 @@ export async function publishLocationsFromChatAction(
 
   revalidatePath(`/t/${slug}`);
   return { added, total: merged.length };
+}
+
+/** Concierge publish: set survey locations from the draft (keeps ids when titles match). */
+export async function publishPlacesDraftAction(
+  slug: string,
+  places: { title: string; summary?: string }[],
+) {
+  const userId = await requireSessionUserId();
+  const cleaned = places
+    .map((p) => ({
+      title: p.title.trim(),
+      summary: p.summary?.trim() || undefined,
+    }))
+    .filter((p) => p.title.length > 0);
+  if (cleaned.length === 0) {
+    throw new Error("Select at least one place to publish.");
+  }
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const existing = normalizeLocationOptions(trip.locationOptions ?? []);
+  const byTitle = new Map(
+    existing.map((l) => [l.title.trim().toLowerCase(), l] as const),
+  );
+
+  const next: LocationOption[] = [];
+  const seen = new Set<string>();
+  for (const p of cleaned) {
+    const key = p.title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const prev = byTitle.get(key);
+    if (prev) {
+      next.push({
+        ...prev,
+        summary: p.summary ?? prev.summary,
+      });
+    } else {
+      next.push({
+        id: crypto.randomUUID(),
+        title: p.title,
+        summary: p.summary,
+      });
+    }
+  }
+
+  await updateTripById(trip.id, { locationOptions: next });
+  revalidatePath(`/t/${slug}`);
+  return { ok: true as const, count: next.length };
 }
 
 function lockedLocationTitleForTrip(

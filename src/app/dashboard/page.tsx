@@ -93,7 +93,7 @@ export default async function DashboardPage() {
           {isGuestOnly ? (
             <p className="muted dashboard-footnote">
               Planning the reunion yourself?{" "}
-              <Link href="/login?callbackUrl=/dashboard">Sign in with a different email</Link>{" "}
+              <Link href="/login?callbackUrl=/dashboard">Sign in with a different Google account</Link>{" "}
               or ask the organizer to invite you as a co-planner.
             </p>
           ) : null}

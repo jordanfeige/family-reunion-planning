@@ -1,10 +1,10 @@
-import { loginWithMagicLinkAction } from "@/app/actions/login";
+import { continueWithGoogleAction } from "@/app/actions/login";
 
 export function GuestSaveSignIn({
   callbackUrl,
-  defaultEmail,
 }: {
   callbackUrl: string;
+  /** @deprecated ignored — Google uses the account email */
   defaultEmail?: string;
 }) {
   return (
@@ -21,25 +21,13 @@ export function GuestSaveSignIn({
         <strong>Sign in to save your answers and edit later</strong>
       </p>
       <p className="muted" style={{ margin: "0 0 0.75rem", fontSize: "0.85rem" }}>
-        We&apos;ll email you the same magic link planners use—then you can return to this page
-        anytime to update your RSVP or votes.
+        Continue with Google — then you can return to this page anytime to update your RSVP or
+        votes.
       </p>
-      <form action={loginWithMagicLinkAction} className="stack" style={{ gap: "0.65rem" }}>
+      <form action={continueWithGoogleAction}>
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
-        <div className="field" style={{ margin: 0 }}>
-          <label htmlFor="guest_signin_email">Email</label>
-          <input
-            id="guest_signin_email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            defaultValue={defaultEmail ?? ""}
-            placeholder="you@example.com"
-          />
-        </div>
-        <button type="submit" className="btn btn-secondary btn-sm" style={{ alignSelf: "flex-start" }}>
-          Email me a sign-in link
+        <button type="submit" className="btn btn-secondary btn-sm btn-google">
+          Continue with Google
         </button>
       </form>
     </div>

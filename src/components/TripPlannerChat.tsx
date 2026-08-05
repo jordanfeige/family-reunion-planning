@@ -77,8 +77,8 @@ export function TripPlannerChat({
         <div className="chat-scroll chat-thread-scroll">
           {messages.length === 0 ? (
             <p className="muted chat-thread-empty">
-              Hi! Try: &quot;We are 20–30 people looking for a summer reunion in Norway or
-              nearby—what 4 areas should we consider?&quot;
+              Hi! Try: &quot;We are 20–30 people looking for a summer reunion in the
+              U.S.—what 4 lake or mountain areas should we consider?&quot;
             </p>
           ) : (
             <div className="chat-thread-messages">

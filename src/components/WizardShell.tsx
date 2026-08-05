@@ -6,6 +6,12 @@ import { WizardFooter, WizardFooterSentinel } from "@/components/WizardFooter";
 import { WizardStepper, type WizardStepperItem } from "@/components/WizardStepper";
 import { useWizardFooterReveal } from "@/components/useWizardFooterReveal";
 import type { WizardIconName } from "@/components/wizard-icons";
+import {
+  readWizardStep,
+  subscribeWizardStep,
+  tripHubStepKey,
+  writeWizardStep,
+} from "@/lib/wizardNav";
 
 export type WizardStepDef = {
   id: string;
@@ -25,43 +31,6 @@ export type WizardPhaseDef = {
   muted?: boolean;
 };
 
-function readStoredStep(storageKey: string, steps: WizardStepDef[]): string {
-  if (steps.length === 0) return "";
-  try {
-    const saved = localStorage.getItem(storageKey);
-    if (saved && steps.some((s) => s.id === saved)) return saved;
-  } catch {
-    /* private mode */
-  }
-  return steps.find((s) => !s.complete)?.id ?? steps[0].id;
-}
-
-function writeStoredStep(storageKey: string, id: string) {
-  try {
-    localStorage.setItem(storageKey, id);
-  } catch {
-    /* private mode */
-  }
-}
-
-const stepStoreListeners = new Map<string, Set<() => void>>();
-
-function subscribeStepStore(storageKey: string, onStoreChange: () => void) {
-  let set = stepStoreListeners.get(storageKey);
-  if (!set) {
-    set = new Set();
-    stepStoreListeners.set(storageKey, set);
-  }
-  set.add(onStoreChange);
-  return () => {
-    set!.delete(onStoreChange);
-  };
-}
-
-function emitStepStore(storageKey: string) {
-  stepStoreListeners.get(storageKey)?.forEach((fn) => fn());
-}
-
 export function WizardShell({
   storageKey,
   phases,
@@ -75,17 +44,18 @@ export function WizardShell({
   header?: React.ReactNode;
   lastStepLabel?: string;
 }) {
-  const getSnapshot = useCallback(
-    () => readStoredStep(storageKey, steps),
-    [storageKey, steps],
-  );
-  const getServerSnapshot = useCallback(
-    () => steps[0]?.id ?? "",
-    [steps],
-  );
+  const getSnapshot = useCallback(() => {
+    const ids = steps.map((s) => s.id);
+    const raw = readWizardStep(storageKey, ids);
+    if (raw && ids.includes(raw)) return raw;
+    const firstIncomplete = steps.find((s) => !s.complete);
+    return firstIncomplete?.id ?? steps[0]?.id ?? "";
+  }, [storageKey, steps]);
+
+  const getServerSnapshot = useCallback(() => steps[0]?.id ?? "", [steps]);
 
   const activeId = useSyncExternalStore(
-    (onStoreChange) => subscribeStepStore(storageKey, onStoreChange),
+    (onStoreChange) => subscribeWizardStep(storageKey, onStoreChange),
     getSnapshot,
     getServerSnapshot,
   );
@@ -112,8 +82,7 @@ export function WizardShell({
 
   function goTo(id: string) {
     if (!steps.some((s) => s.id === id)) return;
-    writeStoredStep(storageKey, id);
-    emitStepStore(storageKey);
+    writeWizardStep(storageKey, id);
   }
 
   function goToPhase(phaseId: string) {
@@ -252,3 +221,5 @@ export function WizardShell({
     </div>
   );
 }
+
+export { tripHubStepKey };

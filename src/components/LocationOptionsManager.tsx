@@ -39,7 +39,7 @@ export function LocationOptionsManager({
                   id="loc_title"
                   name="title"
                   required
-                  placeholder="Bergen & nearby fjords"
+                  placeholder="Lake Tahoe or Outer Banks"
                 />
               </div>
               <div className="field">

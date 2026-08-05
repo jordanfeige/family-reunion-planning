@@ -295,6 +295,29 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["trip_chat_message"]["Insert"]>;
       };
+      plan_draft: {
+        Row: {
+          id: string;
+          secret: string;
+          payload: Json;
+          message_count: number;
+          created_at: string;
+          expires_at: string;
+          claimed_at: string | null;
+          claimed_trip_id: string | null;
+        };
+        Insert: {
+          id?: string;
+          secret: string;
+          payload?: Json;
+          message_count?: number;
+          created_at?: string;
+          expires_at: string;
+          claimed_at?: string | null;
+          claimed_trip_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["plan_draft"]["Insert"]>;
+      };
     };
   };
 };

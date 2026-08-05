@@ -1,4 +1,10 @@
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  tool,
+  type UIMessage,
+} from "ai";
 
 import { auth } from "@/auth";
 import { hasAnthropicApiKey, plannerModel } from "@/lib/ai";
@@ -8,6 +14,7 @@ import {
 } from "@/lib/availability";
 import { formatItineraryForPrompt, normalizeItinerary } from "@/lib/itinerary";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
+import { placesDraftSchema } from "@/lib/placesDraft";
 import {
   findVenueById,
   formatVenuesForPrompt,
@@ -147,13 +154,20 @@ export async function POST(
     .filter(Boolean)
     .join("\n");
 
-  const locationsSystem = `You are WandrAI, a cheerful travel co-planner helping a family choose WHERE to gather.
-Your job in this mode is destination brainstorming only—not day-by-day itineraries yet.
-Suggest 3–6 distinct areas or destinations (regions, cities, or venue types). For each, give a short title, why it fits a multi-generational reunion, rough travel ease, and one caution.
-Format replies in markdown: use ## or ### headings, bullet lists with -, and **bold** for each destination name.
-End with a "## Top picks" section listing the best 3–4 options as bullets with bold titles.
-Never invent specific real-time prices—give ranges or "check current rates".
-If details are missing, state assumptions and proceed.
+  const locationsSystem = `You are WandrAI, a warm, concise destination co-planner for a U.S. family reunion (unless they specify another country).
+This is a two-way interview, then a shortlist—not a lecture and not a day-by-day itinerary.
+
+Flow:
+1. Ask at most one clarifying question per turn (people count, vibe, region, drive/flight limits).
+2. When you know enough, propose 3–6 distinct U.S. areas/destinations with a short why + one caution each.
+3. Call update_places_draft whenever the survey shortlist should change so they see a confirmable card.
+4. After updating the draft, tell them they can keep chatting or publish to the survey.
+
+Rules:
+- Organizer-facing, concise, no emoji unless they use them first.
+- Prefer stating assumptions over stacking questions.
+- Never invent live prices or booking links.
+- Do not reopen lodging/restaurant planning—places only.
 
 Current trip context:
 ${contextBits}`;
@@ -162,6 +176,7 @@ ${contextBits}`;
 The organizer has locked a location, weekend, and headcount. Help refine activities, meals, lodging, and reservations day by day.
 Use clear headings and bullet lists with times. Mark items that need reservations.
 Never invent live prices—say "check availability".
+Default to U.S. norms unless context says otherwise.
 ${focusDay ? `Focus changes on: ${focusDay} only unless asked otherwise.` : ""}
 
 Current trip context:
@@ -184,6 +199,7 @@ Compare options for a multi-generational group: sleeping capacity, meeting space
 Format in markdown with ## sections (e.g. "## Where to stay", "## Where to eat"). End with "## Shortlist" bullets.
 Never invent live prices or fake booking links—say "verify on the property site" unless the user supplied a URL.
 Do not re-open the regional destination debate—the location is already locked.
+Be conversational: ask at most one clarifying question when needed.
 
 Current trip context:
 ${contextBits}`;
@@ -199,6 +215,18 @@ ${contextBits}`;
     model: plannerModel(),
     system,
     messages: modelMessages,
+    stopWhen: stepCountIs(5),
+    tools:
+      mode === "locations"
+        ? {
+            update_places_draft: tool({
+              description:
+                "Update the on-screen survey destinations draft the organizer will publish.",
+              inputSchema: placesDraftSchema,
+              execute: async (draft) => ({ ok: true as const, draft }),
+            }),
+          }
+        : undefined,
   });
 
   return result.toUIMessageStreamResponse({

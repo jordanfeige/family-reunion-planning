@@ -71,7 +71,7 @@ async function tableHasEmailMatch(
 }
 
 /**
- * After magic-link sign-in, attach prior anonymous rows that used the same email.
+ * After Google sign-in, attach prior anonymous rows that used the same email.
  */
 export async function claimGuestSubmissionsForUser(
   userId: string,

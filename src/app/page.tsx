@@ -2,9 +2,16 @@ import Link from "next/link";
 
 import { auth } from "@/auth";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
+import {
+  getPlanDraftBySecret,
+  readPlanDraftCookieSecret,
+} from "@/lib/supabase/planDrafts";
 
 export default async function HomePage() {
   const session = await auth();
+  const secret = await readPlanDraftCookieSecret();
+  const draft = secret ? await getPlanDraftBySecret(secret) : null;
+  const hasDraft = Boolean(draft);
 
   return (
     <div className="landing">
@@ -18,17 +25,38 @@ export default async function HomePage() {
           </p>
           <div className="landing-cta-group">
             {session?.user ? (
-              <Link className="btn btn-berry landing-cta" href="/dashboard">
-                Go to your dashboard
-              </Link>
+              <>
+                <Link className="btn btn-berry landing-cta" href="/dashboard">
+                  Go to your dashboard
+                </Link>
+                {hasDraft ? (
+                  <Link className="landing-secondary" href="/plan">
+                    Resume your draft plan
+                  </Link>
+                ) : (
+                  <Link className="landing-secondary" href="/dashboard">
+                    Plan a new trip
+                  </Link>
+                )}
+              </>
             ) : (
-              <Link className="btn btn-berry landing-cta" href="/login">
-                Start with a magic link
-              </Link>
+              <>
+                <Link className="btn btn-berry landing-cta" href="/plan">
+                  {hasDraft ? "Resume your plan" : "Plan a trip"}
+                </Link>
+                <div className="landing-auth-links">
+                  <Link className="landing-secondary" href="/login">
+                    Sign in
+                  </Link>
+                  <span className="landing-auth-sep" aria-hidden>
+                    ·
+                  </span>
+                  <Link className="landing-secondary" href="/login?intent=signup">
+                    Sign up
+                  </Link>
+                </div>
+              </>
             )}
-            <a className="landing-secondary" href="#how">
-              How magic link works
-            </a>
           </div>
         </div>
       </section>
@@ -42,8 +70,8 @@ export default async function HomePage() {
                 1
               </span>
               <div>
-                <h3>Survey</h3>
-                <p>Send a friendly link. Family picks weekends and places.</p>
+                <h3>Plan</h3>
+                <p>Chat with WandrAI — no account needed to start.</p>
               </div>
             </li>
             <li className="landing-step">
@@ -51,8 +79,8 @@ export default async function HomePage() {
                 2
               </span>
               <div>
-                <h3>Vote</h3>
-                <p>Lock the trip, then thumbs-up stays and activities together.</p>
+                <h3>Save</h3>
+                <p>Continue with Google when you want the family survey link.</p>
               </div>
             </li>
             <li className="landing-step">
@@ -60,8 +88,8 @@ export default async function HomePage() {
                 3
               </span>
               <div>
-                <h3>Plan</h3>
-                <p>Publish the itinerary and collect final RSVPs on one link.</p>
+                <h3>Share</h3>
+                <p>Send the survey, vote, and publish the weekend plan.</p>
               </div>
             </li>
           </ol>

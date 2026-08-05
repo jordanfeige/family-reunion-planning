@@ -21,10 +21,10 @@ export default async function LoginErrorPage({
         ) : null}
         <p className="muted">{message}</p>
         <p className="muted" style={{ fontSize: "0.85rem", marginTop: "1rem" }}>
-          Production checklist: <code>RESEND_API_KEY</code>,{" "}
-          <code>EMAIL_FROM</code> on a verified Resend domain,{" "}
-          <code>AUTH_URL</code> matching your live site, and <code>AUTH_SECRET</code>{" "}
-          set in Vercel. Check Resend → Logs for delivery details.
+          Production checklist: <code>AUTH_GOOGLE_ID</code>, <code>AUTH_GOOGLE_SECRET</code>,{" "}
+          <code>AUTH_URL</code> matching your live site, and <code>AUTH_SECRET</code> set in
+          Vercel. In Google Cloud Console, add{" "}
+          <code>{`{AUTH_URL}/api/auth/callback/google`}</code> as an authorized redirect URI.
         </p>
         <Link className="btn btn-primary" href="/login" style={{ marginTop: "1rem" }}>
           Try again
@@ -33,4 +33,3 @@ export default async function LoginErrorPage({
     </div>
   );
 }
-

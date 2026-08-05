@@ -1,6 +1,6 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import NextAuth from "next-auth";
-import type { NextAuthConfig } from "next-auth";
+import Google from "next-auth/providers/google";
 
 import { getDb } from "@/db";
 import {
@@ -10,9 +10,23 @@ import {
   users,
   verificationTokens,
 } from "@/db/schema";
-import { resendEmailProvider } from "@/lib/auth/resendEmailProvider";
 import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
 import { claimGuestSubmissionsForUser } from "@/lib/supabase/guestIdentity";
+
+function googleProvider() {
+  const clientId = process.env.AUTH_GOOGLE_ID?.trim();
+  const clientSecret = process.env.AUTH_GOOGLE_SECRET?.trim();
+  if (!clientId || !clientSecret) {
+    console.warn(
+      "AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET missing — Google sign-in will not work.",
+    );
+  }
+  return Google({
+    clientId: clientId ?? "missing",
+    clientSecret: clientSecret ?? "missing",
+    allowDangerousEmailAccountLinking: true,
+  });
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   secret: process.env.AUTH_SECRET,
@@ -27,10 +41,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => ({
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
   pages: {
     signIn: "/login",
-    verifyRequest: "/login/verify",
     error: "/login/error",
   },
-  providers: [resendEmailProvider()],
+  providers: [googleProvider()],
   events: {
     async signIn({ user }) {
       if (user.id && user.email) {

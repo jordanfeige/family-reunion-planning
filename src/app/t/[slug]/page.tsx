@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import {
@@ -10,10 +9,9 @@ import {
 } from "@/app/actions/trips";
 import { auth } from "@/auth";
 import { AvailabilitySnapshot } from "@/components/AvailabilitySnapshot";
-import { CopyButton } from "@/components/CopyButton";
 import { FormattedDateTime } from "@/components/FormattedDateTime";
 import { ShareLinkCard } from "@/components/ShareLinkCard";
-import { LocationOptionsManager } from "@/components/LocationOptionsManager";
+import { PlacesConcierge } from "@/components/PlacesConcierge";
 import { PlanConfirmationSnapshot } from "@/components/PlanConfirmationSnapshot";
 import { TripCollaborators } from "@/components/TripCollaborators";
 import { TripDecisionBar } from "@/components/TripDecisionBar";
@@ -25,10 +23,10 @@ import { TripItineraryPanel } from "@/components/TripItineraryPanel";
 import { TripBallotControls } from "@/components/TripBallotControls";
 import { TripBudgetPanel } from "@/components/TripBudgetPanel";
 import { TripVenueSection } from "@/components/TripVenueSection";
+import { hasAnthropicApiKey } from "@/lib/ai";
 import { tallyBallotVotes, countDistinctVoters } from "@/lib/ballotResults";
 import { listBallotVotesForTrip } from "@/lib/supabase/ballotVotes";
 import { ballotOptionsForVoting } from "@/lib/venues";
-import { TripPlannerChat } from "@/components/TripPlannerChat";
 import { WeekendDatePicker } from "@/components/WeekendDatePicker";
 import {
   getTripForOrganizer,
@@ -220,7 +218,7 @@ export default async function TripHubPage({
             <textarea
               id="destination"
               name="destination"
-              placeholder="Bergen, lake house, dietary needs…"
+              placeholder="Lake house, dietary needs, max drive time…"
               defaultValue={trip.destinationNotes ?? ""}
             />
           </div>
@@ -241,17 +239,13 @@ export default async function TripHubPage({
         </>
         }
         locations={
-        <div className="stack">
-          <TripPlannerChat
-            slug={trip.slug}
-            tripName={trip.name}
-            existingLocationTitles={locationOptions.map((l) => l.title)}
-            initialMessages={locationsChatMessages}
-          />
-          <div className="divider" />
-          <h3 style={{ marginTop: 0, color: "var(--color-fjord)" }}>Survey location options</h3>
-          <LocationOptionsManager slug={trip.slug} locations={locationOptions} />
-        </div>
+        <PlacesConcierge
+          slug={trip.slug}
+          tripName={trip.name}
+          locations={locationOptions}
+          initialMessages={locationsChatMessages}
+          aiEnabled={hasAnthropicApiKey()}
+        />
         }
         survey={
         <div className="stack">
@@ -261,16 +255,19 @@ export default async function TripHubPage({
           </p>
           {survey ? (
             <>
-              <p className="mono" style={{ marginTop: "0.75rem" }}>
-                {surveyUrl}
-              </p>
-              <div className="row" style={{ marginTop: "0.75rem" }}>
-                <CopyButton text={surveyUrl} label="Copy survey link" />
-              </div>
+              <ShareLinkCard
+                url={surveyUrl}
+                title="Family survey link"
+                hint={
+                  locationOptions.length
+                    ? `${locationOptions.length} place${locationOptions.length === 1 ? "" : "s"} on this survey.`
+                    : "Add places in the Places step so family has destinations to choose."
+                }
+              />
               <div className="divider" />
               <h3 style={{ marginTop: 0 }}>Responses ({responses.length})</h3>
               {responses.length === 0 ? (
-                <p className="muted">Waiting for the first RSVPs…</p>
+                <p className="muted">Waiting for the first replies…</p>
               ) : (
                 <ul className="stack" style={{ listStyle: "none", padding: 0, margin: 0 }}>
                   {responses.map((r) => (
@@ -342,7 +339,7 @@ export default async function TripHubPage({
           <div className="divider" />
           <h3 style={{ marginTop: 0, color: "var(--color-fjord)" }}>Availability snapshot</h3>
           <p className="muted" style={{ margin: "0 0 0.75rem" }}>
-            Live rollup from RSVPs—use when locking a weekend in the group vote step.
+            Live rollup from replies—use when locking a weekend in the group vote step.
           </p>
           <AvailabilitySnapshot proposedSlots={weekendSlots} responses={responses} />
         </div>

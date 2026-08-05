@@ -6,7 +6,7 @@ export const tripDraftSchema = z.object({
   tagline: z
     .string()
     .optional()
-    .describe("Short vibe line, e.g. Salt air and silly games"),
+    .describe("Short vibe line, e.g. Lake weekends and silly games"),
   destinationNotes: z
     .string()
     .optional()

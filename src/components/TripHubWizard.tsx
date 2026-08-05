@@ -84,7 +84,7 @@ export function TripHubWizard({
       shortLabel: "Places",
       icon: "locations",
       description:
-        "Brainstorm destinations with WandrAI, then add choices so family can vote.",
+        "Open WandrAI to pick destinations, publish them to the survey, then share the link.",
       complete: completion.locations,
       content: locations,
     },

@@ -8,7 +8,7 @@ export function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-/** Magic links and transactional email require Resend in production. */
+/** Transactional email (survey copy, invites) requires Resend in production. */
 export function assertResendConfiguredForProduction(): void {
   if (isProduction() && !process.env.RESEND_API_KEY?.trim()) {
     throw new Error(
