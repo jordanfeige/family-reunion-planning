@@ -165,6 +165,30 @@ export default async function TripHubPage({
       <TripHubWizard
         slug={trip.slug}
         galleryUnlocked={galleryUnlocked}
+        phaseSummaries={{
+          decide:
+            locationOptions.length > 0 || weekendSlots.length > 0
+              ? [
+                  locationOptions.length
+                    ? `${locationOptions.length} place${locationOptions.length === 1 ? "" : "s"}`
+                    : null,
+                  weekendSlots.length
+                    ? `${weekendSlots.length} weekend${weekendSlots.length === 1 ? "" : "s"}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Weekends & places set"
+              : undefined,
+          shape:
+            lockedLocationTitle || lockedWeekendLabel
+              ? [lockedLocationTitle, lockedWeekendLabel].filter(Boolean).join(" · ")
+              : undefined,
+          gather: hasPublishedPlan
+            ? confirmationCount > 0
+              ? `${confirmationCount} RSVP${confirmationCount === 1 ? "" : "s"}`
+              : "Plan published"
+            : undefined,
+        }}
         completion={{
           basics: weekendSlots.length > 0,
           locations: locationOptions.length > 0,

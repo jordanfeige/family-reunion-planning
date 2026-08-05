@@ -1,6 +1,6 @@
 "use client";
 
-import { WizardShell, type WizardStepDef } from "@/components/WizardShell";
+import { WizardShell, type WizardPhaseDef, type WizardStepDef } from "@/components/WizardShell";
 
 export type TripHubCompletion = {
   basics: boolean;
@@ -13,10 +13,17 @@ export type TripHubCompletion = {
   gallery: boolean;
 };
 
+export type TripHubPhaseSummaries = {
+  decide?: string;
+  shape?: string;
+  gather?: string;
+};
+
 export function TripHubWizard({
   slug,
   completion,
   galleryUnlocked,
+  phaseSummaries,
   basics,
   locations,
   survey,
@@ -29,6 +36,7 @@ export function TripHubWizard({
   slug: string;
   completion: TripHubCompletion;
   galleryUnlocked: boolean;
+  phaseSummaries?: TripHubPhaseSummaries;
   basics: React.ReactNode;
   locations: React.ReactNode;
   survey: React.ReactNode;
@@ -38,9 +46,29 @@ export function TripHubWizard({
   confirmations: React.ReactNode;
   gallery: React.ReactNode;
 }) {
+  const phases: WizardPhaseDef[] = [
+    {
+      id: "decide",
+      label: "Decide",
+      summary: phaseSummaries?.decide,
+    },
+    {
+      id: "shape",
+      label: "Shape",
+      summary: phaseSummaries?.shape,
+    },
+    {
+      id: "gather",
+      label: "Gather",
+      summary: phaseSummaries?.gather,
+      muted: !galleryUnlocked,
+    },
+  ];
+
   const steps: WizardStepDef[] = [
     {
       id: "basics",
+      phaseId: "decide",
       label: "Trip basics",
       shortLabel: "Basics",
       icon: "basics",
@@ -51,6 +79,7 @@ export function TripHubWizard({
     },
     {
       id: "locations",
+      phaseId: "decide",
       label: "Locations",
       shortLabel: "Places",
       icon: "locations",
@@ -61,6 +90,7 @@ export function TripHubWizard({
     },
     {
       id: "survey",
+      phaseId: "decide",
       label: "Family survey",
       shortLabel: "Survey",
       icon: "survey",
@@ -71,6 +101,7 @@ export function TripHubWizard({
     },
     {
       id: "ballot",
+      phaseId: "shape",
       label: "Group vote",
       shortLabel: "Vote",
       icon: "ballot",
@@ -81,6 +112,7 @@ export function TripHubWizard({
     },
     {
       id: "blueprint",
+      phaseId: "shape",
       label: "Blueprint",
       shortLabel: "Plan",
       icon: "blueprint",
@@ -91,6 +123,7 @@ export function TripHubWizard({
     },
     {
       id: "budget",
+      phaseId: "gather",
       label: "Budget",
       shortLabel: "Budget",
       icon: "budget",
@@ -101,6 +134,7 @@ export function TripHubWizard({
     },
     {
       id: "confirmations",
+      phaseId: "gather",
       label: "Confirmations",
       shortLabel: "RSVP",
       icon: "share",
@@ -112,6 +146,7 @@ export function TripHubWizard({
     },
     {
       id: "gallery",
+      phaseId: "gather",
       label: "Gallery & memories",
       shortLabel: "Photos",
       icon: "gallery",
@@ -126,8 +161,9 @@ export function TripHubWizard({
   return (
     <WizardShell
       storageKey={`trip-hub-step-${slug}`}
+      phases={phases}
       steps={steps}
-      progressEyebrow="WandrAI trip planner"
+      lastStepLabel="Back to start"
     />
   );
 }

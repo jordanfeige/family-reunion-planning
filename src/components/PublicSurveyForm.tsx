@@ -205,21 +205,22 @@ export function PublicSurveyForm({
         <input key={`slot-${slot}`} type="hidden" name="slot" value={slot} />
       ))}
 
-      <WizardStepper
-        steps={stepperSteps}
-        activeId={step}
-        onSelect={(id) => {
-          setError(null);
-          setStep(id as SurveyStep);
-        }}
-        canSelect={(_s, idx) => idx <= stepIndex}
-        eyebrow="Family RSVP"
-        progressLabel={
-          stepIndex > 0
-            ? `${stepIndex} of ${steps.length - 1} steps done — almost there!`
-            : "Quick taps — takes about a minute"
-        }
-      />
+      <div className="wizard-rail wizard-rail--compact survey-wizard-rail">
+        <p className="wizard-progress-label survey-wizard-progress">
+          {stepIndex > 0
+            ? `${stepIndex} of ${steps.length - 1} steps done`
+            : "Quick taps — about a minute"}
+        </p>
+        <WizardStepper
+          steps={stepperSteps}
+          activeId={step}
+          onSelect={(id) => {
+            setError(null);
+            setStep(id as SurveyStep);
+          }}
+          canSelect={(_s, idx) => idx <= stepIndex}
+        />
+      </div>
 
       <div key={step} className="survey-step-body wizard-panel-enter">
         {step === "party" ? (
