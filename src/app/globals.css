@@ -1183,9 +1183,9 @@ code {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.15rem 0 1rem;
-  margin-bottom: 0.15rem;
+  gap: 0.75rem;
+  padding: 0.15rem 0 1.25rem;
+  margin-bottom: 0.35rem;
   border-bottom: 1px solid rgba(28, 61, 90, 0.12);
 }
 
@@ -1234,6 +1234,86 @@ code {
 
 .wizard-quiet-phase.is-muted {
   opacity: 0.4;
+}
+
+.wizard-step-pill {
+  width: min(12.5rem, 100%);
+}
+
+.wizard-step-pill .compact-select-trigger {
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 2.65rem;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(28, 61, 90, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+  font-weight: 700;
+  color: var(--color-fjord);
+  box-shadow: 0 8px 22px rgba(28, 61, 90, 0.06);
+}
+
+.wizard-step-pill .compact-select-value {
+  flex: 0 1 auto;
+  text-align: center;
+}
+
+.wizard-step-pill-label {
+  margin: 0;
+  min-height: 2.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(28, 61, 90, 0.14);
+  background: rgba(255, 255, 255, 0.82);
+  font-weight: 700;
+  color: var(--color-fjord);
+}
+
+.hub-step-head {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.hub-step-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 4vw, 1.95rem);
+  font-weight: 600;
+  color: var(--color-fjord);
+  letter-spacing: -0.02em;
+}
+
+.hub-step-lede {
+  margin: 0.5rem auto 0;
+  max-width: 26rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--color-slate);
+}
+
+.hub-step-meta {
+  margin: 0.65rem 0 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--color-slate);
+}
+
+.hub-step-meta.is-warn {
+  color: #8a4b2a;
+}
+
+.share-link-card--bare {
+  padding-top: 0;
+  border-bottom: none;
+  margin-bottom: 0.25rem;
+}
+
+.share-link-card--bare .share-link-card-foot {
+  justify-content: center;
+  text-align: center;
 }
 
 .wizard-panel--quiet {
@@ -4642,38 +4722,9 @@ code {
 
 .hub-survey-empty {
   text-align: center;
-  padding: 1.75rem 0.5rem 0.5rem;
+  padding: 1rem 0 0.25rem;
   border: none;
   background: transparent;
-}
-
-.hub-survey-empty-art {
-  display: flex;
-  justify-content: center;
-  gap: 0.4rem;
-  margin: 0 auto 1rem;
-}
-
-.hub-survey-empty-art span {
-  width: 1.7rem;
-  height: 1.7rem;
-  border-radius: 999px;
-  background: rgba(42, 85, 128, 0.1);
-  border: 1.5px solid rgba(28, 61, 90, 0.16);
-}
-
-.hub-survey-empty-art span:nth-child(2) {
-  transform: translateY(-0.2rem);
-  background: rgba(212, 90, 58, 0.12);
-  border-color: rgba(212, 90, 58, 0.28);
-}
-
-.hub-survey-empty-title {
-  margin: 0 0 0.35rem;
-  font-family: var(--font-display);
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: var(--color-fjord);
 }
 
 .hub-survey-empty-copy {

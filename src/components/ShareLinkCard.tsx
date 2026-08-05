@@ -23,6 +23,7 @@ export function ShareLinkCard({
   metaTone = "ok",
   copyLabel = "Copy",
   copyClassName = "btn-primary",
+  bare = false,
 }: {
   url: string;
   title?: string;
@@ -32,19 +33,23 @@ export function ShareLinkCard({
   metaTone?: "ok" | "warn";
   copyLabel?: string;
   copyClassName?: string;
+  /** Hide the card title — page already has a step heading. */
+  bare?: boolean;
 }) {
   return (
-    <div className="share-link-card">
-      <div className="share-link-card-head">
-        <p className="share-link-card-title">{title}</p>
-        {meta ? (
-          <p
-            className={`share-link-card-meta${metaTone === "warn" ? " is-warn" : ""}`}
-          >
-            {meta}
-          </p>
-        ) : null}
-      </div>
+    <div className={`share-link-card${bare ? " share-link-card--bare" : ""}`}>
+      {!bare ? (
+        <div className="share-link-card-head">
+          <p className="share-link-card-title">{title}</p>
+          {meta ? (
+            <p
+              className={`share-link-card-meta${metaTone === "warn" ? " is-warn" : ""}`}
+            >
+              {meta}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <div className="share-link-row">
         <p className="share-link-card-url" title={url}>
           {displayUrl(url)}
@@ -64,7 +69,7 @@ export function ShareLinkCard({
             rel="noreferrer"
             className="share-link-preview"
           >
-            Preview survey
+            Preview
           </Link>
         ) : null}
       </div>

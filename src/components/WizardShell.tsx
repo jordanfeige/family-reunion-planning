@@ -2,6 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
+import { CompactSelect } from "@/components/CompactSelect";
 import { WizardFooter, WizardFooterSentinel } from "@/components/WizardFooter";
 import { useWizardFooterReveal } from "@/components/useWizardFooterReveal";
 import type { WizardIconName } from "@/components/wizard-icons";
@@ -111,6 +112,10 @@ export function WizardShell({
   if (!activeStep || !activePhase) return null;
 
   const progressLabel = `${activePhase.label} · ${phaseStepIndex + 1} of ${activePhaseSteps.length}`;
+  const stepPillOptions = activePhaseSteps.map((step) => ({
+    value: step.id,
+    label: step.shortLabel ?? step.label,
+  }));
 
   return (
     <div className={`wizard${quiet ? " wizard--quiet" : ""}`}>
@@ -149,36 +154,21 @@ export function WizardShell({
               );
             })}
           </div>
-          <div
-            className="wizard-quiet-steps"
-            role="tablist"
-            aria-label={`${activePhase.label} steps`}
-          >
-            {activePhaseSteps.map((step, i) => (
-              <span key={step.id} className="wizard-quiet-step-wrap">
-                {i > 0 ? (
-                  <span className="wizard-quiet-sep" aria-hidden>
-                    ·
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={step.id === activeId}
-                  className={[
-                    "wizard-quiet-step",
-                    step.id === activeId ? "is-active" : "",
-                    step.complete ? "is-complete" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={() => goTo(step.id)}
-                >
-                  {step.shortLabel ?? step.label}
-                </button>
-              </span>
-            ))}
-          </div>
+
+          {stepPillOptions.length > 1 ? (
+            <div className="wizard-step-pill">
+              <CompactSelect
+                value={activeId}
+                options={stepPillOptions}
+                onChange={goTo}
+                aria-label={`${activePhase.label} step`}
+              />
+            </div>
+          ) : (
+            <p className="wizard-step-pill-label">
+              {activeStep.shortLabel ?? activeStep.label}
+            </p>
+          )}
         </nav>
       ) : (
         <div className="wizard-rail wizard-rail--compact">
@@ -219,14 +209,20 @@ export function WizardShell({
         role="tabpanel"
         aria-labelledby={`step-${activeStep.id}`}
       >
-        <div className="wizard-panel-intro wizard-panel-intro--quiet">
-          <h2 id={`step-${activeStep.id}`} className="wizard-panel-title-quiet">
+        {quiet ? (
+          <h2 id={`step-${activeStep.id}`} className="sr-only">
             {activeStep.label}
           </h2>
-          {activeStep.description ? (
-            <p className="muted wizard-panel-desc">{activeStep.description}</p>
-          ) : null}
-        </div>
+        ) : (
+          <div className="wizard-panel-intro wizard-panel-intro--quiet">
+            <h2 id={`step-${activeStep.id}`} className="wizard-panel-title-quiet">
+              {activeStep.label}
+            </h2>
+            {activeStep.description ? (
+              <p className="muted wizard-panel-desc">{activeStep.description}</p>
+            ) : null}
+          </div>
+        )}
 
         <div className="wizard-panel-body">
           {activeStep.content}

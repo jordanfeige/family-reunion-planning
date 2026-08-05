@@ -227,6 +227,12 @@ export default async function TripHubPage({
         }}
         basics={
         <>
+        <header className="hub-step-head">
+          <h2 className="hub-step-title">Trip basics</h2>
+          <p className="hub-step-lede">
+            Name the trip and pick Fri–Sun weekends for the family survey.
+          </p>
+        </header>
         <form action={updateTripBasicsAction} className="stack trip-basics-form">
           <input type="hidden" name="slug" value={trip.slug} />
           <div className="field">
@@ -252,7 +258,7 @@ export default async function TripHubPage({
             />
           </div>
           <WeekendDatePicker defaultSelected={weekendSlots} />
-          <button type="submit" className="btn btn-primary btn-block-sm">
+          <button type="submit" className="btn btn-berry btn-block-sm">
             Save details
           </button>
         </form>
