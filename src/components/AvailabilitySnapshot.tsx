@@ -52,11 +52,11 @@ export function AvailabilitySnapshot({
               borderRadius: "var(--radius-md)",
               padding: "0.75rem 1rem",
               background: best.some((b) => b.fridayIso === a.fridayIso)
-                ? "rgba(94, 234, 212, 0.12)"
-                : "#fff",
+                ? "var(--canvas)"
+                : "var(--card)",
             }}
           >
-            <strong style={{ color: "var(--color-fjord)" }}>{a.label}</strong>
+            <strong style={{ color: "var(--ink)" }}>{a.label}</strong>
             {a.households > 0 ? (
               <>
                 <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.9rem" }}>

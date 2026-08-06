@@ -1,5 +1,6 @@
 "use client";
 
+import { SoftImage } from "@/components/SoftImage";
 import { cityOnly } from "@/lib/driveTimes";
 import { placeStillUrl } from "@/lib/placeImages";
 import type { PlacesDraftItem } from "@/lib/placesDraft";
@@ -39,7 +40,6 @@ export function LiveShortlist({
   groupDriveSummary,
   farthestHouseholds,
   confirmBusy,
-  emptyHint = "As you chat, destinations appear here with a scenic still.",
 }: {
   places: PlacesDraftItem[];
   onToggle: (title: string) => void;
@@ -50,6 +50,8 @@ export function LiveShortlist({
   confirmBusy?: boolean;
   emptyHint?: string;
 }) {
+  if (places.length === 0) return null;
+
   const picked = places.filter((p) => p.selected !== false);
   const total = places.length;
   const pickedCount = picked.length;
@@ -58,87 +60,72 @@ export function LiveShortlist({
     <aside className="live-shortlist" aria-label="Live shortlist">
       <header className="live-shortlist-head">
         <h3 className="live-shortlist-title">Live shortlist</h3>
-        {total > 0 ? (
-          <span className="live-shortlist-count" aria-live="polite">
-            {pickedCount} of {total} picked
-          </span>
-        ) : null}
+        <span className="live-shortlist-count" aria-live="polite">
+          {pickedCount} of {total} picked
+        </span>
       </header>
 
-      {places.length === 0 ? (
-        <div className="live-shortlist-empty">
-          <p className="muted" style={{ margin: 0, lineHeight: 1.5 }}>
-            {emptyHint}
-          </p>
-        </div>
-      ) : (
-        <ul className="live-shortlist-list">
-          {places.map((place) => {
-            const checked = place.selected !== false;
-            const cityState = placeCityStateLine(place);
-            const driveLabel = groupDriveSummary || drivePill(place);
-            const crowdLabel = place.crowdLevel
-              ? CROWD_LABELS[place.crowdLevel]
-              : null;
+      <ul className="live-shortlist-list">
+        {places.map((place) => {
+          const checked = place.selected !== false;
+          const cityState = placeCityStateLine(place);
+          const driveLabel = groupDriveSummary || drivePill(place);
+          const crowdLabel = place.crowdLevel
+            ? CROWD_LABELS[place.crowdLevel]
+            : null;
+          const name = placeName(place.title);
 
-            return (
-              <li key={place.title}>
-                <label className={`live-shortlist-card${checked ? " is-checked" : ""}`}>
-                  <div className="live-shortlist-row">
-                    <div className="live-shortlist-media">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={placeStillUrl(place.title, place.summary)}
-                        alt=""
-                        width={88}
-                        height={62}
-                        loading="lazy"
-                        decoding="async"
+          return (
+            <li key={place.title}>
+              <label className={`live-shortlist-card${checked ? " is-checked" : ""}`}>
+                <div className="live-shortlist-row">
+                  <SoftImage
+                    className="live-shortlist-media"
+                    src={placeStillUrl(place.title, place.summary)}
+                    letter={name}
+                    width={88}
+                    height={62}
+                  />
+                  <div className="live-shortlist-body">
+                    <span className="live-shortlist-check-wrap">
+                      <input
+                        type="checkbox"
+                        className="live-shortlist-check"
+                        checked={checked}
+                        onChange={() => onToggle(place.title)}
+                        aria-label={`Include ${name}`}
                       />
-                    </div>
-                    <div className="live-shortlist-body">
-                      <span className="live-shortlist-check-wrap">
-                        <input
-                          type="checkbox"
-                          className="live-shortlist-check"
-                          checked={checked}
-                          onChange={() => onToggle(place.title)}
-                          aria-label={`Include ${placeName(place.title)}`}
-                        />
-                      </span>
-                      <span className="live-shortlist-text">
-                        <strong className="live-shortlist-name">
-                          {placeName(place.title)}
-                        </strong>
-                        {cityState ? (
-                          <span className="live-shortlist-city">{cityState}</span>
+                    </span>
+                    <span className="live-shortlist-text">
+                      <strong className="live-shortlist-name">{name}</strong>
+                      {cityState ? (
+                        <span className="live-shortlist-city">{cityState}</span>
+                      ) : null}
+                      <span className="live-shortlist-pills">
+                        {driveLabel ? (
+                          <span
+                            className="live-shortlist-pill"
+                            title={
+                              groupDriveSummary && farthestHouseholds
+                                ? farthestHouseholds
+                                : undefined
+                            }
+                          >
+                            {driveLabel}
+                          </span>
                         ) : null}
-                        <span className="live-shortlist-pills">
-                          {driveLabel ? (
-                            <span
-                              className="live-shortlist-pill"
-                              title={
-                                groupDriveSummary && farthestHouseholds
-                                  ? farthestHouseholds
-                                  : undefined
-                              }
-                            >
-                              {driveLabel}
-                            </span>
-                          ) : null}
-                          {crowdLabel ? (
-                            <span className="live-shortlist-pill">{crowdLabel}</span>
-                          ) : null}
-                        </span>
+                        {crowdLabel ? (
+                          <span className="live-shortlist-pill">{crowdLabel}</span>
+                        ) : null}
                       </span>
-                    </div>
+                    </span>
                   </div>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                </div>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
 
       <div className="live-shortlist-foot">
         <button

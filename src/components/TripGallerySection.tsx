@@ -2,6 +2,7 @@ import {
   deleteGalleryItemAction,
 } from "@/app/actions/trips";
 import { GalleryUploader } from "@/components/GalleryUploader";
+import { SoftImage } from "@/components/SoftImage";
 import type { GalleryItem } from "@/lib/supabase/mappers";
 
 export function TripGallerySection({
@@ -58,14 +59,18 @@ export function TripGallerySection({
                 borderRadius: "var(--radius-md)",
                 overflow: "hidden",
                 border: "1px solid rgba(28,61,90,0.1)",
-                background: "#fff",
+                background: "var(--card)",
               }}
             >
               {item.mediaType === "video" ? (
                 <video src={item.url} controls style={{ width: "100%", display: "block" }} />
               ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={item.url} alt={item.caption ?? ""} style={{ width: "100%", display: "block" }} />
+                <SoftImage
+                  src={item.url}
+                  alt={item.caption ?? ""}
+                  letter={item.caption ?? "G"}
+                  className="gallery-soft-image"
+                />
               )}
               <figcaption style={{ padding: "0.65rem", fontSize: "0.85rem" }}>
                 {item.caption ?? <span className="muted">No caption</span>}

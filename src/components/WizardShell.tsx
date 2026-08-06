@@ -86,7 +86,7 @@ export function WizardShell({
     <div className="wizard wizard--trail">
       {header}
 
-      <div className="trail-layout">
+      <div className="trail-layout trail-layout--eyebrow">
         <TrailMap
           stops={steps.map((s) => ({
             id: s.id,
@@ -94,7 +94,6 @@ export function WizardShell({
             complete: s.complete,
           }))}
           activeId={activeId}
-          onSelect={goTo}
         />
         {trailAside ? <div className="trail-aside-slot">{trailAside}</div> : null}
 

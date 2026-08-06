@@ -16,7 +16,7 @@ ${input.loginUrl}
 
 Use the same Google account email (${to}) so the invite matches.`;
 
-  const html = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px"><div style="max-width:480px;margin:0 auto"><h1 style="color:#1c3d5a">Trip planning invite</h1><p>${inviter} invited you to co-plan <strong>${escapeHtml(input.tripName)}</strong>.</p><p><a href="${escapeHtml(input.loginUrl)}" style="color:#d45a3a">Open trip hub →</a></p><p style="color:#3d4f63;font-size:14px">Sign in with Google as <strong>${escapeHtml(to)}</strong> so the invite matches your account.</p></div></body></html>`;
+  const html = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;padding:24px"><div style="max-width:480px;margin:0 auto"><h1 style="color:#16202b">Trip planning invite</h1><p>${inviter} invited you to co-plan <strong>${escapeHtml(input.tripName)}</strong>.</p><p><a href="${escapeHtml(input.loginUrl)}" style="color:#8c1f43">Open trip hub →</a></p><p style="color:#6f7a86;font-size:14px">Sign in with Google as <strong>${escapeHtml(to)}</strong> so the invite matches your account.</p></div></body></html>`;
 
   if (!apiKey) {
     console.log(

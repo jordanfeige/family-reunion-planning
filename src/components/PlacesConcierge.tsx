@@ -69,12 +69,6 @@ function starterMessage(tripName: string): UIMessage {
   };
 }
 
-const PLACE_CHIPS = [
-  "Under 3 hr",
-  "Up to 6 hr",
-  "Anywhere we can fly",
-];
-
 export function PlacesConcierge({
   slug,
   tripName,
@@ -274,7 +268,6 @@ function PlacesFullPlanner({
   const lastMessage = messages[messages.length - 1];
   const streamingAssistant =
     busy && lastMessage?.role === "assistant" ? lastMessage.id : null;
-  const userTurns = messages.filter((m) => m.role === "user").length;
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -308,7 +301,7 @@ function PlacesFullPlanner({
   }
 
   return (
-    <div className="dest-split">
+    <div className={places.length > 0 ? "dest-split" : "dest-split dest-split--solo"}>
       {error || publishError ? (
         <div className="error-banner dest-split-banner">
           {publishError ?? error?.message}
@@ -342,29 +335,10 @@ function PlacesFullPlanner({
                 streaming={message.id === streamingAssistant}
               />
             ))}
-            {userTurns === 0 && !busy ? (
-              <div className="plan-chips">
-                {PLACE_CHIPS.map((chip) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    className="plan-chip"
-                    disabled={pending}
-                    onClick={() => void send(chip)}
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-            ) : null}
           </div>
           <ChatComposer
             id={`places-chat-${slug}`}
-            placeholder={
-              userTurns === 0
-                ? "e.g. lakes in the Midwest, under 6 hours"
-                : "Message WandrAI…"
-            }
+            placeholder="Answer in your own words…"
             value={draftText}
             busy={busy || pending}
             compact
@@ -394,21 +368,23 @@ function PlacesFullPlanner({
         </div>
       </section>
 
-      <LiveShortlist
-        places={places}
-        onToggle={(title) => {
-          const key = title.trim().toLowerCase();
-          setUnchecked((prev) => {
-            const next = { ...prev };
-            if (next[key]) delete next[key];
-            else next[key] = true;
-            return next;
-          });
-        }}
-        onConfirm={publish}
-        confirmBusy={pending}
-        onDifferentIdeas={() => void send("Show me different ideas")}
-      />
+      {places.length > 0 ? (
+        <LiveShortlist
+          places={places}
+          onToggle={(title) => {
+            const key = title.trim().toLowerCase();
+            setUnchecked((prev) => {
+              const next = { ...prev };
+              if (next[key]) delete next[key];
+              else next[key] = true;
+              return next;
+            });
+          }}
+          onConfirm={publish}
+          confirmBusy={pending}
+          onDifferentIdeas={() => void send("Show me different ideas")}
+        />
+      ) : null}
     </div>
   );
 }

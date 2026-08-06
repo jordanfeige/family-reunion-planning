@@ -449,7 +449,7 @@ export default async function TripHubPage({
                             border: "1px solid rgba(28,61,90,0.12)",
                             borderRadius: "var(--radius-md)",
                             padding: "1rem",
-                            background: "#fff",
+                            background: "var(--card)",
                           }}
                         >
                           <div className="row" style={{ justifyContent: "space-between" }}>

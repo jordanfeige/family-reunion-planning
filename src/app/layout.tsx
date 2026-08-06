@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Outfit } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
 
 import { auth } from "@/auth";
 import { SiteChrome } from "@/components/SiteChrome";
@@ -8,14 +8,22 @@ import { APP_DESCRIPTION, APP_NAME, APP_TAGLINE } from "@/lib/brand";
 
 import "./globals.css";
 
-const outfit = Outfit({
-  variable: "--font-outfit",
+const plexSans = IBM_Plex_Sans({
+  variable: "--font-plex-sans",
   subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
   subsets: ["latin"],
+  weight: ["400", "500"],
+});
+
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
+  subsets: ["latin"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -45,7 +53,10 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en" className={`${outfit.variable} ${fraunces.variable}`}>
+    <html
+      lang="en"
+      className={`${plexSans.variable} ${plexMono.variable} ${newsreader.variable}`}
+    >
       <body>
         <SiteChrome session={session}>{children}</SiteChrome>
       </body>

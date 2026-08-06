@@ -6,6 +6,7 @@ import type { Session } from "next-auth";
 
 import { signOutAction } from "@/app/actions/auth";
 import { BrandMark } from "@/components/BrandMark";
+import { SoftImage } from "@/components/SoftImage";
 import { APP_TAGLINE } from "@/lib/brand";
 
 const APP_LINKS = [
@@ -80,11 +81,10 @@ export function SiteHeader({ session }: { session: Session | null }) {
                 </Link>
               ) : null}
               {session.user.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <SoftImage
                   src={session.user.image}
-                  alt=""
-                  className="nav-avatar"
+                  letter={session.user.name ?? session.user.email ?? "?"}
+                  className="nav-avatar soft-image--avatar"
                   width={32}
                   height={32}
                 />

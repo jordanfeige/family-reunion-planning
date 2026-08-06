@@ -7067,3 +7067,514 @@ code {
   font-size: 0.88rem;
 }
 
+
+/* === Design contract (WandrAI) === */
+:root {
+  --ink: #16202b;
+  --muted: #6f7a86;
+  --faint: #8a939d;
+  --accent: #8c1f43;
+  --link: #1d5091;
+  --canvas: #f7f6f3;
+  --surface: #fdfdfc;
+  --card: #ffffff;
+  --hairline: rgba(22, 32, 43, 0.1);
+  --hairline-2: rgba(22, 32, 43, 0.14);
+
+  /* Legacy aliases remapped to contract (no navy/orange/teal) */
+  --color-night: var(--ink);
+  --color-slate: var(--muted);
+  --color-fjord: var(--ink);
+  --color-fjord-soft: var(--link);
+  --color-berry: var(--accent);
+  --color-berry-soft: var(--accent);
+  --color-snow: var(--canvas);
+  --color-mist: var(--canvas);
+  --color-spruce: var(--ink);
+  --color-aurora: var(--muted);
+  --shadow-soft: 0 2px 8px rgba(20, 24, 30, 0.05);
+  --shadow-card: 0 2px 8px rgba(20, 24, 30, 0.05);
+  --font-sans: var(--font-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  --font-display: var(--font-newsreader), Newsreader, Georgia, serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+  --radius-lg: 14px;
+  --radius-md: 12px;
+  --radius-sm: 9px;
+}
+
+body {
+  color: var(--ink);
+  background: var(--canvas);
+  font-family: var(--font-sans);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--link);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.btn {
+  border-radius: 9px;
+  padding: 9px 18px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: none;
+  transform: none;
+}
+
+.btn:hover,
+.btn:active {
+  transform: none;
+}
+
+.btn-primary,
+.btn-berry {
+  background: var(--accent);
+  color: var(--card);
+  border: none;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--hairline-2);
+}
+
+.card,
+.panel,
+.plan-live-card,
+.live-shortlist,
+.dest-places-card,
+.dashboard-card {
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  box-shadow: 0 2px 8px rgba(20, 24, 30, 0.05);
+  background: var(--card);
+}
+
+.pill,
+.plan-chip,
+.live-shortlist-pill,
+.new-trip-pill,
+.new-trip-suggestion {
+  border-radius: 20px;
+  border: 1px solid var(--hairline-2);
+}
+
+.site-header,
+.topbar,
+.nav-shell {
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.brand-mark {
+  color: var(--ink);
+}
+
+.brand-mark-badge {
+  background: var(--canvas);
+  color: var(--ink);
+}
+
+/* Step eyebrow replaces trail map circles */
+.step-progress-eyebrow,
+.create-trip-draft-eyebrow,
+.plan-workspace-eyebrow,
+.new-trip-eyebrow {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.trail-layout--eyebrow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+
+.trail-layout--eyebrow .trail-map {
+  position: static;
+  width: auto;
+  flex: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
+}
+
+.trail-map-list,
+.trail-map-caption,
+.trail-map-path,
+.trail-map-pulse,
+.trail-map-node,
+.trail-map-label {
+  display: none !important;
+}
+
+.trail-map .step-progress-eyebrow {
+  display: block;
+  margin: 0;
+}
+
+/* Soft image */
+.soft-image {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--canvas);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.soft-image-fallback {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--faint);
+  line-height: 1;
+  user-select: none;
+}
+
+.soft-image-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.soft-image-photo.is-ready {
+  opacity: 1;
+}
+
+.soft-image--avatar,
+.soft-image.nav-avatar,
+.soft-image.profile-avatar {
+  border-radius: 999px;
+}
+
+.live-shortlist-media.soft-image {
+  width: 88px;
+  height: 62px;
+}
+
+.dashboard-card-photo.soft-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  aspect-ratio: 16 / 9;
+}
+
+.gallery-soft-image.soft-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 0;
+}
+
+.weekend-timeline-photo.soft-image {
+  width: 96px;
+  height: 70px;
+  margin-top: 12px;
+}
+
+/* New trip screen */
+.plan-page--new-trip {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 70px 40px 48px;
+}
+
+.new-trip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.new-trip-title {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-size: 46px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--ink);
+  max-width: 20ch;
+}
+
+.new-trip-lede {
+  margin: 0 0 30px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 520px;
+}
+
+.new-trip-composer {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--hairline-2);
+  border-radius: 14px;
+  padding: 18px 18px 14px;
+  box-shadow: 0 2px 8px rgba(20, 24, 30, 0.05);
+}
+
+.new-trip-textarea {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink);
+  padding: 0;
+  margin: 0 0 14px;
+}
+
+.new-trip-textarea::placeholder {
+  color: var(--faint);
+}
+
+.new-trip-composer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+
+.new-trip-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.new-trip-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  color: var(--faint);
+  background: var(--canvas);
+}
+
+.new-trip-submit {
+  flex-shrink: 0;
+}
+
+.new-trip-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.new-trip-suggestion {
+  padding: 7px 14px;
+  font-size: 13px;
+  color: var(--link);
+  background: var(--card);
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.new-trip-suggestion:hover:not(:disabled) {
+  border-color: var(--link);
+}
+
+.new-trip-suggestion:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.new-trip-quota {
+  margin: 22px 0 0;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+/* In-flow pages */
+.plan-page--trail,
+.wizard--trail,
+.dashboard-page,
+.content-page,
+.trip-hub-body {
+  padding-top: 26px;
+  padding-bottom: 34px;
+}
+
+.plan-workspace-title,
+.dest-places-title,
+.dashboard-title,
+.live-shortlist-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+
+.plan-workspace-title {
+  font-size: 32px;
+  margin: 0 0 12px;
+}
+
+.plan-workspace-lede,
+.dest-places-lede {
+  margin: 0 0 22px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 520px;
+}
+
+.plan-panel-grid--solo,
+.dest-split--solo {
+  display: block;
+}
+
+.plan-panel-grid--solo .plan-chat-pane,
+.dest-split--solo .dest-places-card {
+  width: 100%;
+  max-width: none;
+}
+
+.plan-chips {
+  display: none !important;
+}
+
+.live-shortlist-empty {
+  display: none !important;
+}
+
+.plan-cap-note {
+  margin-top: 16px;
+  font-size: 14.5px;
+}
+
+/* Kill gradient / aurora shells on app chrome */
+.site-chrome--quiet body,
+.site-chrome--quiet,
+body.site-chrome--quiet {
+  background: var(--canvas);
+}
+
+@media (max-width: 720px) {
+  .plan-page--new-trip {
+    padding: 48px 22px 40px;
+  }
+
+  .new-trip-title {
+    font-size: 36px;
+  }
+
+  .new-trip-composer-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .new-trip-submit {
+    width: 100%;
+  }
+}
+
+/* === Design contract overrides (type weight + chrome) === */
+.site-chrome--app,
+.site-chrome--app main,
+.site-chrome:not(.site-chrome--marketing) {
+  background: var(--canvas);
+}
+
+.site-chrome--app .brand-mark-badge,
+.site-chrome:not(.site-chrome--marketing) .brand-mark-badge {
+  background: var(--canvas);
+  box-shadow: none;
+}
+
+h1, h2, h3, h4,
+.plan-workspace-title,
+.dest-places-title,
+.dashboard-title,
+.dashboard-card-name,
+.live-shortlist-name,
+.live-shortlist-title,
+.new-trip-title,
+.itinerary-block-title,
+.decision-card-name {
+  font-family: var(--font-display) !important;
+  font-weight: 500 !important;
+}
+
+.new-trip-title {
+  font-weight: 400 !important;
+}
+
+.btn,
+.btn-primary,
+.btn-berry,
+.btn-secondary,
+.btn-sm {
+  font-weight: 500 !important;
+}
+
+/* Cap heading→content gaps */
+.plan-workspace-head,
+.dest-places-head,
+.dashboard-header,
+.content-page-head {
+  margin-bottom: 22px;
+}
+
+.wizard-panel-body > *:first-child,
+.trip-hub-body > *:first-child {
+  margin-top: 0;
+}
+
+/* Neutralize remaining gradient shells (contract: no gradients) */
+.site-chrome--app {
+  background: var(--canvas) !important;
+}
+
+.site-chrome--marketing,
+.landing-hero,
+.hero-aurora {
+  background: var(--canvas) !important;
+}
+
+.site-chrome--marketing .landing-hero,
+.site-chrome--marketing [class*="aurora"],
+.site-chrome--marketing [class*="hero"] {
+  background-image: none !important;
+}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { SoftImage } from "@/components/SoftImage";
 import { TripDashboardManage } from "@/components/TripDashboardManage";
 import { APP_TAGLINE } from "@/lib/brand";
 import { dashboardTripCardMeta } from "@/lib/dashboardTripCard";
@@ -168,11 +169,10 @@ export default async function DashboardPage() {
                     <li key={trip.id} className="dashboard-card">
                       <Link href={card.href} className="dashboard-card-link">
                         <div className="dashboard-card-photo-wrap">
-                          <img
+                          <SoftImage
                             src={card.photoUrl}
-                            alt=""
+                            letter={trip.name}
                             className="dashboard-card-photo"
-                            loading="lazy"
                           />
                           <span className="dashboard-card-status-chip">
                             {card.statusPrimary} · {card.statusSecondary}

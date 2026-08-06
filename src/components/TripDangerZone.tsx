@@ -81,7 +81,7 @@ export function TripDangerZone({
                 placeholder={tripName}
               />
             </div>
-            <button type="submit" className="btn btn-secondary" style={{ color: "#9b2c2c" }}>
+            <button type="submit" className="btn btn-secondary" style={{ color: "var(--accent)" }}>
               Delete trip forever
             </button>
           </form>

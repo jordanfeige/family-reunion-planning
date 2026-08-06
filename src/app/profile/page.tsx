@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { signOutAction } from "@/app/actions/auth";
 import { auth } from "@/auth";
+import { SoftImage } from "@/components/SoftImage";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -15,11 +16,10 @@ export default async function ProfilePage() {
     <div className="shell content-page">
       <header className="content-page-head profile-head">
         {session.user.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <SoftImage
             src={session.user.image}
-            alt=""
-            className="profile-avatar"
+            letter={name}
+            className="profile-avatar soft-image--avatar"
             width={72}
             height={72}
           />

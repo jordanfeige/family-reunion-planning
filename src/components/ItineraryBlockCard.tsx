@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { updateItineraryBlockAction } from "@/app/actions/trips";
 import { CompactSelect } from "@/components/CompactSelect";
 import { FormattedTimeOfDay } from "@/components/FormattedTimeOfDay";
+import { SoftImage } from "@/components/SoftImage";
 import {
   blockStartTime,
   blockTagLabel,
@@ -98,11 +99,12 @@ export function ItineraryBlockCard({
             </p>
           ) : null}
           {block.photoUrl ? (
-            <img
+            <SoftImage
               src={block.photoUrl}
-              alt=""
+              letter={block.title}
               className="weekend-timeline-photo"
-              loading="lazy"
+              width={96}
+              height={70}
             />
           ) : null}
         </article>
