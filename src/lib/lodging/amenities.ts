@@ -106,3 +106,50 @@ export function amenityRowsFromCodes(
   }
   return rows;
 }
+
+function osmTagTruthy(v: string | undefined): boolean | null {
+  if (v == null || v === "") return null;
+  const t = v.trim().toLowerCase();
+  if (["yes", "true", "1", "y"].includes(t)) return true;
+  if (["no", "false", "0", "n"].includes(t)) return false;
+  return null;
+}
+
+/**
+ * Map present OSM tags to amenity rows. Missing important tags → "… not listed"
+ * (never invent "no AC" from absence).
+ */
+export function amenityRowsFromOsmTags(
+  tags: Record<string, string>,
+): AmenityRow[] {
+  const codes: LodgingAmenityCode[] = [];
+  const cautions: string[] = [];
+
+  const ac = osmTagTruthy(tags.air_conditioning ?? tags["air_conditioning"]);
+  if (ac === true) codes.push("ac");
+  else if (ac === false) codes.push("no-ac");
+  else cautions.push("AC not listed");
+
+  const kitchen =
+    osmTagTruthy(tags.kitchen) ??
+    osmTagTruthy(tags["cooking"]) ??
+    (tags.amenity === "kitchen" ? true : null);
+  if (kitchen === true) codes.push("full-kitchen");
+  else if (kitchen === false) codes.push("no-kitchen");
+  else cautions.push("Kitchen not listed");
+
+  if (osmTagTruthy(tags.washing_machine) === true || osmTagTruthy(tags.laundry) === true) {
+    codes.push("laundry");
+  }
+  if (osmTagTruthy(tags.swimming_pool) === true || tags.leisure === "swimming_pool") {
+    codes.push("pool");
+  }
+  if (osmTagTruthy(tags.dogs) === true || osmTagTruthy(tags.pets) === true) {
+    codes.push("pet-friendly");
+  }
+  if (/\bwaterfront|beach|lake\b/i.test(tags.tourism ?? "") || tags.natural === "beach") {
+    codes.push("waterfront");
+  }
+
+  return amenityRowsFromCodes(codes, cautions);
+}

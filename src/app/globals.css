@@ -7038,6 +7038,75 @@ code {
   border-top: 1px solid rgba(28, 61, 90, 0.08);
 }
 
+.dashboard-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.dashboard-card-icon-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-slate);
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.dashboard-card-icon-btn:hover {
+  color: var(--color-fjord);
+  background: rgba(28, 61, 90, 0.06);
+}
+
+.dashboard-card-icon-btn:focus-visible {
+  outline: 2px solid var(--color-fjord);
+  outline-offset: 2px;
+}
+
+.dashboard-card-icon-btn--danger:hover {
+  color: #9b2c2c;
+  background: rgba(155, 44, 44, 0.08);
+}
+
+.dashboard-toast {
+  position: fixed;
+  z-index: 300;
+  left: 50%;
+  bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  max-width: min(22rem, calc(100vw - 2rem));
+  padding: 0.75rem 1.15rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(28, 61, 90, 0.12);
+  background: var(--color-snow);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-fjord);
+  animation: dashboard-toast-in 0.28s ease-out;
+}
+
+@keyframes dashboard-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 .dashboard-card--new {
   border-style: dashed;
   border-color: rgba(28, 61, 90, 0.22);
@@ -8754,12 +8823,23 @@ p, h1, h2, h3, h4, h5, h6, li, label, span, a, button, td, th {
   font-size: 22px;
   font-weight: 500;
 }
+.place-lodging-price.is-typical {
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 500;
+}
 .place-lodging-price-note {
   display: block;
   font-size: 12px;
   color: var(--faint);
 }
 .place-lodging-price-note.is-warn { color: #a66b1a; }
+.place-lodging-website {
+  font-size: 13.5px;
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .place-lodging-actions {
   display: flex;
   align-items: center;
@@ -8768,6 +8848,163 @@ p, h1, h2, h3, h4, h5, h6, li, label, span, a, button, td, th {
 .place-lodging-split-link {
   font-size: 13px;
   color: var(--link);
+}
+.place-lodging-capacity-group {
+  margin-top: 1.35rem;
+}
+.place-lodging-capacity-heading {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.place-lodging-count {
+  margin: 0.85rem 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.place-lodging-badge.is-unknown {
+  background: transparent;
+  border: 1px solid var(--hairline);
+  color: var(--faint);
+  font-weight: 400;
+  max-width: 11rem;
+  line-height: 1.35;
+  text-align: right;
+}
+.place-lodging-prices--unknown {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+.place-lodging-unknown-copy {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.place-lodging-others-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+.place-lodging-unknown-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+.place-lodging-provenance {
+  margin: 0.35rem 0 0;
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.4;
+}
+.place-lodging-provenance a,
+.place-lodging-provenance-btn {
+  color: var(--link);
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.place-lodging-rate-editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.place-lodging-rate-lede {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.place-lodging-rate-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.75rem;
+}
+.place-lodging-rate-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 11.5px;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+.place-lodging-rate-field--wide {
+  grid-column: 1 / -1;
+}
+.place-lodging-rate-field input {
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0;
+  color: var(--ink);
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--card);
+}
+.place-lodging-rate-field input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-color: var(--accent);
+}
+.place-lodging-rate-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: #a13a3a;
+}
+.place-lodging-rate-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+.place-lodging-ask {
+  margin: 0.85rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+.place-lodging-ask-note {
+  font-size: 12.5px;
+  color: var(--faint);
+  word-break: break-all;
+}
+.place-detail-stat-link {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+}
+.place-price-help-header {
+  margin-bottom: 1.25rem;
+}
+.place-price-help-header h1 {
+  margin: 0.35rem 0;
+  font-family: var(--font-display);
+  color: var(--ink);
+}
+.place-lodging-card--public .place-lodging-foot {
+  flex-direction: column;
+  align-items: stretch;
+}
+@media (max-width: 900px) {
+  .place-lodging-rate-fields {
+    grid-template-columns: 1fr;
+  }
+  .place-lodging-badge.is-unknown {
+    max-width: none;
+    text-align: left;
+  }
 }
 
 .place-side-card {
@@ -9615,6 +9852,214 @@ p, h1, h2, h3, h4, h5, h6, li, label, span, a, button, td, th {
   margin: 0.5rem 0 0;
   font-size: 13.5px;
   color: var(--muted);
+}
+
+.browse-loading-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  min-height: 7.5rem;
+}
+
+.browse-loading-panel .browse-loading {
+  margin: 0;
+}
+
+.browse-stack-spinner {
+  position: relative;
+  width: 4.5rem;
+  height: 5.5rem;
+}
+
+.browse-stack-spinner-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.35rem;
+  height: 4.25rem;
+  margin: -2.125rem 0 0 -1.675rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--hairline);
+  background: var(--card);
+  box-shadow: 0 2px 8px rgba(22, 32, 43, 0.06);
+  transform-origin: 50% 85%;
+}
+
+.browse-stack-spinner-card--back {
+  background: #f0efec;
+  animation: browse-stack-shuffle-back 1.55s ease-in-out infinite;
+}
+
+.browse-stack-spinner-card--mid {
+  background: var(--surface);
+  animation: browse-stack-shuffle-mid 1.55s ease-in-out infinite;
+}
+
+.browse-stack-spinner-card--front {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 0.55rem;
+  z-index: 2;
+  animation: browse-stack-shuffle-front 1.55s ease-in-out infinite;
+}
+
+.browse-stack-spinner-mark {
+  display: block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--accent);
+  opacity: 0.85;
+  animation: browse-stack-mark-bob 1.55s ease-in-out infinite;
+}
+
+.browse-ready-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  color: var(--accent);
+  animation: browse-ready-pulse 0.9s ease-out both;
+}
+
+.browse-loading-panel.is-ready .browse-loading {
+  color: var(--ink);
+}
+
+.browse-body--enter .browse-deck {
+  animation: browse-deck-settle 0.55s ease-out both;
+}
+
+.browse-body--enter .browse-controls,
+.browse-body--enter .browse-hint {
+  animation: browse-deck-settle 0.55s ease-out 0.08s both;
+}
+
+.browse-body--enter .browse-rail {
+  animation: browse-rail-settle 0.5s ease-out 0.12s both;
+}
+
+@keyframes browse-stack-shuffle-back {
+  0%,
+  100% {
+    transform: translate(-6px, 4px) rotate(-8deg);
+  }
+  40% {
+    transform: translate(-10px, 2px) rotate(-12deg);
+  }
+  70% {
+    transform: translate(-4px, 6px) rotate(-5deg);
+  }
+}
+
+@keyframes browse-stack-shuffle-mid {
+  0%,
+  100% {
+    transform: translate(5px, 2px) rotate(6deg);
+  }
+  35% {
+    transform: translate(9px, 0) rotate(10deg);
+  }
+  65% {
+    transform: translate(3px, 4px) rotate(4deg);
+  }
+}
+
+@keyframes browse-stack-shuffle-front {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  30% {
+    transform: translate(0, -5px) rotate(-2deg);
+  }
+  55% {
+    transform: translate(0, -2px) rotate(1.5deg);
+  }
+}
+
+@keyframes browse-stack-mark-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.75;
+  }
+  45% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+@keyframes browse-ready-pulse {
+  0% {
+    transform: scale(0.72);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes browse-deck-settle {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes browse-rail-settle {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browse-stack-spinner-card--back,
+  .browse-stack-spinner-card--mid,
+  .browse-stack-spinner-card--front,
+  .browse-stack-spinner-mark {
+    animation: none;
+  }
+
+  .browse-stack-spinner-card--back {
+    transform: translate(-6px, 4px) rotate(-8deg);
+  }
+
+  .browse-stack-spinner-card--mid {
+    transform: translate(5px, 2px) rotate(6deg);
+  }
+
+  .browse-stack-spinner-card--front {
+    transform: none;
+  }
+
+  .browse-ready-mark,
+  .browse-body--enter .browse-deck,
+  .browse-body--enter .browse-controls,
+  .browse-body--enter .browse-hint,
+  .browse-body--enter .browse-rail {
+    animation: none;
+  }
 }
 
 .browse-retry {

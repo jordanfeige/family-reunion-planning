@@ -1,21 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-import { refreshPlaceLodgingAction } from "@/app/actions/lodging";
+import {
+  askFamilyToPriceLodgingAction,
+  refreshPlaceLodgingAction,
+} from "@/app/actions/lodging";
+import { LodgingRateEditor } from "@/components/LodgingRateEditor";
 import { SoftImage } from "@/components/SoftImage";
 import type { DriveLeg } from "@/lib/drive";
 import { formatDriveMinutes } from "@/lib/drive";
 import type { LodgingBundle, LodgingProperty } from "@/lib/lodging";
+import { enteredNightlyRange } from "@/lib/lodging/pricing";
 import type { LocationOption } from "@/lib/locations";
 import type { NearbyPlace } from "@/lib/nearby";
 import { listLocalFacts, type PersonFact } from "@/lib/peopleGraph";
 import { placeStillUrl } from "@/lib/placeImages";
 import type { PlanCapabilities } from "@/lib/planMode";
 import { assertNoHouseholdCeilings } from "@/lib/privacyAssert";
-import { formatUsd } from "@/lib/units";
+import { formatDateNumericUS, formatUsd } from "@/lib/units";
 
 function placeName(title: string): string {
   const idx = title.indexOf(",");
@@ -49,22 +54,29 @@ function factLine(fact: PersonFact): string {
 function StatCell({
   label,
   value,
+  valueNode,
   qualifier,
   qualifierTone,
 }: {
   label: string;
   value: string | null;
+  valueNode?: ReactNode;
   qualifier?: string | null;
   qualifierTone?: "ok" | "warn" | "faint";
 }) {
-  // Omit entirely when both value and qualifier are unresolved
-  if (value == null && (qualifier == null || qualifier === "")) return null;
-  if (value == null) return null;
+  if (value == null && !valueNode && (qualifier == null || qualifier === "")) {
+    return null;
+  }
+  if (value == null && !valueNode) return null;
 
   return (
     <div className="place-detail-stat">
       <span className="place-detail-stat-label">{label}</span>
-      <span className="place-detail-stat-value">{value}</span>
+      {valueNode ? (
+        <span className="place-detail-stat-value">{valueNode}</span>
+      ) : (
+        <span className="place-detail-stat-value">{value}</span>
+      )}
       {qualifier ? (
         <span
           className={`place-detail-stat-qual${
@@ -86,28 +98,60 @@ function StatCell({
   );
 }
 
+function provenanceLine(property: LodgingProperty): string | null {
+  const pricing = property.pricing;
+  if (pricing.kind !== "organizerEntered") return null;
+  const d = new Date(pricing.enteredAt);
+  const dateLabel = Number.isNaN(d.getTime())
+    ? ""
+    : formatDateNumericUS(d);
+  let line = `Rate entered by ${pricing.enteredByName}`;
+  if (dateLabel) line += ` on ${dateLabel}`;
+  if (pricing.datesChangedAt) {
+    const changed = new Date(pricing.datesChangedAt);
+    if (!Number.isNaN(changed.getTime())) {
+      line += ` · dates changed ${formatDateNumericUS(changed).slice(0, 5)}`;
+    }
+  }
+  return line;
+}
+
 function LodgingCard({
   property,
   householdCount,
   showSplit,
   recommended,
+  slug,
+  optionId,
+  othersHint,
+  anyPriced,
 }: {
   property: LodgingProperty;
   householdCount: number;
   showSplit: boolean;
   recommended: boolean;
+  slug: string;
+  optionId: string;
+  othersHint: string | null;
+  anyPriced: boolean;
 }) {
+  const router = useRouter();
   const nights = property.nights ?? 3;
-  const perHh =
-    property.totalUsd != null && householdCount > 0
-      ? Math.round(property.totalUsd / householdCount)
-      : undefined;
+  const pricing = property.pricing;
+  const entered = pricing.kind === "organizerEntered" ? pricing : null;
+  const [editing, setEditing] = useState(false);
+  const perHh = entered?.perHouseholdUsd;
   const atCeiling =
-    showSplit && (property.householdsAtCeiling ?? 0) > 0;
+    entered != null && showSplit && (property.householdsAtCeiling ?? 0) > 0;
+  const showBadge = entered != null && (property.badge || recommended);
+  const provenance = provenanceLine(property);
+  const listingUrl = (entered?.sourceUrl || property.websiteUrl) ?? undefined;
+  const phone = property.phone;
 
   return (
     <article
-      className={`place-lodging-card${recommended ? " is-recommended" : ""}`}
+      className={`place-lodging-card${recommended && entered ? " is-recommended" : ""}`}
+      id={`lodging-${property.id}`}
     >
       <div className="place-lodging-media">
         <SoftImage
@@ -128,7 +172,7 @@ function LodgingCard({
                 .join(" · ")}
             </p>
           </div>
-          {property.badge || recommended ? (
+          {showBadge ? (
             <span
               className={`place-lodging-badge${
                 recommended || property.badge === "recommended"
@@ -141,6 +185,10 @@ function LodgingCard({
                 : property.badge === "logistics"
                   ? "Easiest logistics"
                   : property.badge}
+            </span>
+          ) : !entered ? (
+            <span className="place-lodging-badge is-unknown">
+              Price unknown — can&apos;t check against budgets
             </span>
           ) : null}
         </div>
@@ -158,50 +206,124 @@ function LodgingCard({
         </ul>
 
         <div className="place-lodging-foot">
-          <div className="place-lodging-prices">
-            <div>
-              <strong className="place-lodging-price">
-                {property.totalUsd != null
-                  ? formatUsd(property.totalUsd)
-                  : "—"}
-              </strong>
-              <span className="place-lodging-price-note">
-                total, {nights} night{nights === 1 ? "" : "s"}
-                {property.priceKind === "estimated_nightly"
-                  ? " · est."
-                  : ""}
-              </span>
-            </div>
-            {showSplit && perHh != null ? (
+          {editing ? (
+            <LodgingRateEditor
+              slug={slug}
+              optionId={optionId}
+              propertyId={property.id}
+              householdCount={householdCount}
+              initialNightly={entered?.nightlyUsd}
+              initialFees={entered?.feesUsd}
+              initialSourceUrl={
+                entered?.sourceUrl ?? property.websiteUrl
+              }
+              onCancel={() => setEditing(false)}
+              onSaved={() => {
+                setEditing(false);
+                router.refresh();
+              }}
+            />
+          ) : entered ? (
+            <div className="place-lodging-prices">
               <div>
                 <strong className="place-lodging-price">
-                  {formatUsd(perHh)}
+                  {formatUsd(entered.totalUsd)}
                 </strong>
-                <span
-                  className={`place-lodging-price-note${
-                    atCeiling ? " is-warn" : ""
-                  }`}
-                >
-                  {atCeiling
-                    ? `at ${property.householdsAtCeiling} household${
-                        property.householdsAtCeiling === 1 ? "" : "s"
-                      }' ceiling`
-                    : `per household, split ${householdCount} ways`}
+                <span className="place-lodging-price-note">
+                  total, {nights} night{nights === 1 ? "" : "s"}
                 </span>
               </div>
-            ) : null}
-          </div>
-          <div className="place-lodging-actions">
-            {showSplit ? (
-              <span className="place-lodging-split-link">See the split</span>
-            ) : null}
-            <button
-              type="button"
-              className={`btn ${recommended ? "btn-berry" : "btn-secondary"} btn-sm`}
-            >
-              Pick this
-            </button>
-          </div>
+              {showSplit && perHh != null ? (
+                <div>
+                  <strong className="place-lodging-price">
+                    {formatUsd(perHh)}
+                  </strong>
+                  <span
+                    className={`place-lodging-price-note${
+                      atCeiling ? " is-warn" : ""
+                    }`}
+                  >
+                    {atCeiling
+                      ? `at ${property.householdsAtCeiling} household${
+                          property.householdsAtCeiling === 1 ? "" : "s"
+                        }' ceiling`
+                      : `per household, split ${householdCount} ways`}
+                  </span>
+                </div>
+              ) : null}
+              {provenance ? (
+                <p className="place-lodging-provenance">
+                  {provenance}
+                  {listingUrl ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={listingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Listing
+                      </a>
+                    </>
+                  ) : null}
+                  {" · "}
+                  <button
+                    type="button"
+                    className="place-lodging-provenance-btn"
+                    onClick={() => setEditing(true)}
+                  >
+                    Update
+                  </button>
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <div className="place-lodging-prices place-lodging-prices--unknown">
+              <p className="place-lodging-unknown-copy">
+                No public pricing for this rental.
+              </p>
+              {anyPriced && othersHint ? (
+                <p className="place-lodging-others-hint">{othersHint}</p>
+              ) : null}
+              <div className="place-lodging-unknown-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setEditing(true)}
+                >
+                  Add the nightly rate
+                </button>
+                {listingUrl ? (
+                  <a
+                    className="place-lodging-website"
+                    href={listingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Check their site
+                  </a>
+                ) : null}
+                {phone ? (
+                  <a className="place-lodging-website" href={`tel:${phone}`}>
+                    {phone}
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          )}
+          {!editing ? (
+            <div className="place-lodging-actions">
+              {showSplit && entered ? (
+                <span className="place-lodging-split-link">See the split</span>
+              ) : null}
+              <button
+                type="button"
+                className={`btn ${recommended && entered ? "btn-berry" : "btn-secondary"} btn-sm`}
+              >
+                Pick this
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </article>
@@ -297,6 +419,8 @@ export function DestinationDetailView({
   assertNoHouseholdCeilings({ lodging, costLines, viewerHouseholdTotal });
   const router = useRouter();
   const [refreshing, startRefresh] = useTransition();
+  const [asking, startAsk] = useTransition();
+  const [askNote, setAskNote] = useState<string | null>(null);
   const name = placeName(option.title);
   const eyebrowCount = Math.min(3, Math.max(optionCount, 1));
   const eyebrowIndex = Math.min(optionIndex, eyebrowCount);
@@ -312,9 +436,52 @@ export function DestinationDetailView({
     (lodging.status === "ready" || lodging.status === "partial") &&
     lodging.properties.length > 0;
 
+  const capacityKnown = showProperties
+    ? lodging.properties.filter((p) => p.sleeps != null)
+    : [];
+  const capacityUnknown = showProperties
+    ? lodging.properties.filter((p) => p.sleeps == null)
+    : [];
+  const pricedCount =
+    lodging.pricedCount ??
+    lodging.properties.filter((p) => p.pricing.kind === "organizerEntered")
+      .length;
+  const unpricedRentalCount =
+    lodging.unpricedRentalCount ??
+    lodging.properties.filter((p) => p.pricing.kind === "unknown").length;
+
+  const range = enteredNightlyRange(lodging.properties);
+  const othersHint =
+    range != null
+      ? range.low === range.high
+        ? `Others so far: ${formatUsd(range.low)} a night.`
+        : `Others so far: ${formatUsd(range.low)}–${formatUsd(range.high)} a night.`
+      : null;
+
   function onRefresh() {
     startRefresh(async () => {
       await refreshPlaceLodgingAction(slug, option.id);
+      router.refresh();
+    });
+  }
+
+  function onAskFamily() {
+    startAsk(async () => {
+      setAskNote(null);
+      const result = await askFamilyToPriceLodgingAction(slug, option.id);
+      if (!result.ok) {
+        setAskNote(result.error);
+        return;
+      }
+      if (result.sent === 0) {
+        setAskNote(
+          `No household emails on file yet — share this link: ${result.priceUrl}`,
+        );
+      } else {
+        setAskNote(
+          `Emailed ${result.sent} household${result.sent === 1 ? "" : "s"}.`,
+        );
+      }
       router.refresh();
     });
   }
@@ -363,13 +530,20 @@ export function DestinationDetailView({
                   ? formatUsd(perHouseholdLodgingUsd)
                   : null
               }
+              valueNode={
+                perHouseholdLodgingUsd == null ? (
+                  <a className="place-detail-stat-link" href="#where-everyone-sleeps">
+                    Add a rate to see this
+                  </a>
+                ) : undefined
+              }
               qualifier={
                 perHouseholdLodgingUsd != null &&
                 capabilities.budgetFloors &&
                 householdCount > 1
                   ? `clears all ${householdCount}`
                   : perHouseholdLodgingUsd != null
-                    ? "from listed stays"
+                    ? "from entered rates"
                     : null
               }
               qualifierTone={
@@ -396,7 +570,7 @@ export function DestinationDetailView({
 
       <div className="place-detail-body">
         <div className="place-detail-main">
-          <header className="place-detail-section-head">
+          <header className="place-detail-section-head" id="where-everyone-sleeps">
             <h2 className="place-detail-section-title">Where everyone sleeps</h2>
             {weekendLabel ? (
               <span className="place-detail-section-meta">
@@ -407,20 +581,22 @@ export function DestinationDetailView({
           </header>
           <p className="place-detail-section-lede">
             {showProperties
-              ? `${lodging.properties.length} real way${
-                  lodging.properties.length === 1 ? "" : "s"
-                } to house this crew for the weekend.`
+              ? pricedCount === 0
+                ? `Paste a rate and I'll split it ${householdCount > 1 ? `${householdCount} ways` : "among the households"}.`
+                : `${lodging.properties.length} real way${
+                    lodging.properties.length === 1 ? "" : "s"
+                  } to house this crew for the weekend.`
               : lodging.status === "empty"
                 ? "Nothing that sleeps this group cleared retrieval for those dates."
                 : lodging.status === "failed"
                   ? lodging.partialNote ??
-                    "Lodging providers did not return listings."
-                  : "Properties are still being priced for this option."}
+                    "Could not load rentals for this area."
+                  : "Gathering rentals for this option."}
           </p>
 
           {lodgingPending ? (
             <p className="place-detail-lodging-pending">
-              Pricing properties
+              Looking up rentals
               {weekendLabel ? ` for ${weekendLabel}` : ""}…
             </p>
           ) : null}
@@ -434,7 +610,7 @@ export function DestinationDetailView({
                 disabled={refreshing}
                 onClick={onRefresh}
               >
-                {refreshing ? "Refreshing…" : "Refresh prices"}
+                {refreshing ? "Refreshing…" : "Refresh listings"}
               </button>
             </p>
           ) : null}
@@ -451,17 +627,73 @@ export function DestinationDetailView({
           ) : null}
 
           {showProperties ? (
-            <div className="place-lodging-list">
-              {lodging.properties.map((p, i) => (
-                <LodgingCard
-                  key={p.id}
-                  property={p}
-                  householdCount={householdCount}
-                  showSplit={capabilities.splitLabels}
-                  recommended={i === 0 || p.badge === "recommended"}
-                />
-              ))}
-            </div>
+            <>
+              {capacityKnown.length > 0 ? (
+                <div className="place-lodging-list">
+                  {capacityKnown.map((p) => (
+                    <LodgingCard
+                      key={p.id}
+                      property={p}
+                      householdCount={householdCount}
+                      showSplit={capabilities.splitLabels}
+                      recommended={p.badge === "recommended"}
+                      slug={slug}
+                      optionId={option.id}
+                      othersHint={othersHint}
+                      anyPriced={pricedCount > 0}
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {capacityUnknown.length > 0 ? (
+                <div className="place-lodging-capacity-group">
+                  <h3 className="place-lodging-capacity-heading">
+                    Capacity unknown
+                  </h3>
+                  <div className="place-lodging-list">
+                    {capacityUnknown.map((p) => (
+                      <LodgingCard
+                        key={p.id}
+                        property={p}
+                        householdCount={householdCount}
+                        showSplit={capabilities.splitLabels}
+                        recommended={p.badge === "recommended"}
+                        slug={slug}
+                        optionId={option.id}
+                        othersHint={othersHint}
+                        anyPriced={pricedCount > 0}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {(pricedCount > 0 || unpricedRentalCount > 0) && (
+                <p className="place-lodging-count">
+                  {pricedCount} priced, {unpricedRentalCount} rental
+                  {unpricedRentalCount === 1 ? "" : "s"} waiting on a rate.
+                </p>
+              )}
+
+              {unpricedRentalCount > 0 ? (
+                <p className="place-lodging-ask">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={asking}
+                    onClick={onAskFamily}
+                  >
+                    {asking
+                      ? "Sending…"
+                      : "Ask the family to help price these"}
+                  </button>
+                  {askNote ? (
+                    <span className="place-lodging-ask-note">{askNote}</span>
+                  ) : null}
+                </p>
+              ) : null}
+            </>
           ) : null}
 
           {showProperties ? (
@@ -472,7 +704,7 @@ export function DestinationDetailView({
                 disabled={refreshing}
                 onClick={onRefresh}
               >
-                {refreshing ? "Refreshing…" : "Refresh prices"}
+                {refreshing ? "Refreshing…" : "Refresh listings"}
               </button>
             </p>
           ) : null}
@@ -491,6 +723,10 @@ export function DestinationDetailView({
             {gettingThere.length === 0 ? (
               <p className="place-side-empty">
                 Add home cities on the survey to see drive times and gas.
+              </p>
+            ) : gettingThere.every((l) => l.minutes == null) ? (
+              <p className="place-side-empty">
+                Drive times need Mapbox — add MAPBOX_TOKEN to enable them.
               </p>
             ) : (
               <ul className="place-getting-list">

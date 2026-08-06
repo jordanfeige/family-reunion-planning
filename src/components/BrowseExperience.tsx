@@ -51,7 +51,7 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
   const [swipeLog, setSwipeLog] = useState<BrowseSwipeEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [thinMessage, setThinMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadUi, setLoadUi] = useState<"idle" | "building" | "ready">("idle");
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [exiting, setExiting] = useState<"left" | "right" | null>(null);
@@ -85,10 +85,20 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
   }, [swipeLog.length, signedIn]);
 
   useEffect(() => {
+    if (loadUi !== "ready") return;
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ms = reduced ? 400 : 1200;
+    const t = window.setTimeout(() => setLoadUi("idle"), ms);
+    return () => window.clearTimeout(t);
+  }, [loadUi]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (!front || loading || exiting) return;
+      if (!front || loadUi !== "idle" || exiting) return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         void commit("skip");
@@ -107,7 +117,7 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
   async function generate(nextPrompt: string, refine?: "cheaper" | "closer" | "weirder") {
     const text = nextPrompt.trim();
     if (!text) return;
-    setLoading(true);
+    setLoadUi("building");
     setError(null);
     setThinMessage(null);
     setPrompt(text);
@@ -146,13 +156,16 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
         );
         setStack([]);
         setIndex(0);
+        setLoadUi("idle");
         return;
       }
-      setStack(data.ideas ?? []);
+      const ideas = data.ideas ?? [];
+      setStack(ideas);
       setIndex(0);
       setPromptId(data.promptId || crypto.randomUUID());
       if (data.thin) setThinMessage(data.message ?? null);
       undoStack.current = [];
+      setLoadUi(ideas.length > 0 ? "ready" : "idle");
     } catch (err) {
       const timedOut =
         err instanceof DOMException &&
@@ -163,8 +176,7 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
           : "Couldn't build a stack just now.",
       );
       setStack([]);
-    } finally {
-      setLoading(false);
+      setLoadUi("idle");
     }
   }
 
@@ -338,7 +350,7 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
         </div>
       </header>
 
-      {!stack.length && !loading ? (
+      {!stack.length && loadUi === "idle" ? (
         <div className="browse-composer-block">
           <textarea
             ref={composerRef}
@@ -391,12 +403,45 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
         </div>
       ) : null}
 
-      {loading ? (
-        <p className="browse-loading">Building a finite stack…</p>
+      {loadUi === "building" || loadUi === "ready" ? (
+        <div
+          className={`browse-loading-panel${loadUi === "ready" ? " is-ready" : ""}`}
+          role="status"
+          aria-busy={loadUi === "building"}
+          aria-live="polite"
+        >
+          {loadUi === "building" ? (
+            <>
+              <div className="browse-stack-spinner" aria-hidden="true">
+                <span className="browse-stack-spinner-card browse-stack-spinner-card--back" />
+                <span className="browse-stack-spinner-card browse-stack-spinner-card--mid" />
+                <span className="browse-stack-spinner-card browse-stack-spinner-card--front">
+                  <i className="browse-stack-spinner-mark" />
+                </span>
+              </div>
+              <p className="browse-loading">Building a finite stack…</p>
+            </>
+          ) : (
+            <>
+              <div className="browse-ready-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+                  <path
+                    d="M5 12.5l4.2 4.2L19 7.5"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <p className="browse-loading">Stack ready — swipe to keep or skip</p>
+            </>
+          )}
+        </div>
       ) : null}
 
-      {stack.length > 0 ? (
-        <div className="browse-body">
+      {stack.length > 0 && loadUi === "idle" ? (
+        <div className="browse-body browse-body--enter">
           <div className="browse-deck-col">
             {exhausted ? (
               <div className="browse-exhausted">

@@ -12,6 +12,7 @@ export function TripHubMenu({
   role,
   collaborators,
   manage,
+  initialSheet,
 }: {
   tripName: string;
   tagline?: string | null;
@@ -19,10 +20,21 @@ export function TripHubMenu({
   role: TripOrganizerRole;
   collaborators: React.ReactNode;
   manage: React.ReactNode;
+  /** Open collaborators (or manage) sheet on mount — e.g. dashboard invite deep link. */
+  initialSheet?: SheetView | null;
 }) {
   const menuId = useId();
-  const [open, setOpen] = useState(false);
-  const [view, setView] = useState<SheetView>("collaborators");
+  const [open, setOpen] = useState(Boolean(initialSheet));
+  const [view, setView] = useState<SheetView>(initialSheet ?? "collaborators");
+
+  useEffect(() => {
+    if (!initialSheet) return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("sheet")) return;
+    url.searchParams.delete("sheet");
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(null, "", next);
+  }, [initialSheet]);
 
   useEffect(() => {
     if (!open) return;

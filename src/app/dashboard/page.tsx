@@ -2,8 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import { DashboardToast } from "@/components/DashboardToast";
 import { SoftImage } from "@/components/SoftImage";
-import { TripDashboardManage } from "@/components/TripDashboardManage";
+import { TripDashboardCardActions } from "@/components/TripDashboardCardActions";
 import { APP_TAGLINE } from "@/lib/brand";
 import { dashboardTripCardMeta } from "@/lib/dashboardTripCard";
 import { claimTripInvitesForUser } from "@/lib/supabase/collaborators";
@@ -15,11 +16,17 @@ import {
   readPlanDraftCookieSecret,
 } from "@/lib/supabase/planDrafts";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string }>;
+}) {
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/login?callbackUrl=/dashboard");
   }
+
+  const { deleted } = await searchParams;
 
   if (session.user.email) {
     await claimTripInvitesForUser(session.user.id, session.user.email);
@@ -43,6 +50,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="shell dashboard-page">
+      <DashboardToast
+        message={deleted === "1" ? "Trip deleted." : null}
+      />
       <header className="dashboard-header">
         <div className="dashboard-header-row">
           <div>
@@ -205,7 +215,7 @@ export default async function DashboardPage() {
                         <Link className="btn btn-primary btn-sm" href={card.href}>
                           {card.ctaLabel}
                         </Link>
-                        <TripDashboardManage
+                        <TripDashboardCardActions
                           slug={trip.slug}
                           tripName={trip.name}
                           access={trip.access}

@@ -8,6 +8,7 @@ import { geocodeArea } from "@/lib/lodging/geocode";
 import {
   filterLodgingByHeadcount,
   lodgingForLocation,
+  recomputeBundleForNights,
 } from "@/lib/lodging";
 import {
   findLocationById,
@@ -83,12 +84,16 @@ export default async function DestinationDetailPage({
     responses.reduce((n, r) => n + partyTotal(r), 0);
   const capabilities = planCapabilities({ householdCount, headcount });
 
-  const lodging = filterLodgingByHeadcount(
-    lodgingForLocation(option),
-    headcount || null,
+  const stay = weekendStayDates(trip.selectedWeekendFriday);
+
+  // Recompute organizerEntered totals when trip nights changed
+  const lodging = recomputeBundleForNights(
+    filterLodgingByHeadcount(lodgingForLocation(option), headcount || null),
+    stay.nights,
+    householdCount,
+    headcount || undefined,
   );
 
-  const stay = weekendStayDates(trip.selectedWeekendFriday);
   const area = await geocodeArea(option.title);
 
   const homes = responses
@@ -110,7 +115,6 @@ export default async function DestinationDetailPage({
       }),
     );
   }
-  // Prefer labeled legs
   for (let i = 0; i < gettingThere.length; i++) {
     gettingThere[i] = {
       ...gettingThere[i]!,
@@ -165,11 +169,31 @@ export default async function DestinationDetailPage({
         })
       : [];
 
-  const lodgingTotal = lodging.properties[0]?.totalUsd ?? null;
+  // Budget / cost: cheapest organizerEntered stay only — never unknown
+  const pricedTotals = lodging.properties
+    .filter((p) => p.pricing.kind === "organizerEntered")
+    .map((p) =>
+      p.pricing.kind === "organizerEntered" ? p.pricing.totalUsd : null,
+    )
+    .filter((n): n is number => n != null);
+  const lodgingTotal =
+    pricedTotals.length > 0 ? Math.min(...pricedTotals) : null;
+
+  const leadingPriced = [...lodging.properties]
+    .filter((p) => p.pricing.kind === "organizerEntered")
+    .sort((a, b) => {
+      const ta =
+        a.pricing.kind === "organizerEntered" ? a.pricing.totalUsd : Infinity;
+      const tb =
+        b.pricing.kind === "organizerEntered" ? b.pricing.totalUsd : Infinity;
+      return ta - tb;
+    })[0];
   const perHouseholdLodgingUsd =
-    lodgingTotal != null && householdCount > 0
-      ? Math.round(lodgingTotal / householdCount)
-      : null;
+    leadingPriced?.pricing.kind === "organizerEntered"
+      ? leadingPriced.pricing.perHouseholdUsd
+      : lodgingTotal != null && householdCount > 0
+        ? Math.round(lodgingTotal / householdCount)
+        : null;
 
   const gasLegs = gettingThere.filter((l) => l.gasUsd != null);
   const gasEstimate =

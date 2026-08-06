@@ -1794,7 +1794,7 @@ export async function deleteTripAction(formData: FormData) {
 
   await deleteTripById(trip.id);
   revalidatePath("/dashboard");
-  redirect("/dashboard");
+  redirect("/dashboard?deleted=1");
 }
 
 const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);

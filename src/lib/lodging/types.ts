@@ -1,30 +1,32 @@
 import type { AmenityRow } from "@/lib/lodging/amenities";
+import type { LodgingPricing } from "@/lib/lodging/pricing";
 
 export type LodgingSource = "provider" | "unknown";
-
-export type LodgingPriceKind = "confirmed" | "estimated_nightly";
 
 export type Lodging = {
   id: string;
   providerId: string;
-  provider: "rapidapi" | "amadeus" | string;
+  provider: "overpass" | string;
   source: LodgingSource;
   name: string;
   area?: string;
   address?: string;
   structuralFact?: string;
-  sleeps: number;
+  /** Known bed/capacity count. Absent = capacity unknown (never invent). */
+  sleeps?: number | null;
   bedrooms?: number;
+  /** When OSM only has rooms (not beds/capacity) — shown as "N rooms — sleeps unknown". */
+  roomsOnly?: number;
   amenityCodes: string[];
   amenities: AmenityRow[];
-  totalUsd: number;
   nights: number;
-  priceKind: LodgingPriceKind;
-  priceAsOf: string;
+  pricing: LodgingPricing;
   imageUrl?: string;
   reviewScore?: number;
   badge?: "recommended" | "logistics" | string;
   householdsAtCeiling?: number;
+  websiteUrl?: string;
+  phone?: string;
 };
 
 export type LodgingFetchStatus =
@@ -42,6 +44,8 @@ export type LodgingResult = {
   filteredCount?: number;
   filteredReason?: string;
   fetchedAt?: string;
+  pricedCount?: number;
+  unpricedRentalCount?: number;
 };
 
 export type GetLodgingInput = {

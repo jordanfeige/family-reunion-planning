@@ -57,10 +57,24 @@ export default async function TripHubPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ step?: string; stop?: string; send?: string }>;
+  searchParams: Promise<{
+    step?: string;
+    stop?: string;
+    send?: string;
+    sheet?: string;
+  }>;
 }) {
   const { slug } = await params;
-  const { step: stepParam, stop: stopParam, send: sendParam } = await searchParams;
+  const {
+    step: stepParam,
+    stop: stopParam,
+    send: sendParam,
+    sheet: sheetParam,
+  } = await searchParams;
+  const initialSheet =
+    sheetParam === "collaborators" || sheetParam === "manage"
+      ? sheetParam
+      : null;
   const session = await auth();
   if (!session?.user?.id) {
     redirect(`/login?callbackUrl=${encodeURIComponent(`/t/${slug}`)}`);
@@ -174,6 +188,9 @@ export default async function TripHubPage({
         tagline={trip.tagline}
         slug={trip.slug}
         role={role}
+        initialSheet={
+          initialSheet === "manage" && role !== "owner" ? "collaborators" : initialSheet
+        }
         collaborators={
           <TripCollaborators
             slug={trip.slug}

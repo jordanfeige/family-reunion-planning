@@ -1,7 +1,6 @@
 import { getLodgingCache, setLodgingCache } from "@/lib/lodging/cache";
 import { geocodeArea } from "@/lib/lodging/geocode";
-import { fetchAmadeusHotels } from "@/lib/lodging/amadeus";
-import { fetchRapidApiRentals } from "@/lib/lodging/rapidapi";
+import { fetchOverpassRentals } from "@/lib/lodging/overpass";
 import type { LodgingBundle } from "@/lib/lodging/bundle";
 import type {
   GetLodgingInput,
@@ -9,12 +8,12 @@ import type {
   LodgingResult,
 } from "@/lib/lodging/types";
 
-const TTL_FRESH_MS = 6 * 60 * 60 * 1000; // 6h confirmed prices
+const TTL_FRESH_MS = 24 * 60 * 60 * 1000; // Overpass listings — no live prices
 const TTL_EMPTY_MS = 24 * 60 * 60 * 1000;
 
 function cacheKey(input: GetLodgingInput): string {
   const area = input.area.trim().toLowerCase();
-  return `lodging:v1:${area}:${input.checkIn}:${input.checkOut}:${input.headcount}`;
+  return `lodging:v3:${area}:${input.checkIn}:${input.checkOut}:${input.headcount}`;
 }
 
 function dedupe(properties: Lodging[]): Lodging[] {
@@ -29,18 +28,42 @@ function dedupe(properties: Lodging[]): Lodging[] {
   return out;
 }
 
+/** Exclude only when capacity is known and below headcount. */
 function filterCapacity(
   properties: Lodging[],
   headcount: number,
 ): { kept: Lodging[]; filteredCount: number } {
   const need = Math.max(1, headcount);
-  const kept = properties.filter((p) => p.sleeps >= need && p.source === "provider");
+  const kept = properties.filter((p) => {
+    if (p.source !== "provider") return false;
+    if (p.sleeps == null) return true;
+    return p.sleeps >= need;
+  });
   return { kept, filteredCount: properties.length - kept.length };
+}
+
+/** Sort by capacity fit — never by price; unknown capacity sorts last. */
+function sortByCapacityFit(properties: Lodging[], headcount: number): Lodging[] {
+  const need = Math.max(1, headcount);
+  return [...properties].sort((a, b) => {
+    const aKnown = a.sleeps != null;
+    const bKnown = b.sleeps != null;
+    if (aKnown !== bKnown) return aKnown ? -1 : 1;
+    if (aKnown && bKnown) {
+      const da = Math.abs((a.sleeps as number) - need);
+      const db = Math.abs((b.sleeps as number) - need);
+      if (da !== db) return da - db;
+      return (a.sleeps as number) - (b.sleeps as number);
+    }
+    return a.name.localeCompare(b.name);
+  });
 }
 
 /**
  * Unified lodging retrieval. Never call from render paths that block TTFB —
  * use from Server Actions / shortlist publish / refresh.
+ *
+ * Provider: OpenStreetMap Overpass only (no prices).
  */
 export async function getLodging(input: GetLodgingInput): Promise<LodgingResult> {
   const key = cacheKey(input);
@@ -53,23 +76,6 @@ export async function getLodging(input: GetLodgingInput): Promise<LodgingResult>
     };
   }
 
-  const hasRapid = Boolean(process.env.RAPIDAPI_KEY?.trim());
-  const hasAmadeus = Boolean(
-    process.env.AMADEUS_CLIENT_ID?.trim() &&
-      process.env.AMADEUS_CLIENT_SECRET?.trim(),
-  );
-
-  if (!hasRapid && !hasAmadeus) {
-    const failed: LodgingResult = {
-      status: "failed",
-      properties: [],
-      partialNote: "Lodging providers are not configured.",
-      fetchedAt: new Date().toISOString(),
-    };
-    await setLodgingCache(key, failed, TTL_EMPTY_MS);
-    return failed;
-  }
-
   let lat = input.lat;
   let lng = input.lng;
   if ((lat == null || lng == null) && process.env.MAPBOX_TOKEN?.trim()) {
@@ -80,63 +86,46 @@ export async function getLodging(input: GetLodgingInput): Promise<LodgingResult>
     }
   }
 
-  const results: Lodging[] = [];
-  let anyOk = false;
-  let anyFail = false;
-  let rateLimited = false;
-
-  if (hasRapid) {
-    const r = await fetchRapidApiRentals({
-      area: input.area,
-      checkIn: input.checkIn,
-      checkOut: input.checkOut,
-      headcount: input.headcount,
-      lat,
-      lng,
-    });
-    if (r.rateLimited) rateLimited = true;
-    if (r.ok) anyOk = true;
-    else anyFail = true;
-    results.push(...r.properties);
+  if (lat == null || lng == null) {
+    const failed: LodgingResult = {
+      status: "failed",
+      properties: [],
+      partialNote:
+        "Could not resolve this area to coordinates (Mapbox geocode). Lodging search needs a location.",
+      fetchedAt: new Date().toISOString(),
+    };
+    await setLodgingCache(key, failed, TTL_EMPTY_MS);
+    return failed;
   }
 
-  if (hasAmadeus && lat != null && lng != null) {
-    const a = await fetchAmadeusHotels({
-      lat,
-      lng,
-      checkIn: input.checkIn,
-      checkOut: input.checkOut,
-      headcount: input.headcount,
-      areaLabel: input.area,
-    });
-    if (a.rateLimited) rateLimited = true;
-    if (a.ok) anyOk = true;
-    else anyFail = true;
-    results.push(...a.properties);
-  } else if (hasAmadeus && (lat == null || lng == null)) {
-    anyFail = true;
-  }
+  const r = await fetchOverpassRentals({
+    lat,
+    lng,
+    checkIn: input.checkIn,
+    checkOut: input.checkOut,
+    areaLabel: input.area,
+  });
 
-  const unique = dedupe(results).filter((p) => p.source === "provider");
+  const unique = dedupe(r.properties).filter((p) => p.source === "provider");
   const { kept, filteredCount } = filterCapacity(unique, input.headcount);
+  const sorted = sortByCapacityFit(kept, input.headcount);
 
   let status: LodgingResult["status"];
-  if (rateLimited && kept.length === 0) status = "failed";
-  else if (!anyOk && anyFail) status = "failed";
-  else if (kept.length === 0) status = "empty";
-  else if (anyFail && kept.length > 0) status = "partial";
+  if (!r.ok && sorted.length === 0) status = "failed";
+  else if (sorted.length === 0) status = "empty";
+  else if (!r.ok && sorted.length > 0) status = "partial";
   else status = "ready";
 
-  // Badge cheapest as recommended when we have 2+
-  const sorted = [...kept].sort((a, b) => a.totalUsd - b.totalUsd);
-  if (sorted[0]) sorted[0] = { ...sorted[0], badge: "recommended" };
-  if (sorted[1] && !sorted[1].badge) {
-    sorted[1] = { ...sorted[1], badge: "logistics" };
-  }
+  const pricedCount = sorted.filter(
+    (p) => p.pricing.kind === "organizerEntered",
+  ).length;
+  const unpricedRentalCount = sorted.length - pricedCount;
 
   const result: LodgingResult = {
     status,
     properties: sorted,
+    pricedCount,
+    unpricedRentalCount,
     filteredCount: filteredCount > 0 ? filteredCount : undefined,
     filteredReason:
       filteredCount > 0
@@ -144,14 +133,12 @@ export async function getLodging(input: GetLodgingInput): Promise<LodgingResult>
         : undefined,
     partialNote:
       status === "partial"
-        ? "Some lodging sources did not respond; showing what we have."
-        : status === "failed" && rateLimited
-          ? "Lodging providers rate-limited this request. Try refresh later."
-          : status === "failed"
-            ? "Could not reach lodging providers."
-            : status === "empty"
-              ? "No listings found that sleep your whole group for these dates."
-              : undefined,
+        ? "OpenStreetMap did not fully respond; showing what we have."
+        : status === "failed"
+          ? "Could not reach OpenStreetMap for rentals."
+          : status === "empty"
+            ? "No listings found that sleep your whole group for these dates."
+            : undefined,
     fetchedAt: new Date().toISOString(),
   };
 
@@ -170,6 +157,8 @@ export function lodgingResultToBundle(result: LodgingResult): LodgingBundle {
     staleLabel: result.staleLabel,
     partialNote: result.partialNote,
     fetchedAt: result.fetchedAt,
+    pricedCount: result.pricedCount,
+    unpricedRentalCount: result.unpricedRentalCount,
     properties: result.properties.map((p) => ({
       id: p.id,
       providerId: p.providerId,
@@ -179,15 +168,17 @@ export function lodgingResultToBundle(result: LodgingResult): LodgingBundle {
       area: p.area,
       address: p.address,
       structuralFact: p.structuralFact,
-      sleeps: p.sleeps,
+      sleeps: p.sleeps ?? undefined,
       bedrooms: p.bedrooms,
+      roomsOnly: p.roomsOnly,
       amenities: p.amenities,
-      totalUsd: p.totalUsd,
       nights: p.nights,
-      priceKind: p.priceKind,
+      pricing: p.pricing,
       imageUrl: p.imageUrl,
       badge: p.badge,
       householdsAtCeiling: p.householdsAtCeiling,
+      websiteUrl: p.websiteUrl,
+      phone: p.phone,
     })),
   };
 }
@@ -196,8 +187,22 @@ export type { GetLodgingInput, Lodging, LodgingResult } from "@/lib/lodging/type
 export {
   filterLodgingByHeadcount,
   lodgingForLocation,
+  mergeLodgingWithPrior,
   normalizeLodgingBundle,
+  recomputeBundleForNights,
   type LodgingAmenity,
   type LodgingBundle,
   type LodgingProperty,
 } from "@/lib/lodging/bundle";
+export {
+  buildOrganizerPricing,
+  computeLodgingTotals,
+  enteredNightlyRange,
+  isOrganizerEntered,
+  looksLikeUrl,
+  normalizeSourceUrl,
+  parseFeesUsd,
+  parseNightlyUsd,
+  unknownPricing,
+  type LodgingPricing,
+} from "@/lib/lodging/pricing";
