@@ -5,7 +5,6 @@ import { z } from "zod";
 import { extractorModel, hasAnthropicApiKey } from "@/lib/ai";
 import {
   BROWSE_GENERATE_IMAGE_BUDGET_MS,
-  BROWSE_GENERATE_MAX_DURATION_SEC,
   BROWSE_GENERATE_MODEL_TIMEOUT_MS,
 } from "@/lib/browseGenerate";
 import { attachBrowseImages } from "@/lib/browseImages";
@@ -18,7 +17,8 @@ import {
 import { geocodeArea } from "@/lib/lodging/geocode";
 
 export const runtime = "nodejs";
-export const maxDuration = BROWSE_GENERATE_MAX_DURATION_SEC;
+/** Must be a static literal for Next.js segment config (prod Vercel limit). */
+export const maxDuration = 60;
 
 const bodySchema = z.object({
   prompt: z.string().min(1).max(280),
