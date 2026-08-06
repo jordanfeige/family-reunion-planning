@@ -10553,12 +10553,21 @@ p, h1, h2, h3, h4, h5, h6, li, label, span, a, button, td, th {
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
-  padding: 8px 16px 0;
+  padding: 10px 16px 0;
   box-sizing: border-box;
 }
 
 .entry-door-rail .two-door-switch {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+/* Browse brand block sits right under the rail — give it more air than Plan chat */
+.site-chrome--browse .entry-door-rail-inner {
+  padding-top: 12px;
+}
+
+.site-chrome--browse .entry-door-rail .two-door-switch {
+  margin-bottom: 18px;
 }
 
 .site-chrome--doors.site-chrome--plan .entry-door-rail-inner {
@@ -11150,8 +11159,8 @@ p, h1, h2, h3, h4, h5, h6, li, label, span, a, button, td, th {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.75rem;
-  margin-bottom: 0.85rem;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
 }
 
 .browse-head-brand {
@@ -11165,11 +11174,11 @@ p, h1, h2, h3, h4, h5, h6, li, label, span, a, button, td, th {
   font-weight: 500;
   letter-spacing: -0.02em;
   color: var(--ink);
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .browse-page--r12 .browse-eyebrow {
-  margin: 0.15rem 0 0;
+  margin: 0.4rem 0 0;
   color: var(--muted);
   letter-spacing: 0.04em;
   text-transform: none;
