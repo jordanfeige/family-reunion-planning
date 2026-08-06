@@ -8,7 +8,9 @@ import {
 import { savePlanSurveyDraftAction } from "@/app/actions/planDraft";
 import { SignInToSendSheet } from "@/components/SignInToSendSheet";
 import { SurveySegmentGroup } from "@/components/SurveySegmentGroup";
+import { CtaRequirementHint } from "@/components/CtaRequirementHint";
 import { WeekendDatePicker } from "@/components/WeekendDatePicker";
+import { focusBlockingField } from "@/lib/formFocus";
 import type { LocationOption } from "@/lib/locations";
 import type { SurveyPrefs } from "@/lib/surveyPrefs";
 import {
@@ -90,10 +92,25 @@ export function HubSurveyComposer({
   }, []);
 
   function validate(): string | null {
+    if (locations.length === 0) {
+      return "Add at least one destination on Destinations before sending the survey.";
+    }
     if (!prefs.homeCity?.trim()) return "Enter your home city before sending.";
     if (!prefs.homeState?.trim()) return "Enter your home state before sending.";
     if (weekends.length === 0) return "Pick at least one weekend for the survey.";
     return null;
+  }
+
+  function focusValidationTarget(message: string) {
+    if (message.includes("destination")) {
+      focusBlockingField(".hub-survey-rerank-empty, .hub-survey-rerank");
+    } else if (message.includes("city")) {
+      focusBlockingField("#organizer_home_city");
+    } else if (message.includes("state")) {
+      focusBlockingField("#organizer_home_state");
+    } else if (message.includes("weekend")) {
+      focusBlockingField(".weekend-date-picker, .survey-weekend-slots");
+    }
   }
 
   function authCallbackUrl(): string {
@@ -123,6 +140,7 @@ export function HubSurveyComposer({
     const validationError = validate();
     if (validationError) {
       setError(validationError);
+      focusValidationTarget(validationError);
       return;
     }
 
@@ -312,8 +330,6 @@ export function HubSurveyComposer({
         <p className="trail-nudge hub-survey-nudge">{nudge}</p>
       ) : null}
 
-      {error ? <p className="error-banner">{error}</p> : null}
-
       {showAuthSheet ? (
         <SignInToSendSheet
           callbackUrl={authCallbackUrl()}
@@ -325,11 +341,16 @@ export function HubSurveyComposer({
         <button
           type="button"
           className="btn btn-berry"
-          disabled={pending || locations.length === 0}
+          disabled={pending}
           onClick={doSend}
         >
           {pending ? "Sending…" : sent ? "Survey sent" : "Send survey to family"}
         </button>
+        <CtaRequirementHint>
+          {locations.length === 0
+            ? "Add at least one destination on Destinations before sending."
+            : error}
+        </CtaRequirementHint>
       </div>
     </div>
   );

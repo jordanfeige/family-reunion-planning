@@ -1,6 +1,6 @@
 "use server";
 
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -33,11 +33,13 @@ import {
   type VenueBookingStatus,
 } from "@/lib/venues";
 import {
+  formatItineraryForPrompt,
   itineraryDaySchema,
   itineraryFromGenerated,
   itineraryGenerationSchema,
   itineraryHasContent,
   normalizeItinerary,
+  pushItineraryEdit,
   type PublishedItinerary,
   type BlockStatus,
   type DayKey,
@@ -701,6 +703,7 @@ export async function publishPlacesDraftAction(
         avgHighF: p.avgHighF ?? prev.avgHighF,
         crowdLevel: p.crowdLevel ?? prev.crowdLevel,
         typicalLodgingUsd: p.typicalLodgingUsd ?? prev.typicalLodgingUsd,
+        lodging: prev.lodging ?? { status: "pending", properties: [] },
       });
     } else {
       next.push({
@@ -714,6 +717,7 @@ export async function publishPlacesDraftAction(
         avgHighF: p.avgHighF,
         crowdLevel: p.crowdLevel,
         typicalLodgingUsd: p.typicalLodgingUsd,
+        lodging: { status: "pending", properties: [] },
       });
     }
   }
@@ -1262,6 +1266,8 @@ export async function updateItineraryBlockAction(formData: FormData) {
   const slug = String(formData.get("slug") ?? "").trim();
   const dayKey = String(formData.get("day_key") ?? "").trim() as DayKey;
   const blockId = String(formData.get("block_id") ?? "").trim();
+  const action = String(formData.get("action") ?? "").trim();
+  const clientUpdatedAt = String(formData.get("client_updated_at") ?? "").trim();
 
   if (!slug || !dayKey || !blockId) throw new Error("Missing fields.");
 
@@ -1271,35 +1277,202 @@ export async function updateItineraryBlockAction(formData: FormData) {
     trip.selectedWeekendFriday,
   );
 
-  let found = false;
-  for (const day of itinerary.days) {
-    if (day.key !== dayKey) continue;
-    for (const block of day.blocks) {
-      if (block.id !== blockId) continue;
-      if (formData.has("status")) {
-        const status = String(formData.get("status") ?? "").trim() as BlockStatus;
-        if (!["idea", "to_book", "booked"].includes(status)) {
-          throw new Error("Invalid status.");
-        }
-        block.status = status;
-      }
-      if (formData.has("assigned_to_user_id")) {
-        const assignee = String(formData.get("assigned_to_user_id") ?? "").trim();
-        block.assignedToUserId = assignee || undefined;
-      }
-      if (formData.has("planner_notes")) {
-        const notes = String(formData.get("planner_notes") ?? "").trim();
-        block.plannerNotes = notes || undefined;
-      }
-      found = true;
-      break;
-    }
+  const day = itinerary.days.find((d) => d.key === dayKey);
+  if (!day) throw new Error("Day not found.");
+  const idx = day.blocks.findIndex((b) => b.id === blockId);
+  if (idx < 0) throw new Error("Block not found.");
+  const block = day.blocks[idx];
+
+  if (
+    clientUpdatedAt &&
+    block.updatedAt &&
+    Date.parse(block.updatedAt) > Date.parse(clientUpdatedAt)
+  ) {
+    throw new Error(
+      `CONFLICT:${block.updatedByName ?? "Someone"} changed this. Keep mine or keep theirs.`,
+    );
   }
-  if (!found) throw new Error("Block not found.");
+
+  if (action === "remove") {
+    day.blocks.splice(idx, 1);
+    await updateTripById(trip.id, { itinerary });
+    revalidatePath(`/t/${slug}`);
+    return;
+  }
+  if (action === "duplicate") {
+    const copy = {
+      ...structuredClone(block),
+      id: crypto.randomUUID(),
+      title: `${block.title} (copy)`,
+      updatedAt: new Date().toISOString(),
+    };
+    day.blocks.splice(idx + 1, 0, copy);
+    await updateTripById(trip.id, { itinerary });
+    revalidatePath(`/t/${slug}`);
+    return;
+  }
+  if (action === "move") {
+    const target = String(formData.get("target_day") ?? "").trim() as DayKey;
+    const targetDay = itinerary.days.find((d) => d.key === target);
+    if (!targetDay) throw new Error("Target day not found.");
+    day.blocks.splice(idx, 1);
+    targetDay.blocks.push({
+      ...block,
+      updatedAt: new Date().toISOString(),
+    });
+    await updateTripById(trip.id, { itinerary });
+    revalidatePath(`/t/${slug}`);
+    return;
+  }
+
+  if (formData.has("status")) {
+    const status = String(formData.get("status") ?? "").trim() as BlockStatus;
+    if (!["idea", "to_book", "booked", "paid"].includes(status)) {
+      throw new Error("Invalid status.");
+    }
+    block.status = status;
+  }
+  if (formData.has("title")) {
+    const title = String(formData.get("title") ?? "").trim();
+    if (!title) throw new Error("A stop needs a name.");
+    block.title = title;
+  }
+  if (formData.has("start_time")) {
+    const startTime = String(formData.get("start_time") ?? "").trim();
+    block.startTime = startTime || undefined;
+    block.time = startTime || undefined;
+  }
+  if (formData.has("notes")) {
+    const notes = String(formData.get("notes") ?? "").trim().slice(0, 280);
+    block.notes = notes || undefined;
+  }
+  if (formData.has("assigned_to_user_id")) {
+    const assignee = String(formData.get("assigned_to_user_id") ?? "").trim();
+    block.assignedToUserId = assignee || undefined;
+  }
+  if (formData.has("planner_notes")) {
+    const notes = String(formData.get("planner_notes") ?? "").trim();
+    block.plannerNotes = notes || undefined;
+  }
+  block.updatedAt = new Date().toISOString();
 
   await updateTripById(trip.id, { itinerary });
 
   revalidatePath(`/t/${slug}`);
+}
+
+export async function addItineraryStopAction(
+  slug: string,
+  dayKey: DayKey,
+  title = "New stop",
+) {
+  const userId = await requireSessionUserId();
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const itinerary = normalizeItinerary(
+    trip.itinerary,
+    trip.selectedWeekendFriday,
+  );
+  const day = itinerary.days.find((d) => d.key === dayKey);
+  if (!day) throw new Error("Day not found.");
+  day.blocks.push({
+    id: crypto.randomUUID(),
+    title: title.trim() || "New stop",
+    type: "activity",
+    status: "idea",
+    updatedAt: new Date().toISOString(),
+  });
+  await updateTripById(trip.id, { itinerary });
+  revalidatePath(`/t/${slug}`);
+}
+
+export async function undoItineraryEditAction(slug: string) {
+  const userId = await requireSessionUserId();
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const itinerary = normalizeItinerary(
+    trip.itinerary,
+    trip.selectedWeekendFriday,
+  );
+  const history = itinerary.editHistory ?? [];
+  if (history.length === 0) throw new Error("Nothing to undo.");
+  const [latest, ...rest] = history;
+  const restored: typeof itinerary = {
+    ...itinerary,
+    days: structuredClone(latest.days),
+    editHistory: rest,
+  };
+  await updateTripById(trip.id, { itinerary: restored });
+  revalidatePath(`/t/${slug}`);
+  return { label: latest.label };
+}
+
+export async function applyItineraryComposerAction(
+  slug: string,
+  instruction: string,
+  focusDay?: DayKey,
+): Promise<{ kind: "answer" | "edit" | "propose"; message: string }> {
+  const userId = await requireSessionUserId();
+  const text = instruction.trim();
+  if (!text) throw new Error("Type a question or change request.");
+  if (!hasAnthropicApiKey()) {
+    throw new Error("Add ANTHROPIC_API_KEY to talk to WandrAI.");
+  }
+
+  const { trip } = await loadTripForOrganizer(slug, userId);
+  const itinerary = normalizeItinerary(
+    trip.itinerary,
+    trip.selectedWeekendFriday,
+  );
+
+  // Concerns → propose + persist constraint note on trip tagline/notes channel via refine when confirmed
+  const concern =
+    /\b(can't|cannot|can't do|grandma|grandpa|wheelchair|stairs|walk|walking|kids? need|allergy)\b/i.test(
+      text,
+    );
+
+  const isQuestion =
+    /^(who|what|when|where|why|how|is|are|can|does|do|should)\b/i.test(text) ||
+    text.endsWith("?");
+
+  if (isQuestion && !/\b(move|add|remove|swap|change|shift)\b/i.test(text)) {
+    const { text: answer } = await generateText({
+      model: plannerModel(),
+      prompt: `Answer briefly about this family reunion itinerary. Never say "You're absolutely right."
+Itinerary:
+${formatItineraryForPrompt(itinerary)}
+
+Question: ${text}`,
+    });
+    return { kind: "answer", message: answer.trim() };
+  }
+
+  const dayKey = focusDay ?? "saturday";
+  const withHistory = pushItineraryEdit(
+    itinerary,
+    text.slice(0, 80),
+  );
+
+  // Reuse day refine path
+  await refineItineraryDayAction(slug, dayKey, text);
+
+  // Re-load after refine to attach history
+  const { trip: fresh } = await loadTripForOrganizer(slug, userId);
+  const next = normalizeItinerary(fresh.itinerary, fresh.selectedWeekendFriday);
+  next.editHistory = withHistory.editHistory;
+  await updateTripById(fresh.id, { itinerary: next });
+
+  if (concern) {
+    // Persist a soft constraint note on the trip tagline append is too invasive —
+    // store on itinerary generated meta via edit history label.
+    return {
+      kind: "propose",
+      message: `Noted the constraint and updated ${dayKey}. Review the day — Undo if it's wrong.`,
+    };
+  }
+
+  return {
+    kind: "edit",
+    message: `Updated ${dayKey} from your request.`,
+  };
 }
 
 /** @deprecated Use updateItineraryBlockAction */

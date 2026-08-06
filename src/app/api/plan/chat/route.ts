@@ -8,13 +8,24 @@ import {
 
 import { auth } from "@/auth";
 import { hasAnthropicApiKey, plannerModel } from "@/lib/ai";
+import { extractPlanTripDraft } from "@/lib/extractPlanTripDraft";
 import {
   isMessageCapped,
   PLAN_DRAFT_MESSAGE_LIMIT,
   planDraftPayloadSchema,
+  syncLegacyFromTrip,
 } from "@/lib/planDraft";
 import { placesDraftSchema } from "@/lib/placesDraft";
-import { tripDraftSchema } from "@/lib/tripDraft";
+import {
+  formatKnownBlock,
+  formatWorkingFromLine,
+  missingFieldsForStep,
+  normalizePlanTripDraft,
+  planTripDraftFromLegacy,
+  type PlanStepId,
+  FIELD_LABELS,
+} from "@/lib/planTripDraft";
+import { textFromMessage } from "@/lib/chatMessage";
 import {
   getPlanDraftBySecret,
   incrementPlanDraftMessages,
@@ -34,42 +45,47 @@ longer for anyone coming from the coasts." Do not compute per-household drive ti
 the app does that from survey answers. Never invent live prices, availability, or booking links —
 give typical ranges and say they're estimates.`;
 
-const CREATE_SYSTEM = `You are WandrAI, a warm, sharp trip co-planner helping someone start a U.S. family reunion (unless they specify elsewhere).
+const TONE = `Tone: Never begin a message with "You're absolutely right", "Great question", "Great —", "I'd be happy to", or similar sycophantic openers. Start with the substance. Confirmations are at most one short clause before useful content. If the user says they already answered something, do not apologize and do not re-list it — produce the output.`;
+
+function stepFromBody(raw: unknown): PlanStepId {
+  if (raw === "places" || raw === "destinations") return "places";
+  if (raw === "survey") return "survey";
+  return "create";
+}
+
+function buildSystem(opts: {
+  step: PlanStepId;
+  known: string;
+  missing: string[];
+  workingFrom: string;
+}): string {
+  const missingLine =
+    opts.missing.length === 0
+      ? "MISSING: none. Do not ask any questions. State what you are using in one short line, then immediately produce this step's output."
+      : `MISSING (ask ONLY these, batched in one message, max two questions): ${opts.missing.join(", ")}. Never re-ask anything in KNOWN. Never ask a question whose text appears in answeredQuestions.`;
+
+  const stepTask =
+    opts.step === "create"
+      ? "Step: Basics. When nothing is missing, confirm the trip name is set (call update_places_draft only later). For Basics completion, ensure tripName is clear in your reply; the extractor persists state."
+      : opts.step === "places"
+        ? `Step: Destinations. When nothing is missing, open with "Working from: ${opts.workingFrom}." then deliver a shortlist of 3–6 US places and call update_places_draft with full US meta. When something is missing, ask only for the missing fields.`
+        : "Step: Survey prep. Confirm shortlist is ready; do not re-interview.";
+
+  return `You are WandrAI, a U.S. family reunion co-planner. There is ONE trip draft and ONE conversation — steps are views onto that draft, not new sessions.
 
 ${US_SCOPE}
 
-You feel like a helpful concierge — not a form. Keep momentum.
+${TONE}
 
-Gather over a few turns: who's coming, vibe/region feel, rough budget, then a trip name.
+KNOWN — never ask for any of this again:
+${opts.known}
 
-Rules:
-- Ask exactly one clarifying question per turn. Never stack who / vibe / budget in one message.
-- After each answer, briefly reflect what you heard (half a sentence), then ask the next question.
-- When useful, offer 2 short example answers in the question (plain text, not a list dump).
-- Short replies (2–4 sentences). Mirror their energy.
-- Typical order: who → vibe → budget → propose a name → call update_trip_draft.
-- Call update_trip_draft as soon as you have a usable name (include notes/budget/tagline when known).
-- After updating, tell them they can keep chatting or continue to find destinations.
-- Never invent live prices or booking links.
-- Do not claim the trip is saved until they create an account.
-- No emoji unless they use them.`;
+${missingLine}
 
-const PLACES_SYSTEM = `You are WandrAI, helping pick U.S. destinations for a family reunion survey (unless they specify elsewhere).
+${stepTask}
 
-${US_SCOPE}
-
-You are a destination concierge: interview briefly, then deliver a concrete shortlist with photos on the right.
-
-Flow:
-1. Ask exactly one clarifying question per turn (region, drive time, vibe — not all at once).
-2. Offer 2 example directions when the question is open-ended.
-3. After 1–2 answers, propose 3–6 distinct US places. Call update_places_draft with:
-   - title: "Place, ST" (e.g. "Door County, WI")
-   - summary: short why — vibe, season, drive/flight fit
-   - state, driveMinutesFromOrigin, originMetro, nearestAirportCode, avgHighF, crowdLevel, typicalLodgingUsd when you can estimate them
-4. Invite them to refine and remind them saving unlocks the real survey.
-
-Rules: concise, no emoji unless they use them, no fake booking links. Use the draft context (trip name / notes) when present.`;
+You do not own structured state; an extractor does. Still call update_places_draft when you propose or revise destinations so the shortlist UI updates. Keep replies short. No emoji unless they use them.`;
+}
 
 export async function POST(req: Request) {
   if (!hasAnthropicApiKey()) {
@@ -110,83 +126,125 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json()) as { messages?: unknown[]; mode?: string };
-  const mode = body.mode === "places" ? "places" : "create";
+  const body = (await req.json()) as {
+    messages?: unknown[];
+    mode?: string;
+    step?: string;
+  };
+  const step = stepFromBody(body.step ?? body.mode);
   const rawMessages = Array.isArray(body.messages) ? body.messages : [];
 
-  // Count this user turn (anonymous quota only)
-  const last = rawMessages[rawMessages.length - 1] as { role?: string } | undefined;
-  if (!signedIn && last?.role === "user") {
+  let trip = planTripDraftFromLegacy(draft.payload);
+
+  const last = rawMessages[rawMessages.length - 1] as UIMessage | undefined;
+  const lastText = last ? textFromMessage(last) : "";
+  const isAdvanceMarker = lastText.startsWith("⟦advance:");
+
+  if (!signedIn && last?.role === "user" && !isAdvanceMarker) {
     await incrementPlanDraftMessages(draft.id);
   }
+
+  // Extractor: after each real user message (not step markers)
+  if (last?.role === "user" && lastText && !isAdvanceMarker) {
+    try {
+      trip = await extractPlanTripDraft({
+        prior: trip,
+        message: lastText,
+        role: "user",
+      });
+      const nextPayload = syncLegacyFromTrip(
+        planDraftPayloadSchema.parse({
+          ...draft.payload,
+          trip: normalizePlanTripDraft(trip),
+          step: step === "create" ? "create" : step,
+          messages: rawMessages,
+        }),
+      );
+      await updatePlanDraftPayload(draft.id, nextPayload);
+      draft.payload = nextPayload;
+    } catch {
+      // Extraction failure must not block the conversational turn
+    }
+  }
+
+  const missingKeys = missingFieldsForStep(trip, step);
 
   const modelMessages = await convertToModelMessages(
     rawMessages as Parameters<typeof convertToModelMessages>[0],
   );
 
-  const contextBits = [
-    draft.payload.name ? `Working name: ${draft.payload.name}` : null,
-    draft.payload.tagline ? `Tagline: ${draft.payload.tagline}` : null,
-    draft.payload.destinationNotes
-      ? `Notes: ${draft.payload.destinationNotes}`
-      : null,
-    draft.payload.targetBudget ? `Budget: ${draft.payload.targetBudget}` : null,
-    draft.payload.locationTitles?.length
-      ? `Places so far: ${draft.payload.locationTitles.map((p) => p.title).join(" | ")}`
-      : null,
-    `Anonymous draft — ${signedIn ? "signed-in (no message cap)" : `${Math.max(0, PLAN_DRAFT_MESSAGE_LIMIT - draft.messageCount - (last?.role === "user" ? 1 : 0))} messages left before save is required.`}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const system = buildSystem({
+    step,
+    known: formatKnownBlock(trip),
+    missing: missingKeys.map((k) => FIELD_LABELS[k] ?? k),
+    workingFrom: formatWorkingFromLine(trip),
+  });
+
+  const draftId = draft.id;
+  let payloadSnap = draft.payload;
 
   const result = streamText({
     model: plannerModel(),
-    system: `${mode === "places" ? PLACES_SYSTEM : CREATE_SYSTEM}\n\nDraft context:\n${contextBits}`,
+    system,
     messages: modelMessages,
     stopWhen: stepCountIs(5),
-    tools:
-      mode === "places"
-        ? {
-            update_places_draft: tool({
-              description:
-                "Update survey destinations draft. For each place use title 'Place, ST' and fill US meta when known: state, driveMinutesFromOrigin, originMetro, nearestAirportCode, avgHighF, crowdLevel, typicalLodgingUsd (estimates only).",
-              inputSchema: placesDraftSchema,
-              execute: async (input) => {
-                const places = input.places.map((p) => ({
-                  title: p.title.trim(),
-                  summary: p.summary?.trim() || undefined,
-                }));
-                const next = planDraftPayloadSchema.parse({
-                  ...draft.payload,
-                  locationTitles: places,
-                  step: "places",
-                });
-                await updatePlanDraftPayload(draft.id, next);
-                return { ok: true as const, draft: input };
-              },
+    tools: {
+      update_places_draft: tool({
+        description:
+          "Update destination shortlist. Titles as 'Place, ST' with US meta when known.",
+        inputSchema: placesDraftSchema,
+        execute: async (input) => {
+          const shortlist = input.places.map((p) => ({
+            ...p,
+            title: p.title.trim(),
+            summary: p.summary?.trim() || undefined,
+            selected: p.selected !== false,
+          }));
+          const nextTrip = normalizePlanTripDraft({
+            ...trip,
+            shortlist,
+          });
+          trip = nextTrip;
+          const next = syncLegacyFromTrip(
+            planDraftPayloadSchema.parse({
+              ...payloadSnap,
+              trip: nextTrip,
+              step: "places",
+              locationTitles: shortlist.map((p) => ({
+                title: p.title,
+                summary: p.summary,
+              })),
             }),
-          }
-        : {
-            update_trip_draft: tool({
-              description: "Update the trip draft card.",
-              inputSchema: tripDraftSchema,
-              execute: async (input) => {
-                const next = planDraftPayloadSchema.parse({
-                  ...draft.payload,
-                  name: input.name,
-                  tagline: input.tagline,
-                  destinationNotes: input.destinationNotes,
-                  targetBudget: input.targetBudget,
-                  locationTitles:
-                    input.locationTitles?.map((title) => ({ title })) ??
-                    draft.payload.locationTitles,
-                  step: "create",
-                });
-                await updatePlanDraftPayload(draft.id, next);
-                return { ok: true as const, draft: input };
-              },
-            }),
-          },
+          );
+          payloadSnap = next;
+          await updatePlanDraftPayload(draftId, next);
+          return { ok: true as const, draft: input };
+        },
+      }),
+    },
+    onFinish: async ({ text }) => {
+      try {
+        if (text?.trim()) {
+          const extracted = await extractPlanTripDraft({
+            prior: trip,
+            message: text,
+            role: "assistant",
+          });
+          trip = extracted;
+        }
+        const next = syncLegacyFromTrip(
+          planDraftPayloadSchema.parse({
+            ...payloadSnap,
+            trip: normalizePlanTripDraft(trip),
+            step: step === "create" ? "create" : step,
+            messages: rawMessages,
+          }),
+        );
+        await updatePlanDraftPayload(draftId, next);
+      } catch {
+        /* ignore persist errors on finish */
+      }
+    },
   });
 
   return result.toUIMessageStreamResponse({

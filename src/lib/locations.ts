@@ -1,3 +1,6 @@
+import type { LodgingBundle } from "@/lib/lodging";
+import { normalizeLodgingBundle } from "@/lib/lodging";
+
 export type LocationOption = {
   id: string;
   title: string;
@@ -9,6 +12,8 @@ export type LocationOption = {
   avgHighF?: number;
   crowdLevel?: "quiet" | "moderate" | "busy";
   typicalLodgingUsd?: number;
+  /** Persisted lodging candidates — fetched when shortlist is created, never at render. */
+  lodging?: LodgingBundle;
 };
 
 export function normalizeLocationOptions(raw: unknown): LocationOption[] {
@@ -57,6 +62,7 @@ export function normalizeLocationOptions(raw: unknown): LocationOption[] {
       avgHighF,
       crowdLevel,
       typicalLodgingUsd,
+      lodging: o.lodging != null ? normalizeLodgingBundle(o.lodging) : undefined,
     });
   }
   return out;

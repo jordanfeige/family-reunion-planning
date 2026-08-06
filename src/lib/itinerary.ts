@@ -5,7 +5,7 @@ import { formatUsd } from "@/lib/units";
 import { parseFridayIso, sundayFromFriday } from "@/lib/weekends";
 
 export const BLOCK_TYPES = ["activity", "meal", "lodging", "travel"] as const;
-export const BLOCK_STATUSES = ["idea", "to_book", "booked"] as const;
+export const BLOCK_STATUSES = ["idea", "to_book", "booked", "paid"] as const;
 export const BLOCK_TAGS = ["drive", "stay", "water", "hike", "food"] as const;
 export const DAY_KEYS = ["friday", "saturday", "sunday"] as const;
 
@@ -30,6 +30,8 @@ export type ItineraryBlock = {
   bookingUrl?: string;
   status: BlockStatus;
   assignedToUserId?: string;
+  updatedAt?: string;
+  updatedByName?: string;
 };
 
 const TYPE_TO_TAG: Record<BlockType, BlockTag> = {
@@ -55,9 +57,18 @@ export type ItineraryDay = {
   blocks: ItineraryBlock[];
 };
 
+export type ItineraryEditSnapshot = {
+  id: string;
+  at: string;
+  label: string;
+  days: ItineraryDay[];
+};
+
 export type TripItinerary = {
   days: ItineraryDay[];
   generatedAt?: string;
+  /** Last 10 applied AI/manual structural edits for Undo (server-persisted). */
+  editHistory?: ItineraryEditSnapshot[];
 };
 
 export type PublishedItinerary = TripItinerary & {
@@ -82,8 +93,10 @@ export const itineraryBlockSchema = z.object({
   photoUrl: z.string().optional(),
   plannerNotes: z.string().optional(),
   bookingUrl: z.string().optional(),
-  status: z.enum(["idea", "to_book", "booked"]),
+  status: z.enum(["idea", "to_book", "booked", "paid"]),
   assignedToUserId: z.string().optional(),
+  updatedAt: z.string().optional(),
+  updatedByName: z.string().optional(),
 });
 
 export const itineraryDaySchema = z.object({
@@ -176,6 +189,8 @@ export function normalizeItinerary(
           ? (b.status as BlockStatus)
           : "idea",
         assignedToUserId: b.assignedToUserId?.trim() || undefined,
+        updatedAt: b.updatedAt?.trim() || undefined,
+        updatedByName: b.updatedByName?.trim() || undefined,
       };
     });
     return {
@@ -186,7 +201,11 @@ export function normalizeItinerary(
     };
   });
 
-  return { days, generatedAt: o.generatedAt };
+  const editHistory = Array.isArray(o.editHistory)
+    ? o.editHistory.slice(0, 10)
+    : undefined;
+
+  return { days, generatedAt: o.generatedAt, editHistory };
 }
 
 export function itineraryFromGenerated(
@@ -271,3 +290,44 @@ export function weekendDateRangeLabel(fridayIso: string): string {
     d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   return `${fmt(fri)} – ${fmt(sun)}`;
 }
+
+const STATUS_CYCLE: BlockStatus[] = ["idea", "booked", "paid"];
+
+export function nextBookingStatus(status: BlockStatus): BlockStatus {
+  const idx = STATUS_CYCLE.indexOf(status === "to_book" ? "idea" : status);
+  return STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length] ?? "idea";
+}
+
+export function bookingStatusLabel(status: BlockStatus): string {
+  if (status === "booked") return "Booked";
+  if (status === "paid") return "Paid";
+  return "Not booked";
+}
+
+export function pushItineraryEdit(
+  itinerary: TripItinerary,
+  label: string,
+): TripItinerary {
+  const snap: ItineraryEditSnapshot = {
+    id: crypto.randomUUID(),
+    at: new Date().toISOString(),
+    label,
+    days: structuredClone(itinerary.days),
+  };
+  const editHistory = [snap, ...(itinerary.editHistory ?? [])].slice(0, 10);
+  return { ...itinerary, editHistory };
+}
+
+export function bookingSummary(itinerary: TripItinerary): {
+  booked: number;
+  total: number;
+  needDeposit: number;
+} {
+  const items = getBookingBlocks(itinerary);
+  const booked = items.filter(
+    (b) => b.status === "booked" || b.status === "paid",
+  ).length;
+  const needDeposit = items.filter((b) => b.status === "to_book").length;
+  return { booked, total: items.length, needDeposit };
+}
+

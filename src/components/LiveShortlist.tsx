@@ -1,10 +1,13 @@
 "use client";
 
 import { SoftImage } from "@/components/SoftImage";
+import { CtaRequirementHint } from "@/components/CtaRequirementHint";
 import { cityOnly } from "@/lib/driveTimes";
+import { focusBlockingField } from "@/lib/formFocus";
 import { placeStillUrl } from "@/lib/placeImages";
 import type { PlacesDraftItem } from "@/lib/placesDraft";
 import { formatCityState, formatDriveTime } from "@/lib/units";
+import { useState } from "react";
 
 const CROWD_LABELS: Record<NonNullable<PlacesDraftItem["crowdLevel"]>, string> = {
   quiet: "Quiet",
@@ -50,11 +53,23 @@ export function LiveShortlist({
   confirmBusy?: boolean;
   emptyHint?: string;
 }) {
-  if (places.length === 0) return null;
-
+  const [hint, setHint] = useState<string | null>(null);
   const picked = places.filter((p) => p.selected !== false);
   const total = places.length;
   const pickedCount = picked.length;
+
+  if (places.length === 0) return null;
+
+  function handleConfirm() {
+    if (confirmBusy) return;
+    if (pickedCount === 0) {
+      setHint("Pick at least one place on the shortlist to continue.");
+      focusBlockingField(".live-shortlist-list, .live-shortlist");
+      return;
+    }
+    setHint(null);
+    onConfirm();
+  }
 
   return (
     <aside className="live-shortlist" aria-label="Live shortlist">
@@ -92,7 +107,10 @@ export function LiveShortlist({
                         type="checkbox"
                         className="live-shortlist-check"
                         checked={checked}
-                        onChange={() => onToggle(place.title)}
+                        onChange={() => {
+                          setHint(null);
+                          onToggle(place.title);
+                        }}
                         aria-label={`Include ${name}`}
                       />
                     </span>
@@ -131,14 +149,14 @@ export function LiveShortlist({
         <button
           type="button"
           className="btn btn-berry live-shortlist-cta"
-          disabled={confirmBusy || pickedCount === 0}
-          onClick={onConfirm}
+          disabled={confirmBusy}
+          onClick={handleConfirm}
         >
           {confirmBusy
             ? "Saving…"
             : pickedCount > 0
               ? `These ${pickedCount} feel right →`
-              : "Pick at least one"}
+              : "These feel right →"}
         </button>
         {onDifferentIdeas ? (
           <button
@@ -151,6 +169,7 @@ export function LiveShortlist({
           </button>
         ) : null}
       </div>
+      <CtaRequirementHint>{hint}</CtaRequirementHint>
     </aside>
   );
 }

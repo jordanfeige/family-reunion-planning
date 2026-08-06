@@ -13,6 +13,21 @@ export function ChatBubble({
   streaming?: boolean;
 }) {
   const text = textFromMessage(message);
+  if (!text && !streaming) return null;
+  if (text.startsWith("⟦advance:")) return null;
+
+  const isDivider =
+    message.id.startsWith("divider-") ||
+    /^—— .+ ——$/.test(text.trim());
+
+  if (isDivider) {
+    return (
+      <div className="chat-step-divider" role="separator">
+        <span>{text.replace(/^——\s*|\s*——$/g, "").trim() || text}</span>
+      </div>
+    );
+  }
+
   const isUser = message.role === "user";
 
   return (

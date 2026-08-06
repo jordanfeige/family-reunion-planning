@@ -1,5 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
+import { CtaRequirementHint } from "@/components/CtaRequirementHint";
+import { focusBlockingField } from "@/lib/formFocus";
+
 export function ChatComposer({
   id,
   placeholder,
@@ -8,6 +13,7 @@ export function ChatComposer({
   onChange,
   onSubmit,
   compact = false,
+  blockedReason = null,
 }: {
   id: string;
   placeholder: string;
@@ -16,13 +22,30 @@ export function ChatComposer({
   onChange: (value: string) => void;
   onSubmit: () => void | Promise<void>;
   compact?: boolean;
+  /** Hard block (no AI key, quota) — button disabled with adjacent explanation. */
+  blockedReason?: string | null;
 }) {
+  const [emptyHint, setEmptyHint] = useState<string | null>(null);
+  const hardBlocked = Boolean(blockedReason);
+  const sendDisabled = busy || hardBlocked;
+
+  function handleSubmit() {
+    if (sendDisabled) return;
+    if (!value.trim()) {
+      setEmptyHint("Type a message to continue.");
+      focusBlockingField(`#${id}`);
+      return;
+    }
+    setEmptyHint(null);
+    void onSubmit();
+  }
+
   return (
     <form
       className={`chat-composer${compact ? " chat-composer--compact" : ""}`}
       onSubmit={(e) => {
         e.preventDefault();
-        void onSubmit();
+        handleSubmit();
       }}
     >
       <div className="refine-row">
@@ -37,12 +60,15 @@ export function ChatComposer({
             rows={compact ? 1 : undefined}
             placeholder={placeholder}
             value={value}
-            disabled={busy}
-            onChange={(e) => onChange(e.target.value)}
+            disabled={busy || hardBlocked}
+            onChange={(e) => {
+              setEmptyHint(null);
+              onChange(e.target.value);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                void onSubmit();
+                handleSubmit();
               }
             }}
           />
@@ -50,11 +76,12 @@ export function ChatComposer({
         <button
           type="submit"
           className={`btn btn-primary${compact ? "" : " btn-block-sm"}`}
-          disabled={busy}
+          disabled={sendDisabled}
         >
           {busy ? "…" : "Send"}
         </button>
       </div>
+      <CtaRequirementHint>{blockedReason ?? emptyHint}</CtaRequirementHint>
     </form>
   );
 }

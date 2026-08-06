@@ -1,9 +1,15 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+
 import {
   closeBallotAction,
   publishBallotAction,
   reopenBallotAction,
 } from "@/app/actions/trips";
 import { CopyButton } from "@/components/CopyButton";
+import { CtaRequirementHint } from "@/components/CtaRequirementHint";
+import { focusBlockingField } from "@/lib/formFocus";
 import type { BallotStatus } from "@/lib/venues";
 
 export function TripBallotControls({
@@ -19,12 +25,30 @@ export function TripBallotControls({
   optionCount: number;
   locationLocked: boolean;
 }) {
+  const [ctaHint, setCtaHint] = useState<string | null>(null);
+
   const statusLabel =
     ballotStatus === "open"
       ? "Voting open"
       : ballotStatus === "closed"
         ? "Voting closed"
         : "Draft";
+
+  function onOpenVoting(e: FormEvent<HTMLFormElement>) {
+    if (!locationLocked) {
+      e.preventDefault();
+      setCtaHint("Lock a destination on the Decision step before opening the vote.");
+      focusBlockingField(".ballot-controls");
+      return;
+    }
+    if (optionCount === 0) {
+      e.preventDefault();
+      setCtaHint("Add at least one venue option to the ballot before opening voting.");
+      focusBlockingField(".ballot-controls");
+      return;
+    }
+    setCtaHint(null);
+  }
 
   return (
     <div className="card ballot-controls" style={{ padding: "1rem" }}>
@@ -40,13 +64,9 @@ export function TripBallotControls({
         </div>
         <div className="row" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
           {ballotStatus === "draft" ? (
-            <form action={publishBallotAction}>
+            <form action={publishBallotAction} onSubmit={onOpenVoting}>
               <input type="hidden" name="slug" value={slug} />
-              <button
-                type="submit"
-                className="btn btn-berry"
-                disabled={!locationLocked || optionCount === 0}
-              >
+              <button type="submit" className="btn btn-berry">
                 Open voting
               </button>
             </form>
@@ -70,6 +90,10 @@ export function TripBallotControls({
         </div>
       </div>
 
+      {ballotStatus === "draft" ? (
+        <CtaRequirementHint>{ctaHint}</CtaRequirementHint>
+      ) : null}
+
       {ballotStatus !== "draft" ? (
         <div style={{ marginTop: "0.85rem" }}>
           <p className="mono" style={{ fontSize: "0.82rem", margin: "0 0 0.5rem" }}>
@@ -81,12 +105,6 @@ export function TripBallotControls({
             planning survey, their ballot is linked to that household.
           </p>
         </div>
-      ) : null}
-
-      {!locationLocked ? (
-        <p className="muted" style={{ margin: "0.75rem 0 0", fontSize: "0.88rem" }}>
-          Lock a location below before opening the vote.
-        </p>
       ) : null}
     </div>
   );

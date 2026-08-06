@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { planTripDraftSchema } from "@/lib/planTripDraft";
+
 /** Max AI user messages on an anonymous plan draft before save is required. */
 export const PLAN_DRAFT_MESSAGE_LIMIT = 15;
 
@@ -7,6 +9,15 @@ export const PLAN_DRAFT_MESSAGE_LIMIT = 15;
 export const PLAN_DRAFT_TTL_DAYS = 7;
 
 export const PLAN_DRAFT_COOKIE = "wandrai_plan_draft";
+
+/** Persisted UIMessage-shaped objects (validated loosely for forward compat). */
+const uiMessageSchema = z
+  .object({
+    id: z.string(),
+    role: z.string(),
+    parts: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
 
 export const planDraftPayloadSchema = z.object({
   name: z.string().optional(),
@@ -22,6 +33,10 @@ export const planDraftPayloadSchema = z.object({
     )
     .optional(),
   step: z.enum(["create", "places", "survey", "save"]).optional(),
+  /** Single source of truth for the continuous /plan conversation. */
+  trip: planTripDraftSchema.optional(),
+  /** One continuous chat thread across Basics → Destinations → Survey. */
+  messages: z.array(uiMessageSchema).optional(),
   surveyPrefs: z
     .object({
       pace: z.enum(["easy", "balanced", "full"]).optional(),
@@ -55,4 +70,25 @@ export function messagesRemaining(messageCount: number): number {
 
 export function isMessageCapped(messageCount: number): boolean {
   return messageCount >= PLAN_DRAFT_MESSAGE_LIMIT;
+}
+
+/** Keep legacy claim fields in sync with PlanTripDraft. */
+export function syncLegacyFromTrip(payload: PlanDraftPayload): PlanDraftPayload {
+  const trip = payload.trip;
+  if (!trip) return payload;
+  return {
+    ...payload,
+    name: trip.tripName?.trim() || payload.name,
+    tagline: trip.vibe?.[0] || payload.tagline,
+    destinationNotes: trip.region || payload.destinationNotes,
+    targetBudget:
+      trip.budgetPerHouseholdUsd != null
+        ? `$${trip.budgetPerHouseholdUsd} per household`
+        : payload.targetBudget,
+    locationTitles:
+      trip.shortlist?.map((p) => ({
+        title: p.title,
+        summary: p.summary,
+      })) ?? payload.locationTitles,
+  };
 }

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 
 import { updateTripPlanContextAction } from "@/app/actions/trips";
 import { CompactSelect } from "@/components/CompactSelect";
+import { CtaRequirementHint } from "@/components/CtaRequirementHint";
 import { queueTrailBeat } from "@/components/TrailBeat";
+import Link from "next/link";
 import {
   aggregateLocationAvailability,
   aggregateWeekendAvailability,
@@ -14,6 +16,7 @@ import {
   type SurveyResponseRow,
 } from "@/lib/availability";
 import { cityOnly } from "@/lib/driveTimes";
+import { focusBlockingField } from "@/lib/formFocus";
 import type { LocationOption } from "@/lib/locations";
 import { findLocationById } from "@/lib/locations";
 import { goToTripHubStep } from "@/lib/wizardNav";
@@ -106,6 +109,7 @@ export function TripDecisionBar({
 
   const [locationId, setLocationId] = useState(selectedLocationId ?? "");
   const [weekendFriday, setWeekendFriday] = useState(defaultWeekend);
+  const [ctaHint, setCtaHint] = useState<string | null>(null);
 
   const ranked = useMemo(() => {
     return [...locations].sort((a, b) => {
@@ -168,7 +172,18 @@ export function TripDecisionBar({
       : "Pick a finalist to see why it might fit your crew.");
 
   function submit() {
-    if (!activeLocationId || !weekendFriday) return;
+    if (pending) return;
+    if (!activeLocationId) {
+      setCtaHint("Choose a destination first — Lock it in or Choose on a card above.");
+      focusBlockingField(".decision-compare-cards, .decision-card");
+      return;
+    }
+    if (!weekendFriday) {
+      setCtaHint("Pick a weekend before building the itinerary.");
+      focusBlockingField(`#decision-weekend-${slug}, .decision-weekend-field`);
+      return;
+    }
+    setCtaHint(null);
     const form = new FormData();
     form.set("slug", slug);
     form.set("selected_location_id", activeLocationId);
@@ -227,7 +242,15 @@ export function TripDecisionBar({
               className={`decision-card${isRecommended ? " is-recommended" : ""}${isSelected ? " is-selected" : ""}`}
             >
               <header className="decision-card-head">
-                <h3 className="decision-card-title">{placeDisplayName(loc.title)}</h3>
+                <h3 className="decision-card-title">
+                  <Link
+                    href={`/t/${slug}/place/${loc.id}`}
+                    className="decision-card-title-link"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {placeDisplayName(loc.title)}
+                  </Link>
+                </h3>
                 <span className="decision-match-chip">{matchLabel(votes)}</span>
               </header>
               <dl className="decision-card-criteria">
@@ -252,7 +275,10 @@ export function TripDecisionBar({
                 type="button"
                 className={`decision-card-pick${isRecommended ? " decision-card-pick--lock" : ""}`}
                 aria-pressed={isSelected}
-                onClick={() => setLocationId(loc.id)}
+                onClick={() => {
+                  setCtaHint(null);
+                  setLocationId(loc.id);
+                }}
               >
                 {isRecommended ? "Lock it in" : "Choose"}
               </button>
@@ -278,7 +304,12 @@ export function TripDecisionBar({
                     className={`decision-table-place-head${isRecommended ? " is-recommended" : ""}`}
                   >
                     <span className="decision-table-place-name">
-                      {placeDisplayName(loc.title)}
+                      <Link
+                        href={`/t/${slug}/place/${loc.id}`}
+                        className="decision-card-title-link"
+                      >
+                        {placeDisplayName(loc.title)}
+                      </Link>
                     </span>
                     <span className="decision-match-chip">
                       {matchLabel(
@@ -294,7 +325,10 @@ export function TripDecisionBar({
                       type="button"
                       className={`decision-table-pick${isRecommended ? " decision-table-pick--lock" : ""}`}
                       aria-pressed={loc.id === activeLocationId}
-                      onClick={() => setLocationId(loc.id)}
+                      onClick={() => {
+                  setCtaHint(null);
+                  setLocationId(loc.id);
+                }}
                     >
                       {isRecommended ? "Lock it in" : "Choose"}
                     </button>
@@ -342,18 +376,24 @@ export function TripDecisionBar({
             name="selected_weekend_friday"
             value={weekendFriday}
             options={weekendOptions}
-            onChange={setWeekendFriday}
+            onChange={(v) => {
+              setCtaHint(null);
+              setWeekendFriday(v);
+            }}
             placeholder="Choose a weekend…"
           />
         </div>
-        <button
-          type="button"
-          className="btn btn-berry decision-build-cta"
-          disabled={pending || !activeLocationId || !weekendFriday}
-          onClick={submit}
-        >
-          {pending ? "Saving…" : "Build the weekend →"}
-        </button>
+        <div className="decision-build-wrap">
+          <button
+            type="button"
+            className="btn btn-berry decision-build-cta"
+            disabled={pending}
+            onClick={submit}
+          >
+            {pending ? "Saving…" : "Build the weekend →"}
+          </button>
+          <CtaRequirementHint>{ctaHint}</CtaRequirementHint>
+        </div>
       </div>
     </div>
   );

@@ -17,6 +17,7 @@ import {
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatComposer } from "@/components/ChatComposer";
 import { CopyButton } from "@/components/CopyButton";
+import { CtaRequirementHint } from "@/components/CtaRequirementHint";
 import { LiveShortlist } from "@/components/LiveShortlist";
 import { ManualAddDrawer } from "@/components/ManualAddDrawer";
 import { queueTrailBeat } from "@/components/TrailBeat";
@@ -136,6 +137,11 @@ export function PlacesConcierge({
             Refine with WandrAI
           </button>
         </div>
+        {!aiEnabled ? (
+          <CtaRequirementHint>
+            AI needs an API key before you can refine destinations.
+          </CtaRequirementHint>
+        ) : null}
         <ManualAddOnly slug={slug} />
       </div>
     );

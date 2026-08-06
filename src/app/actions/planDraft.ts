@@ -6,8 +6,16 @@ import { auth } from "@/auth";
 import {
   isMessageCapped,
   planDraftPayloadSchema,
+  syncLegacyFromTrip,
   type PlanDraftPayload,
 } from "@/lib/planDraft";
+import {
+  mergePlanTripDraft,
+  normalizePlanTripDraft,
+  planTripDraftFromLegacy,
+  planTripDraftSchema,
+  type PlanTripDraft,
+} from "@/lib/planTripDraft";
 import {
   clearPlanDraftCookie,
   ensurePlanDraft,
@@ -27,12 +35,33 @@ export async function savePlanDraftPayloadAction(payload: PlanDraftPayload) {
   if (isMessageCapped(draft.messageCount) && payload.step !== "save") {
     // still allow saving payload when capped
   }
-  const parsed = planDraftPayloadSchema.parse({
+  const merged = planDraftPayloadSchema.parse({
     ...draft.payload,
     ...payload,
   });
-  await updatePlanDraftPayload(draft.id, parsed);
-  return { ok: true as const };
+  const withLegacy = syncLegacyFromTrip(merged);
+  await updatePlanDraftPayload(draft.id, withLegacy);
+  return { ok: true as const, payload: withLegacy };
+}
+
+/** UI correction: patch one or more PlanTripDraft fields without chatting. */
+export async function patchPlanTripDraftAction(patch: PlanTripDraft) {
+  const secret = await readPlanDraftCookieSecret();
+  if (!secret) throw new Error("No active plan draft.");
+  const draft = await getPlanDraftBySecret(secret);
+  if (!draft) throw new Error("Plan draft expired. Start again from the home page.");
+
+  const prior = planTripDraftFromLegacy(draft.payload);
+  const parsedPatch = planTripDraftSchema.parse(patch);
+  const trip = mergePlanTripDraft(prior, parsedPatch);
+  const next = syncLegacyFromTrip(
+    planDraftPayloadSchema.parse({
+      ...draft.payload,
+      trip: normalizePlanTripDraft(trip),
+    }),
+  );
+  await updatePlanDraftPayload(draft.id, next);
+  return { ok: true as const, trip: next.trip ?? trip };
 }
 
 /** Guest-safe: persist survey composition to the plan draft cookie. */
@@ -96,7 +125,8 @@ export async function claimPlanDraftForUser(): Promise<{ slug: string } | { erro
     return { error: "expired" };
   }
 
-  const name = draft.payload.name?.trim();
+  const name =
+    draft.payload.trip?.tripName?.trim() || draft.payload.name?.trim();
   if (!name) {
     return { error: "needs_name" };
   }
@@ -108,8 +138,11 @@ export async function claimPlanDraftForUser(): Promise<{ slug: string } | { erro
   const trip = await createTrip({
     slug,
     name,
-    tagline: draft.payload.tagline?.trim() || null,
-    destinationNotes: draft.payload.destinationNotes?.trim() || null,
+    tagline: draft.payload.tagline?.trim() || draft.payload.trip?.vibe?.[0] || null,
+    destinationNotes:
+      draft.payload.destinationNotes?.trim() ||
+      draft.payload.trip?.region ||
+      null,
     targetBudget: draft.payload.targetBudget?.trim() || null,
     shareOptionsToken,
     ownerId: session.user.id,
@@ -121,7 +154,13 @@ export async function claimPlanDraftForUser(): Promise<{ slug: string } | { erro
     title: "When can your crew join?",
   });
 
-  const places = draft.payload.locationTitles ?? [];
+  const places =
+    draft.payload.trip?.shortlist?.map((p) => ({
+      title: p.title,
+      summary: p.summary,
+    })) ??
+    draft.payload.locationTitles ??
+    [];
   if (places.length > 0) {
     await updateTripById(trip.id, {
       locationOptions: places.map((p) => ({
@@ -129,6 +168,13 @@ export async function claimPlanDraftForUser(): Promise<{ slug: string } | { erro
         title: p.title.trim(),
         summary: p.summary?.trim() || undefined,
       })),
+      ...(draft.payload.trip?.originMetro
+        ? { originMetro: draft.payload.trip.originMetro }
+        : {}),
+    });
+  } else if (draft.payload.trip?.originMetro) {
+    await updateTripById(trip.id, {
+      originMetro: draft.payload.trip.originMetro,
     });
   }
 

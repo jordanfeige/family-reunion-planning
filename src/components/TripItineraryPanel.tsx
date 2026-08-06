@@ -5,9 +5,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  addItineraryStopAction,
+  applyItineraryComposerAction,
   generateItineraryAction,
   publishItineraryAction,
   refineItineraryDayAction,
+  undoItineraryEditAction,
   unpublishItineraryAction,
 } from "@/app/actions/trips";
 import {
@@ -16,9 +19,9 @@ import {
 } from "@/components/ItineraryBlockCard";
 import { ShareLinkCard } from "@/components/ShareLinkCard";
 import { queueTrailBeat } from "@/components/TrailBeat";
-import { TripItineraryChat } from "@/components/TripItineraryChat";
 import {
-  getBookingBlocks,
+  bookingSummary,
+  DAY_KEYS,
   normalizeItinerary,
   type DayKey,
 } from "@/lib/itinerary";
@@ -57,6 +60,7 @@ export function TripItineraryPanel({
   initialChatByDay?: Partial<Record<DayKey, UIMessage[]>>;
   lockedChip?: string | null;
 }) {
+  void initialChatByDay;
   const router = useRouter();
   const itinerary = normalizeItinerary(itineraryRaw, selectedWeekendFriday);
   const [activeDay, setActiveDay] = useState<DayKey>(
@@ -64,10 +68,18 @@ export function TripItineraryPanel({
   );
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [refineDraft, setRefineDraft] = useState("");
+  const [askDraft, setAskDraft] = useState("");
+  const [askWorking, setAskWorking] = useState(false);
+  const [askLine, setAskLine] = useState<string | null>(null);
+  const [diffLine, setDiffLine] = useState<string | null>(null);
+  const [highlightIds, setHighlightIds] = useState<Set<string>>(new Set());
+  const [bookingFilter, setBookingFilter] = useState<"all" | "booked" | "deposit">(
+    "all",
+  );
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
 
   const currentDay = itinerary.days.find((d) => d.key === activeDay);
-  const bookingItems = getBookingBlocks(itinerary);
+  const summary = bookingSummary(itinerary);
   const hasBlocks = itinerary.days.some((d) => d.blocks.length > 0);
 
   const fri = selectedWeekendFriday ? parseFridayIso(selectedWeekendFriday) : null;
@@ -82,9 +94,20 @@ export function TripItineraryPanel({
   const sundayCount =
     itinerary.days.find((d) => d.key === "sunday")?.blocks.length ?? 0;
   const showSaturdayNudge =
-    hasBlocks && saturdayCount > sundayCount && saturdayCount >= 3;
+    hasBlocks &&
+    !suggestionDismissed &&
+    saturdayCount > sundayCount &&
+    saturdayCount >= 3;
 
   async function generate() {
+    if (
+      hasBlocks &&
+      !window.confirm(
+        "Regenerate replaces the current itinerary. In-place edits will be lost. Continue?",
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     setStatus(null);
     try {
@@ -98,20 +121,54 @@ export function TripItineraryPanel({
     }
   }
 
-  async function refineDay() {
-    const text = refineDraft.trim();
-    if (!text) return;
-    setBusy(true);
+  async function submitAsk() {
+    const text = askDraft.trim();
+    if (!text || askWorking) return;
+    setAskWorking(true);
+    setAskLine("Working…");
     setStatus(null);
     try {
-      await refineItineraryDayAction(slug, activeDay, text);
-      setRefineDraft("");
-      setStatus(`Updated ${activeDay}.`);
-      router.refresh();
+      const result = await Promise.race([
+        applyItineraryComposerAction(slug, text, activeDay),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 20000),
+        ),
+      ]);
+      if (result.kind === "answer") {
+        setAskLine(result.message);
+        setDiffLine(null);
+      } else {
+        setAskLine(null);
+        setDiffLine(result.message);
+        const ids = new Set(
+          (currentDay?.blocks ?? []).map((b) => b.id),
+        );
+        setHighlightIds(ids);
+        window.setTimeout(() => setHighlightIds(new Set()), 2000);
+        router.refresh();
+      }
+      setAskDraft("");
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Could not refine day.");
+      const msg = err instanceof Error ? err.message : "Couldn't reach me just now.";
+      if (msg === "timeout" || /network|fetch/i.test(msg)) {
+        setAskLine("Couldn't reach me just now.");
+      } else {
+        setAskLine(msg);
+      }
     } finally {
-      setBusy(false);
+      setAskWorking(false);
+    }
+  }
+
+  async function undo() {
+    try {
+      const res = await undoItineraryEditAction(slug);
+      setDiffLine(`Undid: ${res.label}`);
+      router.refresh();
+    } catch {
+      setDiffLine((prev) =>
+        prev ? `${prev} — Couldn't undo.` : "Couldn't undo.",
+      );
     }
   }
 
@@ -134,9 +191,84 @@ export function TripItineraryPanel({
       <header className="weekend-itinerary-head">
         <h2 className="weekend-itinerary-title">{headerTitle}</h2>
         <p className="weekend-itinerary-lede">
-          A loose plan — drag anything, or ask me to swap it.
+          A loose plan — edit anything in place, or ask me to swap it.
         </p>
       </header>
+
+      <div className="itinerary-ask">
+        <div className="itinerary-ask-composer">
+          <textarea
+            className="itinerary-ask-input"
+            rows={1}
+            placeholder="Move the hike to Sunday, add a rainy-day option, ask me anything…"
+            value={askDraft}
+            onChange={(e) => setAskDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void submitAsk();
+              }
+            }}
+          />
+          <span className="itinerary-ask-hold">Hold to talk</span>
+          <button
+            type="button"
+            className={`btn btn-berry itinerary-ask-send${askWorking ? " is-working" : ""}`}
+            onClick={() => void submitAsk()}
+          >
+            Send
+          </button>
+        </div>
+        {askLine ? (
+          <p className="itinerary-ask-status">
+            {askLine}{" "}
+            {askLine.includes("Couldn't") || askLine.includes("Didn't") ? (
+              <button type="button" className="itinerary-inline-retry" onClick={() => void submitAsk()}>
+                Try again
+              </button>
+            ) : null}
+          </p>
+        ) : null}
+        {diffLine ? (
+          <p className="itinerary-ask-diff">
+            {diffLine}{" "}
+            <button type="button" onClick={() => void undo()}>
+              Undo
+            </button>
+          </p>
+        ) : null}
+      </div>
+
+      {showSaturdayNudge ? (
+        <div className="itinerary-suggestion">
+          <span>Saturday is the fullest day. Say the word and I&apos;ll move the hike to Sunday.</span>
+          <button
+            type="button"
+            className="btn btn-berry btn-sm"
+            disabled={busy || askWorking}
+            onClick={async () => {
+              setSuggestionDismissed(true);
+              setAskDraft("Move the hike to Sunday");
+              await refineItineraryDayAction(
+                slug,
+                "saturday",
+                "Move the longest outdoor hike or walk from Saturday to Sunday morning.",
+              );
+              setDiffLine("Moved the hike toward Sunday.");
+              router.refresh();
+            }}
+          >
+            Move it
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setSuggestionDismissed(true)}
+          >
+            Leave it
+          </button>
+        </div>
+      ) : null}
 
       {!hasBlocks ? (
         <div className="action-stack" aria-label="Itinerary actions">
@@ -148,6 +280,9 @@ export function TripItineraryPanel({
           >
             {busy ? "Generating…" : "Generate itinerary"}
           </button>
+          <p className="muted" style={{ margin: 0 }}>
+            Or let me draft three days from your dates — use Generate above.
+          </p>
         </div>
       ) : null}
 
@@ -162,6 +297,30 @@ export function TripItineraryPanel({
 
       {hasBlocks ? (
         <>
+          {summary.total > 0 ? (
+            <p className="itinerary-booking-summary">
+              <button type="button" onClick={() => setBookingFilter("booked")}>
+                {summary.booked} of {summary.total} booked
+              </button>
+              {summary.needDeposit > 0 ? (
+                <>
+                  {" · "}
+                  <button type="button" onClick={() => setBookingFilter("deposit")}>
+                    {summary.needDeposit} need deposits
+                  </button>
+                </>
+              ) : null}
+              {bookingFilter !== "all" ? (
+                <>
+                  {" · "}
+                  <button type="button" onClick={() => setBookingFilter("all")}>
+                    Show all
+                  </button>
+                </>
+              ) : null}
+            </p>
+          ) : null}
+
           <div className="weekend-day-tabs" role="tablist" aria-label="Weekend days">
             {itinerary.days.map((day) => (
               <button
@@ -180,78 +339,45 @@ export function TripItineraryPanel({
           {currentDay ? (
             <div className="weekend-timeline-wrap">
               {currentDay.blocks.length === 0 ? (
-                <p className="muted weekend-timeline-empty">Nothing planned this day yet.</p>
+                <p className="muted weekend-timeline-empty">
+                  Nothing planned yet — a free day is a legitimate choice.
+                </p>
               ) : (
                 <ul className="weekend-timeline">
-                  {currentDay.blocks.map((block) => (
-                    <ItineraryBlockCard
-                      key={block.id}
-                      slug={slug}
-                      dayKey={currentDay.key}
-                      block={block}
-                      planners={planners}
-                      timeline
-                    />
-                  ))}
+                  {currentDay.blocks.map((block) => {
+                    const dimmed =
+                      bookingFilter === "booked"
+                        ? !(block.status === "booked" || block.status === "paid")
+                        : bookingFilter === "deposit"
+                          ? block.status !== "to_book"
+                          : false;
+                    return (
+                      <ItineraryBlockCard
+                        key={block.id}
+                        slug={slug}
+                        dayKey={currentDay.key}
+                        block={block}
+                        planners={planners}
+                        timeline
+                        dayKeys={[...DAY_KEYS]}
+                        dimmed={dimmed}
+                        highlighted={highlightIds.has(block.id)}
+                      />
+                    );
+                  })}
                 </ul>
               )}
 
-              <button type="button" className="weekend-ghost-row">
-                + Add a stop, or ask WandrAI for an idea
+              <button
+                type="button"
+                className="weekend-ghost-row"
+                onClick={async () => {
+                  await addItineraryStopAction(slug, activeDay);
+                  router.refresh();
+                }}
+              >
+                + Add a stop
               </button>
-
-              <details className="weekend-block-details">
-                <summary>Edit stops &amp; booking status</summary>
-                <ul className="itinerary-block-list">
-                  {currentDay.blocks.map((block) => (
-                    <ItineraryBlockCard
-                      key={`edit-${block.id}`}
-                      slug={slug}
-                      dayKey={currentDay.key}
-                      block={block}
-                      planners={planners}
-                    />
-                  ))}
-                </ul>
-              </details>
-
-              <details className="itinerary-chat-details">
-                <summary className="itinerary-chat-details-summary">
-                  Ask WandrAI about this plan
-                </summary>
-                <div className="itinerary-chat-details-body">
-                  <div className="field" style={{ marginBottom: "0.75rem" }}>
-                    <label htmlFor={`refine-${activeDay}`} className="sr-only">
-                      Refine day
-                    </label>
-                    <textarea
-                      id={`refine-${activeDay}`}
-                      style={{ minHeight: "72px", width: "100%" }}
-                      placeholder='e.g. "Make Saturday lighter for toddlers"'
-                      value={refineDraft}
-                      onChange={(e) => setRefineDraft(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-block-sm"
-                      disabled={busy}
-                      style={{ marginTop: "0.5rem" }}
-                      onClick={() => refineDay()}
-                    >
-                      Update day
-                    </button>
-                  </div>
-                  <TripItineraryChat
-                    key={activeDay}
-                    slug={slug}
-                    tripName={tripName}
-                    focusDay={activeDay}
-                    focusDayLabel={currentDay?.label ?? activeDay}
-                    hasBlocks={hasBlocks}
-                    initialMessages={initialChatByDay[activeDay] ?? []}
-                  />
-                </div>
-              </details>
             </div>
           ) : null}
 
@@ -316,13 +442,6 @@ export function TripItineraryPanel({
             </div>
           </div>
 
-          {showSaturdayNudge ? (
-            <p className="weekend-itinerary-nudge">
-              Saturday is the fullest day. Say the word and I&apos;ll move the hike to
-              Sunday.
-            </p>
-          ) : null}
-
           {isPublished ? (
             <ShareLinkCard
               url={shareUrl}
@@ -331,48 +450,8 @@ export function TripItineraryPanel({
               bare
             />
           ) : null}
-
-          {bookingItems.length > 0 ? (
-            <details className="weekend-block-details">
-              <summary>Booking checklist ({bookingItems.length})</summary>
-              <ul className="stack" style={{ listStyle: "none", padding: 0, margin: "0.75rem 0 0" }}>
-                {bookingItems.map((item) => (
-                  <li key={item.id} className="weekend-booking-row">
-                    <strong>{item.title}</strong>
-                    <span className="muted"> · {item.dayLabel}</span>
-                    <span className="pill">{item.status.replace("_", " ")}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
         </>
-      ) : (
-        <>
-          <details className="itinerary-chat-details">
-            <summary className="itinerary-chat-details-summary">
-              Ask WandrAI about this plan
-            </summary>
-            <div className="itinerary-chat-details-body">
-              <TripItineraryChat
-                key={activeDay}
-                slug={slug}
-                tripName={tripName}
-                focusDay={activeDay}
-                focusDayLabel={
-                  itinerary.days.find((d) => d.key === activeDay)?.label ?? activeDay
-                }
-                hasBlocks={false}
-                initialMessages={initialChatByDay[activeDay] ?? []}
-              />
-            </div>
-          </details>
-          <p className="muted" style={{ margin: 0 }}>
-            Click <strong>Generate itinerary</strong> for a full Fri–Sun plan with activities,
-            meals, and lodging ideas.
-          </p>
-        </>
-      )}
+      ) : null}
     </div>
   );
 }

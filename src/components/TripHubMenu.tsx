@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
 import type { TripOrganizerRole } from "@/lib/tripAccess";
 
-type SheetView = "menu" | "collaborators" | "manage";
+type SheetView = "collaborators" | "manage";
 
 export function TripHubMenu({
   tripName,
@@ -23,62 +22,57 @@ export function TripHubMenu({
 }) {
   const menuId = useId();
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState<SheetView>("menu");
+  const [view, setView] = useState<SheetView>("collaborators");
 
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        if (view !== "menu") setView("menu");
-        else setOpen(false);
-      }
+      if (e.key === "Escape") setOpen(false);
     }
     document.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = prev;
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, view]);
+  }, [open]);
 
   function close() {
     setOpen(false);
-    setView("menu");
   }
 
-  const sheetTitle =
-    view === "collaborators"
-      ? "Collaborators"
-      : view === "manage"
-        ? "Manage trip"
-        : "Trip menu";
+  function openSheet(next: SheetView) {
+    setView(next);
+    setOpen(true);
+  }
+
+  const sheetTitle = view === "manage" ? "Manage trip" : "Collaborators";
 
   return (
     <>
       <header className="trip-hub-header">
         <div className="trip-hub-header-row">
-          <div>
+          <div className="trip-hub-header-main">
             <h1 className="trip-hub-title">
               {tripName}
-              <button
-                type="button"
-                className="trip-hub-edit"
-                aria-label="Edit trip"
-                onClick={() => {
-                  setView(role === "owner" ? "manage" : "menu");
-                  setOpen(true);
-                }}
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none">
-                  <path
-                    d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+              {role === "owner" ? (
+                <button
+                  type="button"
+                  className="trip-hub-edit"
+                  aria-label="Edit trip"
+                  onClick={() => openSheet("manage")}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden fill="none">
+                    <path
+                      d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              ) : null}
             </h1>
             {tagline ? <p className="muted trip-hub-tagline">{tagline}</p> : null}
             {role === "editor" ? (
@@ -87,20 +81,12 @@ export function TripHubMenu({
           </div>
           <button
             type="button"
-            className="trip-hub-menu-btn"
-            aria-expanded={open}
+            className="trip-hub-collaborators-btn"
+            aria-expanded={open && view === "collaborators"}
             aria-controls={menuId}
-            aria-label="Trip menu"
-            onClick={() => {
-              if (open && view !== "menu") {
-                setView("menu");
-                return;
-              }
-              setOpen((o) => !o);
-              if (!open) setView("menu");
-            }}
+            onClick={() => openSheet("collaborators")}
           >
-            <span className="trip-hub-menu-icon" aria-hidden />
+            Collaborators
           </button>
         </div>
       </header>
@@ -110,7 +96,7 @@ export function TripHubMenu({
           <button
             type="button"
             className="trip-hub-sheet-backdrop"
-            aria-label="Close menu"
+            aria-label="Close"
             onClick={close}
           />
           <div
@@ -120,15 +106,6 @@ export function TripHubMenu({
             aria-labelledby={`${menuId}-title`}
           >
             <div className="trip-hub-sheet-header">
-              {view !== "menu" ? (
-                <button
-                  type="button"
-                  className="trip-hub-sheet-back"
-                  onClick={() => setView("menu")}
-                >
-                  ← Back
-                </button>
-              ) : null}
               <h2 id={`${menuId}-title`} className="trip-hub-sheet-title">
                 {sheetTitle}
               </h2>
@@ -143,37 +120,10 @@ export function TripHubMenu({
             </div>
 
             <div className="trip-hub-sheet-body">
-              {view === "menu" ? (
-                <nav className="trip-hub-sheet-nav" aria-label="Trip hub">
-                  <Link
-                    href="/dashboard"
-                    className="trip-hub-sheet-link"
-                    onClick={close}
-                  >
-                    All trips
-                  </Link>
-                  <button
-                    type="button"
-                    className="trip-hub-sheet-link"
-                    onClick={() => setView("collaborators")}
-                  >
-                    Collaborators
-                  </button>
-                  {role === "owner" && manage ? (
-                    <button
-                      type="button"
-                      className="trip-hub-sheet-link"
-                      onClick={() => setView("manage")}
-                    >
-                      Manage trip
-                    </button>
-                  ) : null}
-                </nav>
-              ) : null}
               {view === "collaborators" ? (
                 <div className="trip-hub-sheet-panel">{collaborators}</div>
               ) : null}
-              {view === "manage" ? (
+              {view === "manage" && role === "owner" && manage ? (
                 <div className="trip-hub-sheet-panel">{manage}</div>
               ) : null}
             </div>
