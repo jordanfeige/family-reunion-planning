@@ -1,4 +1,5 @@
 /** Persisted lodging candidate on a destination option row. Never invent at render. */
+
 export type LodgingAmenity = {
   kind: "pro" | "con";
   label: string;
@@ -17,17 +18,22 @@ export type LodgingProperty = {
   nights?: number;
   imageUrl?: string;
   source?: string;
+  providerId?: string;
+  provider?: string;
+  priceKind?: string;
   badge?: "recommended" | "logistics" | string;
   /** How many households sit at/above their private ceiling for this split — count only. */
   householdsAtCeiling?: number;
 };
 
 export type LodgingBundle = {
-  status: "pending" | "ready" | "empty";
+  status: "pending" | "ready" | "empty" | "failed" | "partial";
   properties: LodgingProperty[];
-  /** Filtered-out count message parts */
   filteredCount?: number;
   filteredReason?: string;
+  staleLabel?: string;
+  partialNote?: string;
+  fetchedAt?: string;
 };
 
 export function normalizeLodgingBundle(raw: unknown): LodgingBundle {
@@ -37,7 +43,11 @@ export function normalizeLodgingBundle(raw: unknown): LodgingBundle {
   const o = raw as Record<string, unknown>;
   const statusRaw = String(o.status ?? "").trim();
   const status =
-    statusRaw === "ready" || statusRaw === "empty" || statusRaw === "pending"
+    statusRaw === "ready" ||
+    statusRaw === "empty" ||
+    statusRaw === "pending" ||
+    statusRaw === "failed" ||
+    statusRaw === "partial"
       ? statusRaw
       : "pending";
   const properties: LodgingProperty[] = [];
@@ -47,6 +57,9 @@ export function normalizeLodgingBundle(raw: unknown): LodgingBundle {
       const p = item as Record<string, unknown>;
       const name = String(p.name ?? "").trim();
       if (!name) continue;
+      // Never surface fabricated / unknown-source rows as cards
+      const source = String(p.source ?? "").trim();
+      if (source && source !== "provider") continue;
       const amenities: LodgingAmenity[] = [];
       if (Array.isArray(p.amenities)) {
         for (const a of p.amenities) {
@@ -60,7 +73,6 @@ export function normalizeLodgingBundle(raw: unknown): LodgingBundle {
           });
         }
       }
-      // Every card must have at least one amber row at render — stamp if missing.
       if (!amenities.some((x) => x.kind === "con")) {
         amenities.push({ kind: "con", label: "Nothing flagged" });
       }
@@ -88,7 +100,10 @@ export function normalizeLodgingBundle(raw: unknown): LodgingBundle {
             ? Math.round(p.nights)
             : undefined,
         imageUrl: String(p.imageUrl ?? "").trim() || undefined,
-        source: String(p.source ?? "").trim() || undefined,
+        source: source || undefined,
+        providerId: String(p.providerId ?? "").trim() || undefined,
+        provider: String(p.provider ?? "").trim() || undefined,
+        priceKind: String(p.priceKind ?? "").trim() || undefined,
         badge: String(p.badge ?? "").trim() || undefined,
         householdsAtCeiling:
           typeof p.householdsAtCeiling === "number" &&
@@ -98,18 +113,25 @@ export function normalizeLodgingBundle(raw: unknown): LodgingBundle {
       });
     }
   }
+  let nextStatus: LodgingBundle["status"] = status;
+  if (properties.length === 0 && status === "ready") nextStatus = "empty";
   return {
-    status: properties.length === 0 && status === "ready" ? "empty" : status,
+    status: nextStatus,
     properties: properties.slice(0, 3),
     filteredCount:
       typeof o.filteredCount === "number" && Number.isFinite(o.filteredCount)
         ? Math.round(o.filteredCount)
         : undefined,
     filteredReason: String(o.filteredReason ?? "").trim() || undefined,
+    staleLabel: String(o.staleLabel ?? "").trim() || undefined,
+    partialNote: String(o.partialNote ?? "").trim() || undefined,
+    fetchedAt: String(o.fetchedAt ?? "").trim() || undefined,
   };
 }
 
-export function lodgingForLocation(loc: { lodging?: LodgingBundle | unknown }): LodgingBundle {
+export function lodgingForLocation(loc: {
+  lodging?: LodgingBundle | unknown;
+}): LodgingBundle {
   return normalizeLodgingBundle(loc.lodging);
 }
 

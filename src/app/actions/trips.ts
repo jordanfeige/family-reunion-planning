@@ -724,6 +724,14 @@ export async function publishPlacesDraftAction(
 
   await updateTripById(trip.id, { locationOptions: next });
   revalidatePath(`/t/${slug}`);
+
+  // Provider lodging fetch runs after response (never invent at render).
+  const { after } = await import("next/server");
+  const { hydrateTripLodgingAction } = await import("@/app/actions/lodging");
+  after(() => {
+    void hydrateTripLodgingAction(slug);
+  });
+
   return { ok: true as const, count: next.length };
 }
 

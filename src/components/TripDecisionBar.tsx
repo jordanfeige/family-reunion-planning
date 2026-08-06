@@ -111,6 +111,8 @@ export function TripDecisionBar({
   const [weekendFriday, setWeekendFriday] = useState(defaultWeekend);
   const [ctaHint, setCtaHint] = useState<string | null>(null);
 
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
+
   const ranked = useMemo(() => {
     return [...locations].sort((a, b) => {
       const va = locationVotes.find((v) => v.locationId === a.id)?.totalAttendees ?? 0;
@@ -122,6 +124,9 @@ export function TripDecisionBar({
     });
   }, [locations, locationVotes]);
 
+  const hiddenCount = Math.max(0, ranked.length - 3);
+  const visibleRanked = showAllPlaces ? ranked : ranked.slice(0, 3);
+
   const recommendedId = ranked[0]?.id ?? "";
   const activeLocationId = locationId || recommendedId;
   const activeLocation = findLocationById(locations, activeLocationId);
@@ -130,22 +135,22 @@ export function TripDecisionBar({
     {
       key: "drive",
       label: "Drive",
-      values: ranked.map((loc) => criteriaForLocation(loc).drive),
+      values: visibleRanked.map((loc) => criteriaForLocation(loc).drive),
     },
     {
       key: "rentals",
       label: "Rentals",
-      values: ranked.map((loc) => criteriaForLocation(loc).rentals),
+      values: visibleRanked.map((loc) => criteriaForLocation(loc).rentals),
     },
     {
       key: "weather",
       label: "Weather",
-      values: ranked.map((loc) => criteriaForLocation(loc).weather),
+      values: visibleRanked.map((loc) => criteriaForLocation(loc).weather),
     },
     {
       key: "crowds",
       label: "Crowds",
-      values: ranked.map((loc) => criteriaForLocation(loc).crowds),
+      values: visibleRanked.map((loc) => criteriaForLocation(loc).crowds),
     },
   ];
 
@@ -224,7 +229,7 @@ export function TripDecisionBar({
   return (
     <div className="decision-compare">
       <div className="decision-compare-cards" aria-label="Finalist destinations">
-        {ranked.map((loc) => {
+        {visibleRanked.map((loc) => {
           const votes =
             locationVotes.find((v) => v.locationId === loc.id) ?? {
               locationId: loc.id,
@@ -287,6 +292,16 @@ export function TripDecisionBar({
         })}
       </div>
 
+      {hiddenCount > 0 && !showAllPlaces ? (
+        <button
+          type="button"
+          className="decision-see-more"
+          onClick={() => setShowAllPlaces(true)}
+        >
+          See {hiddenCount} more
+        </button>
+      ) : null}
+
       <div className="decision-compare-table-wrap" aria-label="Destination comparison">
         <table className="decision-compare-table">
           <thead>
@@ -294,7 +309,7 @@ export function TripDecisionBar({
               <th scope="col" className="decision-table-criteria-head">
                 Criteria
               </th>
-              {ranked.map((loc) => {
+              {visibleRanked.map((loc) => {
                 const isRecommended = loc.id === recommendedId;
                 const votes = locationVotes.find((v) => v.locationId === loc.id);
                 return (
@@ -344,7 +359,7 @@ export function TripDecisionBar({
                   {row.label}
                 </th>
                 {row.values.map((value, i) => {
-                  const loc = ranked[i]!;
+                  const loc = visibleRanked[i]!;
                   const isRecommended = loc.id === recommendedId;
                   return (
                     <td

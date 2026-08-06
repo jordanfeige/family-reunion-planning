@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { DestinationDetailView } from "@/components/DestinationDetailView";
 import { aggregateLocationAvailability } from "@/lib/availability";
-import { summarizeGroupDriveTimes } from "@/lib/driveTimes";
+import { formatDriveMinutes, getDriveTime, type DriveLeg } from "@/lib/drive";
+import { geocodeArea } from "@/lib/lodging/geocode";
 import {
   filterLodgingByHeadcount,
   lodgingForLocation,
@@ -12,13 +13,16 @@ import {
   findLocationById,
   normalizeLocationOptions,
 } from "@/lib/locations";
-import { formatDriveTime } from "@/lib/units";
+import { getNearbyPlaces } from "@/lib/nearby";
+import { planCapabilities } from "@/lib/planMode";
 import { partyTotal } from "@/lib/partyCount";
+import { weekendStayDates } from "@/lib/stayDates";
 import {
   getSurveyByTripId,
   getTripForOrganizer,
   listSurveyResponses,
 } from "@/lib/supabase/queries";
+import { getSeasonStat } from "@/lib/weather";
 import { formatWeekendLabel } from "@/lib/weekends";
 
 export default async function DestinationDetailPage({
@@ -54,10 +58,17 @@ export default async function DestinationDetailPage({
     homeState: r.homeState,
   }));
 
-  const optionIndex = Math.max(
-    1,
-    locations.findIndex((l) => l.id === option.id) + 1,
-  );
+  const shortlist = locations.slice(0, 3);
+  const shortlistIndex = shortlist.findIndex((l) => l.id === option.id);
+  const optionIndex =
+    shortlistIndex >= 0
+      ? shortlistIndex + 1
+      : Math.min(
+          locations.findIndex((l) => l.id === option.id) + 1,
+          3,
+        );
+  const optionCount = Math.min(locations.length, 3);
+
   const votes = aggregateLocationAvailability(locations, surveyRows);
   const leadingId = [...locations].sort((a, b) => {
     const va = votes.find((v) => v.locationId === a.id)?.totalAttendees ?? 0;
@@ -70,92 +81,149 @@ export default async function DestinationDetailPage({
   const headcount =
     trip.planHeadcount ??
     responses.reduce((n, r) => n + partyTotal(r), 0);
+  const capabilities = planCapabilities({ householdCount, headcount });
 
-  const hasLodgingField = option.lodging != null;
   const lodging = filterLodgingByHeadcount(
-    hasLodgingField
-      ? lodgingForLocation(option)
-      : { status: "pending", properties: [] },
+    lodgingForLocation(option),
     headcount || null,
   );
 
-  const groupDrive = summarizeGroupDriveTimes(
-    responses.map((r) => ({
-      householdLabel: r.respondentName,
-      homeCity: r.homeCity,
-      homeState: r.homeState,
-      driveMinutes: option.driveMinutesFromOrigin,
-    })),
-  );
+  const stay = weekendStayDates(trip.selectedWeekendFriday);
+  const area = await geocodeArea(option.title);
 
-  const fitLines: string[] = [];
-  for (const r of responses.slice(0, 3)) {
-    const who = r.respondentName?.trim() || "A household";
-    if (r.homeCity && option.driveMinutesFromOrigin != null) {
-      const drive = formatDriveTime(option.driveMinutesFromOrigin);
-      fitLines.push(
-        drive
-          ? `${who} from ${r.homeCity} — about ${drive} on the shared origin clock.`
-          : `${who} from ${r.homeCity}.`,
-      );
-    } else if (r.homeCity) {
-      fitLines.push(`${who} listed home as ${r.homeCity}.`);
-    }
-  }
-  if (headcount > 0) {
-    fitLines.push(
-      `Crew size locked around ${headcount} people for lodging capacity.`,
+  const homes = responses
+    .map((r) => {
+      const city = [r.homeCity, r.homeState].filter(Boolean).join(", ").trim();
+      const label = r.respondentName?.trim() || city || "Household";
+      return { label, city };
+    })
+    .filter((h) => h.city);
+
+  const gettingThere: DriveLeg[] = [];
+  for (const h of homes.slice(0, 8)) {
+    gettingThere.push(
+      await getDriveTime({
+        fromCity: h.city,
+        toArea: option.title,
+        toLat: area?.lat,
+        toLng: area?.lng,
+      }),
     );
   }
+  // Prefer labeled legs
+  for (let i = 0; i < gettingThere.length; i++) {
+    gettingThere[i] = {
+      ...gettingThere[i]!,
+      fromLabel: homes[i]?.label || gettingThere[i]!.fromLabel,
+    };
+  }
 
-  const nights = 3;
-  const lodgingTotal = lodging.properties[0]?.totalUsd;
+  const viewerLeg = gettingThere[0];
+  const driveStat = {
+    value:
+      viewerLeg?.minutes != null
+        ? formatDriveMinutes(viewerLeg.minutes)
+        : option.driveMinutesFromOrigin != null
+          ? formatDriveMinutes(option.driveMinutesFromOrigin)
+          : null,
+    qualifier: null as string | null,
+  };
+
+  let farthestDriveLabel: string | null = null;
+  if (capabilities.farthestHousehold && gettingThere.length > 1) {
+    const farthest = [...gettingThere]
+      .filter((l) => l.minutes != null)
+      .sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0))[0];
+    if (farthest?.minutes != null) {
+      farthestDriveLabel = formatDriveMinutes(farthest.minutes);
+    }
+  }
+
+  const seasonStat =
+    area != null
+      ? await getSeasonStat({
+          lat: area.lat,
+          lng: area.lng,
+          month: stay.month,
+        })
+      : option.avgHighF != null
+        ? {
+            value: `${Math.round(option.avgHighF)}°`,
+            qualifier: "typical high",
+          }
+        : null;
+
+  const sleepsValue =
+    lodging.properties.find((p) => p.sleeps != null)?.sleeps ?? null;
+
+  const nearby =
+    area != null
+      ? await getNearbyPlaces({
+          lat: area.lat,
+          lng: area.lng,
+          areaLabel: option.title,
+        })
+      : [];
+
+  const lodgingTotal = lodging.properties[0]?.totalUsd ?? null;
+  const perHouseholdLodgingUsd =
+    lodgingTotal != null && householdCount > 0
+      ? Math.round(lodgingTotal / householdCount)
+      : null;
+
+  const gasLegs = gettingThere.filter((l) => l.gasUsd != null);
   const gasEstimate =
-    option.driveMinutesFromOrigin != null
-      ? Math.round((option.driveMinutesFromOrigin / 60) * 2 * 8)
-      : undefined;
-  const groceries = headcount > 0 ? headcount * 18 : undefined;
+    gasLegs.length > 0
+      ? gasLegs.reduce((s, l) => s + (l.gasUsd ?? 0), 0)
+      : gettingThere.length === 0
+        ? 0
+        : null;
+  const groceries = headcount > 0 ? headcount * 28 : null;
+
   const costLines = [
     { label: "Lodging", amount: lodgingTotal },
     { label: "Gas round trip", amount: gasEstimate },
     { label: "Shared groceries", amount: groceries },
   ];
+  const costReady =
+    lodgingTotal != null && gasEstimate != null && groceries != null;
+
   const viewerHouseholdTotal =
-    lodgingTotal != null && householdCount > 0
+    costReady && lodgingTotal != null && householdCount > 0
       ? Math.round(lodgingTotal / householdCount) +
-        (gasEstimate ?? 0) +
-        (groceries != null ? Math.round(groceries / householdCount) : 0)
+        Math.round((gasEstimate ?? 0) / Math.max(householdCount, 1)) +
+        Math.round((groceries ?? 0) / householdCount)
       : null;
 
   const weekendLabel = trip.selectedWeekendFriday
     ? formatWeekendLabel(trip.selectedWeekendFriday)
     : null;
 
-  const farthestDriveLabel =
-    groupDrive.farthest != null
-      ? formatDriveTime(groupDrive.farthest.minutes) || null
-      : null;
-
   return (
     <DestinationDetailView
       slug={slug}
       option={option}
       optionIndex={optionIndex}
-      optionCount={locations.length}
+      optionCount={optionCount}
       isLeading={isLeading}
       headcount={headcount || 0}
       householdCount={householdCount}
       responsesReceived={responses.length}
       responsesTotal={Math.max(responses.length, householdCount)}
       weekendLabel={weekendLabel}
-      nightCount={nights}
-      viewerDriveMinutes={option.driveMinutesFromOrigin}
+      nightCount={stay.nights}
+      driveStat={driveStat}
       farthestDriveLabel={farthestDriveLabel}
-      nearby={[]}
-      fitLines={fitLines.slice(0, 3)}
+      perHouseholdLodgingUsd={perHouseholdLodgingUsd}
+      seasonStat={seasonStat}
+      sleepsValue={sleepsValue}
+      gettingThere={gettingThere}
+      nearby={nearby}
       costLines={costLines}
+      costReady={Boolean(costReady)}
       viewerHouseholdTotal={viewerHouseholdTotal}
       lodging={lodging}
+      capabilities={capabilities}
     />
   );
 }
