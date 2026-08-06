@@ -41,7 +41,7 @@ export const BROWSE_GENERATE_MAX_DURATION_SEC = isServerRelaxed() ? 120 : 60;
  */
 export const BROWSE_GENERATE_MODEL_TIMEOUT_MS = isServerRelaxed()
   ? 90_000
-  : 28_000;
+  : 42_000;
 
 /** Cap reverse-geocode / Mapbox before the model call. */
 export const BROWSE_GENERATE_AREA_BUDGET_MS = isServerRelaxed() ? 8_000 : 4_000;
@@ -55,4 +55,4 @@ export const BROWSE_GENERATE_IMAGE_BUDGET_MS = isServerRelaxed()
   : 0;
 
 /** Smaller decks finish structured generation well under the gateway limit. */
-export const BROWSE_GENERATE_PROD_MAX_IDEAS = 8;
+export const BROWSE_GENERATE_PROD_MAX_IDEAS = 6;

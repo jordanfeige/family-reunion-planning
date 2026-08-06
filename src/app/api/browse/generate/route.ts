@@ -11,9 +11,9 @@ import {
 } from "@/lib/browseGenerate";
 import { attachBrowseImages } from "@/lib/browseImages";
 import {
+  BROWSE_CATEGORIES,
   BROWSE_DEAL_MORE,
   BROWSE_DECK_SIZE,
-  browseIdeaSchema,
   composeBrowseStack,
 } from "@/lib/browseIdeas";
 import { geocodeArea } from "@/lib/lodging/geocode";
@@ -31,6 +31,18 @@ const bodySchema = z.object({
   lat: z.number().min(-90).max(90).optional().nullable(),
   lng: z.number().min(-180).max(180).optional().nullable(),
   areaLabel: z.string().max(120).optional().nullable(),
+});
+
+/** Lean schema — full browseIdeaSchema JSON Schema is too large/slow for Haiku under gateway limits. */
+const leanIdeaSchema = z.object({
+  title: z.string().min(1).max(52),
+  category: z.enum(BROWSE_CATEGORIES),
+  blurb: z.string().min(8).max(140),
+  durationMins: z.number().positive(),
+  estCostUsd: z.number().min(0),
+  costNote: z.string().min(1).max(48),
+  driveMinutes: z.number().nonnegative().nullable().optional(),
+  placeName: z.string().max(80).nullable().optional(),
 });
 
 function isTimeoutError(err: unknown): boolean {
@@ -171,26 +183,21 @@ export async function POST(request: Request) {
     const { object } = await generateObject({
       model: extractorModel(),
       schema: z.object({
-        ideas: z.array(browseIdeaSchema).min(Math.min(4, count)).max(count),
+        ideas: z.array(leanIdeaSchema).min(Math.min(4, count)).max(count),
       }),
       maxRetries: 0,
-      maxOutputTokens: 2_400,
+      maxOutputTokens: 1_600,
+      temperature: 0.7,
       abortSignal: AbortSignal.timeout(BROWSE_GENERATE_MODEL_TIMEOUT_MS),
-      prompt: `You invent concrete weekend / evening ideas LOCAL to the user — near their city/town/area in the United States. No fantasy far-away destinations (no Azores, Kyoto, Dolomites, etc.) unless the user explicitly asked for that place.
+      prompt: `Invent ${count} concrete local weekend/evening ideas (US). No exotic far-away destinations unless the user asked for that place.
 User prompt: ${body.prompt}
 ${locationLine}
 ${refineNote}
 
-Rules:
-- Return exactly ${count} ideas.
-- Local-first: stay-home, stay-local, and day-trip should dominate. At most 2 overnight. At most 1 go-somewhere, and only if still regional (driveable).
-- Prefer real placeName values the user could find near them (park, bakery, trailhead, neighborhood). placeName null for pure at-home activities.
-- Each idea needs: title, category, short blurb (one line, max ~110 chars), durationMins (positive), estCostUsd, costNote, optional driveMinutes (realistic from their area; null for stay-home), optional placeName, optional tags from: quiet, lively, outdoors, hands-on, food-forward, alcohol, spectator, physical, kids-friendly, at-home, long-drive, budget, splurge.
-- Descriptions: omit or 1 short sentence. Blurb is required for the card face.
-- Never reuse these skipped titles: ${skipped.slice(0, 40).join(" | ") || "(none)"}
-- Titles max 52 characters.
-- costNote like "free", "~$40 groceries", "$22 for two".
-${isRefill ? "- These are refill cards for an existing shortlist — keep variety, avoid duplicates." : ""}`,
+Return JSON ideas with: title, category (stay-home|stay-local|day-trip|overnight|go-somewhere), blurb (~110 chars), durationMins, estCostUsd, costNote, optional driveMinutes (null for stay-home), optional placeName.
+Local-first: mostly stay-home / stay-local / day-trip. At most 1 overnight, at most 1 go-somewhere (regional only).
+Skip titles: ${skipped.slice(0, 24).join(" | ") || "(none)"}
+${isRefill ? "Refill cards — keep variety." : ""}`,
     });
 
     const stack = composeBrowseStack(object.ideas, count);
