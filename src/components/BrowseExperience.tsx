@@ -324,7 +324,9 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
           data.error ||
             (timedOut
               ? "That took too long — try a shorter prompt, or tap Generate again."
-              : "Couldn't build a stack just now."),
+              : res.status === 503
+                ? "AI planning is unavailable right now."
+                : "Couldn't build a stack just now."),
         );
         if (!opts?.append) {
           setStack([]);

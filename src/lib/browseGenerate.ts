@@ -1,10 +1,14 @@
 /**
  * Browse `/api/browse/generate` timing.
  * Local/dev is slow (cold LLM + Places); Vercel production stays under gateway limits.
+ *
+ * Note: AI SDK `generateObject` does not wire the `timeout` option (unlike
+ * `generateText`). Always pass `abortSignal: AbortSignal.timeout(ms)`.
  */
 
 const BROWSE_GENERATE_TIMEOUT_LOCAL_MS = 120_000;
-const BROWSE_GENERATE_TIMEOUT_REMOTE_MS = 55_000;
+/** Client must outlive server abort + response; keep under Vercel maxDuration. */
+const BROWSE_GENERATE_TIMEOUT_REMOTE_MS = 50_000;
 
 /** Server-only: `next dev`, local `next start`, or non-Vercel hosts. */
 function isServerRelaxed(): boolean {
@@ -28,18 +32,27 @@ export function browseGenerateClientTimeoutMs(): number {
   return BROWSE_GENERATE_TIMEOUT_REMOTE_MS;
 }
 
-/** Next.js / Vercel route `maxDuration` (seconds). */
+/** Next.js / Vercel route `maxDuration` (seconds) — must be a numeric literal in the route file. */
 export const BROWSE_GENERATE_MAX_DURATION_SEC = isServerRelaxed() ? 120 : 60;
 
-/** `generateObject` abort before the route is killed. */
+/**
+ * Hard abort for `generateObject` via AbortSignal.timeout (see note above).
+ * Leave headroom before Vercel FUNCTION_INVOCATION_TIMEOUT (~60s on Pro).
+ */
 export const BROWSE_GENERATE_MODEL_TIMEOUT_MS = isServerRelaxed()
   ? 90_000
-  : 35_000;
+  : 28_000;
+
+/** Cap reverse-geocode / Mapbox before the model call. */
+export const BROWSE_GENERATE_AREA_BUDGET_MS = isServerRelaxed() ? 8_000 : 4_000;
 
 /**
  * Cap Places/Mapbox enrichment so a slow image pipeline cannot fail generation.
- * Ideas return without images (SoftImage letter fallback) if the budget elapses.
+ * Production skips images on the critical path entirely (letter-block SoftImage).
  */
 export const BROWSE_GENERATE_IMAGE_BUDGET_MS = isServerRelaxed()
   ? 25_000
-  : 10_000;
+  : 0;
+
+/** Smaller decks finish structured generation well under the gateway limit. */
+export const BROWSE_GENERATE_PROD_MAX_IDEAS = 8;

@@ -4,8 +4,10 @@ import { z } from "zod";
 
 import { extractorModel, hasAnthropicApiKey } from "@/lib/ai";
 import {
+  BROWSE_GENERATE_AREA_BUDGET_MS,
   BROWSE_GENERATE_IMAGE_BUDGET_MS,
   BROWSE_GENERATE_MODEL_TIMEOUT_MS,
+  BROWSE_GENERATE_PROD_MAX_IDEAS,
 } from "@/lib/browseGenerate";
 import { attachBrowseImages } from "@/lib/browseImages";
 import {
@@ -43,6 +45,7 @@ async function withBudget<T>(
   ms: number,
   fallback: () => T,
 ): Promise<T> {
+  if (ms <= 0) return fallback();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -85,7 +88,7 @@ async function resolveArea(opts: {
         url.searchParams.set("limit", "1");
         url.searchParams.set("types", "place,locality,neighborhood");
         const res = await fetch(url.toString(), {
-          signal: AbortSignal.timeout(6000),
+          signal: AbortSignal.timeout(3_000),
         });
         if (res.ok) {
           const json = (await res.json()) as {
@@ -124,7 +127,11 @@ export async function POST(request: Request) {
   const skipped = (body.skippedTitles ?? [])
     .map((t) => t.trim().toLowerCase())
     .filter(Boolean);
-  const count = body.count ?? BROWSE_DECK_SIZE;
+  const onVercel = Boolean(process.env.VERCEL);
+  const requested = body.count ?? BROWSE_DECK_SIZE;
+  const count = onVercel
+    ? Math.min(requested, BROWSE_GENERATE_PROD_MAX_IDEAS)
+    : requested;
   const isRefill = count <= BROWSE_DEAL_MORE;
   const refineNote =
     body.refine === "cheaper"
@@ -135,11 +142,19 @@ export async function POST(request: Request) {
           ? "Bias toward unusual, specific, non-touristy ideas."
           : "";
 
-  const area = await resolveArea({
-    lat: body.lat,
-    lng: body.lng,
-    areaLabel: body.areaLabel,
-  });
+  const area = await withBudget(
+    resolveArea({
+      lat: body.lat,
+      lng: body.lng,
+      areaLabel: body.areaLabel,
+    }),
+    BROWSE_GENERATE_AREA_BUDGET_MS,
+    () => ({
+      lat: body.lat ?? null,
+      lng: body.lng ?? null,
+      areaLabel: body.areaLabel?.trim() || null,
+    }),
+  );
 
   const locationLine = area.areaLabel
     ? `User area: ${area.areaLabel}${
@@ -152,13 +167,15 @@ export async function POST(request: Request) {
       : "User area unknown — prefer generic US stay-home / stay-local ideas, not exotic destinations.";
 
   try {
+    // AI SDK generateObject ignores `timeout` — must use abortSignal.
     const { object } = await generateObject({
       model: extractorModel(),
       schema: z.object({
-        ideas: z.array(browseIdeaSchema).min(Math.min(6, count)).max(12),
+        ideas: z.array(browseIdeaSchema).min(Math.min(4, count)).max(count),
       }),
-      maxRetries: 1,
-      timeout: BROWSE_GENERATE_MODEL_TIMEOUT_MS,
+      maxRetries: 0,
+      maxOutputTokens: 2_400,
+      abortSignal: AbortSignal.timeout(BROWSE_GENERATE_MODEL_TIMEOUT_MS),
       prompt: `You invent concrete weekend / evening ideas LOCAL to the user — near their city/town/area in the United States. No fantasy far-away destinations (no Azores, Kyoto, Dolomites, etc.) unless the user explicitly asked for that place.
 User prompt: ${body.prompt}
 ${locationLine}
@@ -169,7 +186,7 @@ Rules:
 - Local-first: stay-home, stay-local, and day-trip should dominate. At most 2 overnight. At most 1 go-somewhere, and only if still regional (driveable).
 - Prefer real placeName values the user could find near them (park, bakery, trailhead, neighborhood). placeName null for pure at-home activities.
 - Each idea needs: title, category, short blurb (one line, max ~110 chars), durationMins (positive), estCostUsd, costNote, optional driveMinutes (realistic from their area; null for stay-home), optional placeName, optional tags from: quiet, lively, outdoors, hands-on, food-forward, alcohol, spectator, physical, kids-friendly, at-home, long-drive, budget, splurge.
-- Descriptions: 1–2 short concrete sentences if you include them. Blurb is required for the card face.
+- Descriptions: omit or 1 short sentence. Blurb is required for the card face.
 - Never reuse these skipped titles: ${skipped.slice(0, 40).join(" | ") || "(none)"}
 - Titles max 52 characters.
 - costNote like "free", "~$40 groceries", "$22 for two".
@@ -177,6 +194,7 @@ ${isRefill ? "- These are refill cards for an existing shortlist — keep variet
     });
 
     const stack = composeBrowseStack(object.ideas, count);
+    // Prod: skip Places/Mapbox on the critical path — SoftImage letter fallback.
     const withImages = await withBudget(
       attachBrowseImages(stack, {
         lat: area.lat,
@@ -191,7 +209,7 @@ ${isRefill ? "- These are refill cards for an existing shortlist — keep variet
         })),
     );
 
-    if (withImages.length < Math.min(6, count)) {
+    if (withImages.length < Math.min(4, count)) {
       return NextResponse.json({
         ideas: withImages,
         thin: true,
