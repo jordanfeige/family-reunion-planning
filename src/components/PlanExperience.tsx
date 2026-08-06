@@ -314,9 +314,11 @@ export function PlanExperience({
 function LiveTripCard({
   trip,
   hints,
+  variant = "aside",
 }: {
   trip: TripDraft | null;
   hints: { who?: string; vibe?: string };
+  variant?: "aside" | "inline";
 }) {
   const rows = [
     { label: "Who's coming", value: hints.who },
@@ -328,9 +330,16 @@ function LiveTripCard({
   if (rows.length === 0) return null;
 
   return (
-    <aside className="plan-live-card" aria-label="Live trip draft">
+    <aside
+      className={
+        variant === "inline" ? "plan-live-inline" : "plan-live-card plan-live-aside"
+      }
+      aria-label="Live trip draft"
+    >
       <div className="places-draft-head">
-        <p className="create-trip-draft-eyebrow">Live draft</p>
+        <p className="create-trip-draft-eyebrow">
+          {variant === "inline" ? "Confirmed so far" : "Live draft"}
+        </p>
         {trip?.name ? <span className="places-draft-live">Ready</span> : null}
       </div>
       <ul className="plan-live-rows">
@@ -466,6 +475,7 @@ function CreatePhase({
   }
 
   const liveCard = <LiveTripCard trip={trip} hints={hints} />;
+  const liveInline = <LiveTripCard trip={trip} hints={hints} variant="inline" />;
   const hasLiveDraft = Boolean(
     hints.who ||
       hints.vibe ||
@@ -513,11 +523,29 @@ function CreatePhase({
             </div>
             <button
               type="button"
-              className="btn btn-berry new-trip-submit"
+              className="btn btn-berry new-trip-submit new-trip-submit--labeled"
               disabled={!aiEnabled || pending || capped || !draftText.trim()}
               onClick={() => void send(draftText)}
             >
               Start planning →
+            </button>
+            <button
+              type="button"
+              className="new-trip-send"
+              aria-label="Start planning"
+              disabled={!aiEnabled || pending || capped || !draftText.trim()}
+              onClick={() => void send(draftText)}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+                <path
+                  d="M12 19V5M5 12l7-7 7 7"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.25"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
           </div>
         </div>
@@ -549,7 +577,7 @@ function CreatePhase({
 
   return (
     <section className="plan-panel plan-panel--split">
-      <p className="step-progress-eyebrow">Step 1 · Basics</p>
+      <p className="step-progress-eyebrow">Step 1 of 3 · Basics</p>
       {error ? (
         <div className="error-banner">
           {error.message}
@@ -564,53 +592,56 @@ function CreatePhase({
           hasLiveDraft ? "plan-panel-grid" : "plan-panel-grid plan-panel-grid--solo"
         }
       >
-        <PlanChatPane
-          messages={messages}
-          streamingAssistantId={streamingAssistant}
-          composerId="plan-create-composer"
-          placeholder={
-            userTurns <= 1
-              ? "Answer in your own words…"
-              : "e.g. under $1,000 per household"
-          }
-          draftText={draftText}
-          busy={busy || pending || !aiEnabled}
-          onChange={setDraftText}
-          onSubmit={() => send(draftText)}
-          footer={
-            trip?.name ? (
-              <div className="plan-draft-bar">
-                <div className="plan-draft-bar-main">
-                  <span className="plan-draft-bar-label">Draft ready</span>
-                  <strong>{trip.name}</strong>
-                  {trip.tagline ? <span className="muted">{trip.tagline}</span> : null}
+        <div className="plan-chat-with-inline">
+          <PlanChatPane
+            messages={messages}
+            streamingAssistantId={streamingAssistant}
+            composerId="plan-create-composer"
+            placeholder={
+              userTurns <= 1
+                ? "Answer in your own words…"
+                : "e.g. under $1,000 per household"
+            }
+            draftText={draftText}
+            busy={busy || pending || !aiEnabled}
+            onChange={setDraftText}
+            onSubmit={() => send(draftText)}
+            footer={
+              trip?.name ? (
+                <div className="plan-draft-bar">
+                  <div className="plan-draft-bar-main">
+                    <span className="plan-draft-bar-label">Draft ready</span>
+                    <strong>{trip.name}</strong>
+                    {trip.tagline ? <span className="muted">{trip.tagline}</span> : null}
+                  </div>
+                  <div className="plan-draft-actions action-pair">
+                    <button
+                      type="button"
+                      className="btn btn-berry btn-sm"
+                      disabled={pending}
+                      onClick={() => onContinue(trip)}
+                    >
+                      Find destinations →
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm action-pair-secondary"
+                      disabled={pending}
+                      onClick={() => onSave(trip)}
+                    >
+                      {saveLabel}
+                    </button>
+                  </div>
                 </div>
-                <div className="plan-draft-actions">
-                  <button
-                    type="button"
-                    className="btn btn-berry btn-sm"
-                    disabled={pending}
-                    onClick={() => onContinue(trip)}
-                  >
-                    Find destinations →
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    disabled={pending}
-                    onClick={() => onSave(trip)}
-                  >
-                    {saveLabel}
-                  </button>
-                </div>
-              </div>
-            ) : capped ? (
-              <p className="plan-chat-hint">
-                Message limit reached — save with Google to keep going.
-              </p>
-            ) : null
-          }
-        />
+              ) : capped ? (
+                <p className="plan-chat-hint">
+                  Message limit reached — save with Google to keep going.
+                </p>
+              ) : null
+            }
+          />
+          {liveInline}
+        </div>
         {liveCard}
       </div>
     </section>

@@ -27,7 +27,7 @@ export function TrailMap({
 
   return (
     <p className="step-progress-eyebrow" aria-live="polite">
-      Step {activeIndex + 1} · {active.label}
+      Step {activeIndex + 1} of {stops.length} · {active.label}
     </p>
   );
 }
