@@ -2,14 +2,18 @@ import { generateObject } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { hasAnthropicApiKey, plannerModel } from "@/lib/ai";
+import { extractorModel, hasAnthropicApiKey } from "@/lib/ai";
 import {
   browseIdeaSchema,
   composeBrowseStack,
 } from "@/lib/browseIdeas";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+/** Keep under typical gateway limits; model call aborts earlier via timeout. */
+export const maxDuration = 45;
+
+/** Abort model call before Vercel kills the function with a bare 504. */
+const MODEL_TIMEOUT_MS = 35_000;
 
 const bodySchema = z.object({
   prompt: z.string().min(1).max(280),
@@ -19,6 +23,13 @@ const bodySchema = z.object({
   skippedTitles: z.array(z.string()).max(200).optional(),
   refine: z.enum(["cheaper", "closer", "weirder"]).optional(),
 });
+
+function isTimeoutError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { name?: string; message?: string };
+  if (e.name === "AbortError" || e.name === "TimeoutError") return true;
+  return /timed?\s*out|aborted|timeout/i.test(e.message ?? "");
+}
 
 export async function POST(request: Request) {
   if (!hasAnthropicApiKey()) {
@@ -48,40 +59,33 @@ export async function POST(request: Request) {
           : "";
 
   try {
+    // Haiku + smaller stack: one structured call must finish well under gateway limit.
+    // A second Sonnet pass previously pushed this past 60s → production 504.
     const { object } = await generateObject({
-      model: plannerModel(),
+      model: extractorModel(),
       schema: z.object({
-        ideas: z.array(browseIdeaSchema).min(10).max(20),
+        ideas: z.array(browseIdeaSchema).min(8).max(12),
       }),
+      maxRetries: 1,
+      timeout: MODEL_TIMEOUT_MS,
       prompt: `You invent concrete weekend / evening ideas for a US family or couple.
 User prompt: ${body.prompt}
 Filter hint: ${body.filter ?? "anything"}
 ${refineNote}
 
 Rules:
-- Return 14–18 ideas.
-- At least 4 must be category "stay-home" with estCostUsd <= 20 and place null.
-- At least 3 "stay-local", at least 2 "day-trip", at most 2 "overnight".
+- Return exactly 10 ideas.
+- At least 3 must be category "stay-home" with estCostUsd <= 20 and place null.
+- At least 2 "stay-local", at least 2 "day-trip", at most 2 "overnight".
 - Every idea MUST include 1–2 honest cautions (drawbacks). Empty cautions are invalid.
-- Descriptions: 2–3 concrete sentences with real-feeling details (hours, what you do). No marketing adjectives.
+- Descriptions: 2 short concrete sentences (hours, what you do). No marketing adjectives.
 - driveMinutes must be null (drive times come from a separate tool).
-- Never reuse these skipped titles: ${skipped.slice(0, 80).join(" | ") || "(none)"}
+- Never reuse these skipped titles: ${skipped.slice(0, 40).join(" | ") || "(none)"}
 - Titles max 52 characters.
 - costNote like "free", "~$40 groceries", "$22 for two".`,
     });
 
-    let stack = composeBrowseStack(object.ideas);
-    if (stack.length < 6) {
-      // Second pass focused on stay-home fill
-      const { object: more } = await generateObject({
-        model: plannerModel(),
-        schema: z.object({ ideas: z.array(browseIdeaSchema).min(6).max(12) }),
-        prompt: `Generate 8 stay-home and stay-local ideas for: ${body.prompt}.
-Every idea needs cautions. stay-home place=null, estCostUsd<=20. driveMinutes=null.
-Avoid titles: ${[...skipped, ...stack.map((s) => s.title.toLowerCase())].join(" | ")}`,
-      });
-      stack = composeBrowseStack([...object.ideas, ...more.ideas]);
-    }
+    const stack = composeBrowseStack(object.ideas);
 
     if (stack.length < 6) {
       return NextResponse.json({
@@ -98,6 +102,15 @@ Avoid titles: ${[...skipped, ...stack.map((s) => s.title.toLowerCase())].join(" 
     });
   } catch (err) {
     console.error("browse generate:", err);
+    if (isTimeoutError(err)) {
+      return NextResponse.json(
+        {
+          error:
+            "That took too long — try a shorter prompt, or tap Generate again.",
+        },
+        { status: 504 },
+      );
+    }
     return NextResponse.json(
       { error: "Couldn't build a stack just now." },
       { status: 502 },

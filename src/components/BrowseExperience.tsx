@@ -112,6 +112,7 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
     setThinMessage(null);
     setPrompt(text);
     try {
+      // Fail client-side before a hanging gateway 504 with opaque HTML.
       const res = await fetch("/api/browse/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -121,10 +122,28 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
           skippedTitles: listSkippedTitles(),
           refine,
         }),
+        signal: AbortSignal.timeout(42_000),
       });
-      const data = await res.json();
+      let data: {
+        error?: string;
+        ideas?: BrowseIdea[];
+        promptId?: string;
+        thin?: boolean;
+        message?: string;
+      } = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
       if (!res.ok) {
-        setError(data.error || "Couldn't build a stack just now.");
+        const timedOut = res.status === 504 || res.status === 408;
+        setError(
+          data.error ||
+            (timedOut
+              ? "That took too long — try a shorter prompt, or tap Generate again."
+              : "Couldn't build a stack just now."),
+        );
         setStack([]);
         setIndex(0);
         return;
@@ -132,10 +151,17 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
       setStack(data.ideas ?? []);
       setIndex(0);
       setPromptId(data.promptId || crypto.randomUUID());
-      if (data.thin) setThinMessage(data.message);
+      if (data.thin) setThinMessage(data.message ?? null);
       undoStack.current = [];
-    } catch {
-      setError("Couldn't build a stack just now.");
+    } catch (err) {
+      const timedOut =
+        err instanceof DOMException &&
+        (err.name === "TimeoutError" || err.name === "AbortError");
+      setError(
+        timedOut
+          ? "That took too long — try a shorter prompt, or tap Generate again."
+          : "Couldn't build a stack just now.",
+      );
       setStack([]);
     } finally {
       setLoading(false);
