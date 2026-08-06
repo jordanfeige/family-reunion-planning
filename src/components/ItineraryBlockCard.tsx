@@ -11,10 +11,10 @@ import {
   blockTagLabel,
   bookingStatusLabel,
   nextBookingStatus,
-  type BlockStatus,
   type DayKey,
   type ItineraryBlock,
 } from "@/lib/itinerary";
+import { formatTimeOfDay } from "@/lib/datetime";
 import { formatUsd } from "@/lib/units";
 
 export type PlannerOption = {
@@ -25,15 +25,21 @@ export type PlannerOption = {
 function InlineField({
   value,
   className,
+  wrapClassName,
   multiline,
   maxLength,
+  emptyLabel,
+  displayValue,
   validate,
   onCommit,
 }: {
   value: string;
   className?: string;
+  wrapClassName?: string;
   multiline?: boolean;
   maxLength?: number;
+  emptyLabel?: string;
+  displayValue?: string;
   validate?: (next: string) => string | null;
   onCommit: (next: string) => Promise<void>;
 }) {
@@ -88,8 +94,13 @@ function InlineField({
   }
 
   if (!editing) {
+    const shown = value
+      ? displayValue ?? value
+      : emptyLabel ?? (
+          <span className="muted">{multiline ? "Add note…" : "—"}</span>
+        );
     return (
-      <div>
+      <div className={wrapClassName}>
         <button
           type="button"
           className={`itinerary-stop-edit ${className ?? ""}`}
@@ -99,7 +110,7 @@ function InlineField({
             setError(null);
           }}
         >
-          {value || <span className="muted">Add note…</span>}
+          {shown}
         </button>
         {error ? (
           <p className="itinerary-stop-error">
@@ -124,7 +135,7 @@ function InlineField({
     maxLength != null ? maxLength - draft.length : null;
 
   return (
-    <div>
+    <div className={wrapClassName}>
       {multiline ? (
         <textarea
           className="itinerary-stop-input"
@@ -183,6 +194,7 @@ export function ItineraryBlockCard({
   canEdit = true,
   dimmed = false,
   highlighted = false,
+  isLast = false,
   onRemoved,
   dayKeys,
 }: {
@@ -194,6 +206,7 @@ export function ItineraryBlockCard({
   canEdit?: boolean;
   dimmed?: boolean;
   highlighted?: boolean;
+  isLast?: boolean;
   onRemoved?: () => void;
   dayKeys?: DayKey[];
 }) {
@@ -202,6 +215,7 @@ export function ItineraryBlockCard({
   const [hourWarn, setHourWarn] = useState<string | null>(null);
   const startTime = blockStartTime(block);
   const tag = blockTagLabel(block);
+  const timeDisplay = startTime ? formatTimeOfDay(startTime) || startTime : "";
 
   async function patch(fields: Record<string, string>) {
     const fd = new FormData();
@@ -227,19 +241,16 @@ export function ItineraryBlockCard({
       <li
         className={`weekend-timeline-row${highlighted ? " is-highlight" : ""}${
           dimmed ? " is-filter-dim" : ""
-        }`}
-        draggable={false}
+        }${isLast ? " is-last" : ""}`}
       >
-        {canEdit ? (
-          <span className="weekend-drag-handle" aria-hidden>
-            ⋮⋮
-          </span>
-        ) : null}
-        <div className="weekend-timeline-gutter">
+        <div className="weekend-timeline-time-cell">
           {canEdit ? (
             <InlineField
               value={startTime ?? ""}
               className="weekend-timeline-time"
+              wrapClassName="weekend-timeline-time-wrap"
+              emptyLabel="—"
+              displayValue={timeDisplay}
               validate={(next) => {
                 if (!next) return null;
                 const m = /^(\d{1,2}):(\d{2})$/.exec(next);
@@ -261,19 +272,26 @@ export function ItineraryBlockCard({
           ) : (
             <span className="weekend-timeline-time is-empty">—</span>
           )}
-          <span className="weekend-timeline-connector" aria-hidden="true">
-            <span className="weekend-timeline-dot" />
-          </span>
         </div>
+
+        <div className="weekend-timeline-rail" aria-hidden="true">
+          <span className="weekend-timeline-rail-line" />
+          <span className="weekend-timeline-dot" />
+        </div>
+
         <article className="weekend-timeline-card">
           <div className="weekend-timeline-card-head">
+            {canEdit ? (
+              <span className="weekend-drag-handle" aria-hidden>
+                ⋮⋮
+              </span>
+            ) : null}
             {canEdit ? (
               <InlineField
                 value={block.title}
                 className="weekend-timeline-title"
-                validate={(next) =>
-                  next ? null : "A stop needs a name."
-                }
+                wrapClassName="weekend-timeline-title-wrap"
+                validate={(next) => (next ? null : "A stop needs a name.")}
                 onCommit={async (next) => {
                   await patch({ title: next });
                 }}
@@ -312,19 +330,21 @@ export function ItineraryBlockCard({
                     >
                       Duplicate
                     </button>
-                    {(dayKeys ?? []).filter((k) => k !== dayKey).map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={async () => {
-                          setMenuOpen(false);
-                          await patch({ action: "move", target_day: k });
-                          onRemoved?.();
-                        }}
-                      >
-                        Move to {k}
-                      </button>
-                    ))}
+                    {(dayKeys ?? [])
+                      .filter((k) => k !== dayKey)
+                      .map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={async () => {
+                            setMenuOpen(false);
+                            await patch({ action: "move", target_day: k });
+                            onRemoved?.();
+                          }}
+                        >
+                          Move to {k}
+                        </button>
+                      ))}
                     <button
                       type="button"
                       onClick={async () => {
@@ -346,6 +366,7 @@ export function ItineraryBlockCard({
               <InlineField
                 value={block.notes ?? ""}
                 className="weekend-timeline-note"
+                wrapClassName="weekend-timeline-note-wrap"
                 multiline
                 maxLength={280}
                 onCommit={async (next) => {

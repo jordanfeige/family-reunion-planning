@@ -9053,3 +9053,403 @@ p, h1, h2, h3, h4, h5, h6, li, label, span, a, button, td, th {
   padding-top: 1rem;
   border-top: 1px solid var(--hairline);
 }
+
+/* === R7 Itinerary day/stop layout (design contract) === */
+.weekend-itinerary {
+  gap: 0;
+}
+
+.weekend-itinerary-head {
+  margin: 0 0 18px;
+}
+
+.weekend-itinerary-title {
+  margin: 10px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.5vw, 1.65rem);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.weekend-itinerary-lede {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.itinerary-ask {
+  margin: 18px 0 0;
+}
+
+.itinerary-ask-composer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.itinerary-ask-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 2.75rem;
+}
+
+.itinerary-ask-hold {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 7px 13px;
+  border: 1px solid var(--hairline-2);
+  border-radius: 18px;
+  background: var(--card);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.itinerary-ask-send {
+  flex: none;
+  border-radius: 9px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.itinerary-suggestion {
+  margin: 16px 0 0;
+}
+
+.itinerary-booking-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.45rem;
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.itinerary-booking-seg {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+.itinerary-booking-seg.is-action {
+  cursor: pointer;
+  color: var(--link);
+  text-decoration: none;
+}
+
+.itinerary-booking-seg.is-action:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.itinerary-booking-count {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.itinerary-booking-label {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.itinerary-booking-seg.is-action .itinerary-booking-count,
+.itinerary-booking-seg.is-action .itinerary-booking-label {
+  color: inherit;
+}
+
+.itinerary-booking-dot {
+  color: var(--faint);
+  user-select: none;
+}
+
+.weekend-day-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  margin: 22px 0 18px;
+  padding: 3px;
+  border-radius: 20px;
+  background: #f0efec;
+  border: none;
+  gap: 0;
+}
+
+.weekend-day-tab {
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 7px 16px;
+  border-radius: 18px;
+  cursor: pointer;
+}
+
+.weekend-day-tab.is-active {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.weekend-timeline-wrap {
+  gap: 0;
+}
+
+.weekend-timeline {
+  display: grid;
+  grid-template-columns: 96px 20px minmax(0, 1fr);
+  column-gap: 0;
+  row-gap: 18px;
+  align-items: start;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.weekend-timeline-row {
+  display: contents;
+}
+
+.weekend-timeline-row.is-highlight .weekend-timeline-card {
+  border-left: 3px solid var(--accent);
+}
+
+.weekend-timeline-row.is-remote .weekend-timeline-card {
+  border-left: 3px solid var(--link);
+}
+
+.weekend-timeline-row.is-filter-dim .weekend-timeline-card {
+  opacity: 0.4;
+}
+
+.weekend-timeline-time-cell {
+  grid-column: 1;
+  min-width: 0;
+  text-align: right;
+  padding: 2px 14px 0 0;
+}
+
+.weekend-timeline-time-wrap {
+  min-width: 0;
+}
+
+.weekend-timeline-time,
+.weekend-timeline-time-wrap .itinerary-stop-edit {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  line-height: 1.25;
+  text-align: right;
+  width: 100%;
+}
+
+.weekend-timeline-time.is-empty,
+.weekend-timeline-time-wrap .itinerary-stop-edit:empty,
+.weekend-timeline-time-wrap .muted {
+  color: var(--faint);
+}
+
+.weekend-timeline-rail {
+  grid-column: 2;
+  position: relative;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 1.5rem;
+}
+
+.weekend-timeline-rail-line {
+  position: absolute;
+  left: 9px;
+  top: 0;
+  bottom: -18px;
+  width: 1px;
+  background: var(--hairline);
+}
+
+.weekend-timeline-row.is-last .weekend-timeline-rail-line {
+  bottom: 50%;
+}
+
+.weekend-timeline-dot {
+  position: absolute;
+  left: 5px;
+  top: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: none;
+  transform: none;
+}
+
+.weekend-timeline-card {
+  grid-column: 3;
+  min-width: 0;
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(20, 24, 30, 0.05);
+  padding: 14px 16px;
+  overflow: visible;
+}
+
+.weekend-timeline-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.weekend-drag-handle {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  justify-content: center;
+  color: var(--faint);
+  cursor: grab;
+  user-select: none;
+  line-height: 1;
+}
+
+.weekend-timeline-title-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.weekend-timeline-title,
+.weekend-timeline-title-wrap .itinerary-stop-edit {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  line-height: 1.25;
+  text-align: left;
+}
+
+.weekend-tag-chip {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: #f0efec;
+  border-radius: 5px;
+  padding: 3px 8px;
+  border: none;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.itinerary-status-pill {
+  flex: none;
+  white-space: nowrap;
+  border: 1px solid var(--hairline-2);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.itinerary-kebab {
+  flex: none;
+  margin-left: auto;
+  position: relative;
+}
+
+.weekend-timeline-note-wrap,
+.weekend-timeline-note {
+  min-width: 0;
+  margin-top: 8px;
+  max-width: 62ch;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.weekend-timeline-note-wrap .itinerary-stop-edit {
+  width: 100%;
+  text-align: left;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: normal;
+}
+
+.weekend-ghost-row {
+  margin-top: 18px;
+}
+
+.weekend-itinerary-foot {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* Kill legacy gutter/connector layout that caused the shrink bug */
+.weekend-timeline-gutter,
+.weekend-timeline-connector {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .weekend-timeline {
+    grid-template-columns: 64px 16px minmax(0, 1fr);
+  }
+
+  .weekend-timeline-time-cell {
+    padding-right: 8px;
+  }
+
+  .weekend-timeline-time,
+  .weekend-timeline-time-wrap .itinerary-stop-edit {
+    font-size: 11.5px;
+  }
+
+  .weekend-timeline-rail-line {
+    left: 7px;
+  }
+
+  .weekend-timeline-dot {
+    left: 3px;
+  }
+
+  .weekend-timeline-card {
+    padding: 12px 13px;
+  }
+
+  .weekend-timeline-title,
+  .weekend-timeline-title-wrap .itinerary-stop-edit {
+    font-size: 17px;
+    flex: 1 1 100%;
+  }
+
+  .weekend-timeline-title-wrap {
+    flex: 1 1 100%;
+  }
+
+  .weekend-drag-handle {
+    display: none;
+  }
+
+  .itinerary-ask-hold {
+    display: none;
+  }
+}

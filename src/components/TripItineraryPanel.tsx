@@ -210,7 +210,19 @@ export function TripItineraryPanel({
               }
             }}
           />
-          <span className="itinerary-ask-hold">Hold to talk</span>
+          <span className="itinerary-ask-hold" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+              <path
+                d="M12 14a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v4a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0M12 19v3M8 22h8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Hold to talk
+          </span>
           <button
             type="button"
             className={`btn btn-berry itinerary-ask-send${askWorking ? " is-working" : ""}`}
@@ -299,21 +311,44 @@ export function TripItineraryPanel({
         <>
           {summary.total > 0 ? (
             <p className="itinerary-booking-summary">
-              <button type="button" onClick={() => setBookingFilter("booked")}>
-                {summary.booked} of {summary.total} booked
+              <button
+                type="button"
+                className="itinerary-booking-seg is-action"
+                onClick={() => setBookingFilter("booked")}
+              >
+                <span className="itinerary-booking-count">{summary.booked}</span>
+                <span className="itinerary-booking-label">
+                  {" "}
+                  of {summary.total} booked
+                </span>
               </button>
               {summary.needDeposit > 0 ? (
                 <>
-                  {" · "}
-                  <button type="button" onClick={() => setBookingFilter("deposit")}>
-                    {summary.needDeposit} need deposits
+                  <span className="itinerary-booking-dot" aria-hidden>
+                    ·
+                  </span>
+                  <button
+                    type="button"
+                    className="itinerary-booking-seg is-action"
+                    onClick={() => setBookingFilter("deposit")}
+                  >
+                    <span className="itinerary-booking-count">
+                      {summary.needDeposit}
+                    </span>
+                    <span className="itinerary-booking-label"> need deposits</span>
                   </button>
                 </>
               ) : null}
               {bookingFilter !== "all" ? (
                 <>
-                  {" · "}
-                  <button type="button" onClick={() => setBookingFilter("all")}>
+                  <span className="itinerary-booking-dot" aria-hidden>
+                    ·
+                  </span>
+                  <button
+                    type="button"
+                    className="itinerary-booking-seg is-action"
+                    onClick={() => setBookingFilter("all")}
+                  >
                     Show all
                   </button>
                 </>
@@ -344,7 +379,7 @@ export function TripItineraryPanel({
                 </p>
               ) : (
                 <ul className="weekend-timeline">
-                  {currentDay.blocks.map((block) => {
+                  {currentDay.blocks.map((block, blockIndex) => {
                     const dimmed =
                       bookingFilter === "booked"
                         ? !(block.status === "booked" || block.status === "paid")
@@ -362,6 +397,7 @@ export function TripItineraryPanel({
                         dayKeys={[...DAY_KEYS]}
                         dimmed={dimmed}
                         highlighted={highlightIds.has(block.id)}
+                        isLast={blockIndex === currentDay.blocks.length - 1}
                       />
                     );
                   })}
