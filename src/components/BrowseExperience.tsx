@@ -1040,9 +1040,11 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
           <button
             type="button"
             className="btn btn-berry btn-sm"
-            onClick={() =>
-              router.push(signedIn ? "/plan" : "/login?callbackUrl=/plan")
-            }
+            onClick={() => {
+              window.location.assign(
+                signedIn ? "/api/plan/start" : "/login?callbackUrl=/api/plan/start",
+              );
+            }}
           >
             Plan something
           </button>

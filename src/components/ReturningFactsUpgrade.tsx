@@ -15,7 +15,7 @@ export function ReturningFactsUpgrade() {
       if (typeof window === "undefined") return;
       if (new URLSearchParams(window.location.search).get("stay") === "1") return;
       if (listLocalFacts().length > 0) {
-        window.location.replace("/plan");
+        window.location.replace("/api/plan/start");
       }
     } catch {
       /* stay on browse */

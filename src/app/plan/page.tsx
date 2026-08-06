@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
-
 import { auth } from "@/auth";
+import { PlanDraftBootstrap } from "@/components/PlanDraftBootstrap";
 import { PlanExperience } from "@/components/PlanExperience";
 import { hasAnthropicApiKey } from "@/lib/ai";
 import {
@@ -18,12 +17,19 @@ export default async function PlanPage({
   const { error } = await searchParams;
 
   const secret = await readPlanDraftCookieSecret();
-  const draft = secret ? await getPlanDraftBySecret(secret) : null;
+  let draft = null;
+  if (secret) {
+    try {
+      draft = await getPlanDraftBySecret(secret);
+    } catch {
+      draft = null;
+    }
+  }
 
   // Cookie must be set in a Route Handler, not a Server Component.
+  // Do not redirect() to /api/plan/start from RSC — soft navigation 500s.
   if (!draft) {
-    const qs = error ? `?error=${encodeURIComponent(error)}` : "";
-    redirect(`/api/plan/start${qs}`);
+    return <PlanDraftBootstrap error={error} />;
   }
 
   let activeTrip: { name: string; href: string } | null = null;

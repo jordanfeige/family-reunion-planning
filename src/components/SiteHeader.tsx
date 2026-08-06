@@ -178,9 +178,9 @@ function HeaderNavLinks({
             ))
           : null}
         {!isPlan ? (
-          <Link className={cls(false)} href="/plan" onClick={onNavigate}>
+          <a className={cls(false)} href="/api/plan/start" onClick={onNavigate}>
             Plan a trip
-          </Link>
+          </a>
         ) : null}
         <Link
           className={
@@ -215,9 +215,9 @@ function HeaderNavLinks({
         </Link>
       ))}
       {!isPlan ? (
-        <Link className={cls(false)} href="/plan" onClick={onNavigate}>
+        <a className={cls(false)} href="/api/plan/start" onClick={onNavigate}>
           Plan a trip
-        </Link>
+        </a>
       ) : null}
       {forDrawer ? (
         <div className="nav-drawer-account">

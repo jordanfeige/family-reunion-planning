@@ -8,14 +8,14 @@ export function PlanBrowseSwitch({
 }) {
   return (
     <nav className="two-door-switch" aria-label="How do you want to start?">
-      <Link
-        href="/plan"
-        scroll={false}
+      {/* Plain <a> so missing-draft visits hard-nav to the cookie route (RSC soft-nav to /plan 500s). */}
+      <a
+        href="/api/plan/start"
         className={`two-door-switch-btn${active === "plan" ? " is-active" : ""}`}
         aria-current={active === "plan" ? "page" : undefined}
       >
         <span className="two-door-switch-text">Tell me what you want</span>
-      </Link>
+      </a>
       <Link
         href="/browse?stay=1"
         scroll={false}
