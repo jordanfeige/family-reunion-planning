@@ -21,10 +21,12 @@ export default async function LoginErrorPage({
         ) : null}
         <p className="muted">{message}</p>
         <p className="muted" style={{ fontSize: "0.85rem", marginTop: "1rem" }}>
-          Production checklist: <code>AUTH_GOOGLE_ID</code>, <code>AUTH_GOOGLE_SECRET</code>,{" "}
-          <code>AUTH_URL</code> matching your live site, and <code>AUTH_SECRET</code> set in
-          Vercel. In Google Cloud Console, add{" "}
-          <code>{`{AUTH_URL}/api/auth/callback/google`}</code> as an authorized redirect URI.
+          If this just started after a deploy: check Vercel logs for{" "}
+          <code>AdapterError</code> / missing columns, and apply pending SQL in{" "}
+          <code>supabase/migrations</code>. Also confirm <code>AUTH_GOOGLE_ID</code>,{" "}
+          <code>AUTH_GOOGLE_SECRET</code>, <code>AUTH_URL</code>, and <code>AUTH_SECRET</code>{" "}
+          in Vercel, plus{" "}
+          <code>{`{AUTH_URL}/api/auth/callback/google`}</code> in Google Cloud Console.
         </p>
         <Link className="btn btn-primary" href="/login" style={{ marginTop: "1rem" }}>
           Try again

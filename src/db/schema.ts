@@ -11,7 +11,12 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-/** Auth.js tables — keep column names aligned with the Drizzle adapter */
+/** Auth.js tables — keep column names aligned with the Drizzle adapter.
+ *  App-only profile fields (home_city / home_state) live on the same Postgres
+ *  table but are read/written via Supabase — do NOT add them here. Auth.js
+ *  selects every column on this table definition during Google callback; a
+ *  missing column surfaces as a misleading "Configuration" sign-in error.
+ */
 export const users = pgTable("user", {
   id: text("id")
     .primaryKey()
@@ -20,8 +25,6 @@ export const users = pgTable("user", {
   email: text("email").unique(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
-  homeCity: text("home_city"),
-  homeState: text("home_state"),
 });
 
 export const accounts = pgTable(
