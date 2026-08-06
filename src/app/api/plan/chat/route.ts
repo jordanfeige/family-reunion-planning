@@ -15,6 +15,11 @@ import {
   planDraftPayloadSchema,
   syncLegacyFromTrip,
 } from "@/lib/planDraft";
+import {
+  applyScaleInference,
+  resolvePlanScale,
+  scalePromptHint,
+} from "@/lib/planMode";
 import { placesDraftSchema } from "@/lib/placesDraft";
 import {
   formatKnownBlock,
@@ -38,11 +43,9 @@ export const maxDuration = 60;
 
 const US_SCOPE = `Scope: United States only. Never suggest a non-US destination unless the user explicitly names one.
 Units: miles, Fahrenheit, USD, MM/DD/YYYY dates, 12-hour times. Never metric, never Celsius.
-Name places as "Place, ST" (e.g. "Lake Okoboji, IA"). The family is scattered across the US: the
-organizer's default origin is Sioux Falls, SD, but never assume everyone drives from there. When you
-give a drive time, say which origin it is from, and prefer framing like "about 4 hr from Sioux Falls,
-longer for anyone coming from the coasts." Do not compute per-household drive times or averages —
-the app does that from survey answers. Never invent live prices, availability, or booking links —
+Name places as "Place, ST" (e.g. "Lake Okoboji, IA"). Default origin framing is Sioux Falls, SD
+when the organizer has not named one — but never assume a multi-household reunion. When you give a
+drive time, say which origin it is from. Do not invent live prices, availability, or booking links —
 give typical ranges and say they're estimates.`;
 
 const TONE = `Tone: Never begin a message with "You're absolutely right", "Great question", "Great —", "I'd be happy to", or similar sycophantic openers. Start with the substance. Confirmations are at most one short clause before useful content. If the user says they already answered something, do not apologize and do not re-list it — produce the output.`;
@@ -58,6 +61,7 @@ function buildSystem(opts: {
   known: string;
   missing: string[];
   workingFrom: string;
+  scaleHint: string;
 }): string {
   const missingLine =
     opts.missing.length === 0
@@ -71,7 +75,9 @@ function buildSystem(opts: {
         ? `Step: Destinations. When nothing is missing, open with "Working from: ${opts.workingFrom}." then deliver a shortlist of 3–6 US places and call update_places_draft with full US meta. When something is missing, ask only for the missing fields.`
         : "Step: Survey prep. Confirm shortlist is ready; do not re-interview.";
 
-  return `You are WandrAI, a U.S. family reunion co-planner. There is ONE trip draft and ONE conversation — steps are views onto that draft, not new sessions.
+  return `You are WandrAI, a U.S. trip co-planner. There is ONE trip draft and ONE conversation — steps are views onto that draft, not new sessions.
+
+${opts.scaleHint}
 
 ${US_SCOPE}
 
@@ -144,6 +150,11 @@ export async function POST(req: Request) {
     await incrementPlanDraftMessages(draft.id);
   }
 
+  // R3: deterministic scale first so missing-fields / system prompt match the turn
+  if (last?.role === "user" && lastText && !isAdvanceMarker) {
+    trip = normalizePlanTripDraft(applyScaleInference(trip, lastText));
+  }
+
   // Extractor: after each real user message (not step markers)
   if (last?.role === "user" && lastText && !isAdvanceMarker) {
     try {
@@ -152,6 +163,8 @@ export async function POST(req: Request) {
         message: lastText,
         role: "user",
       });
+      // Re-apply heuristics after LLM extract so duo/solo cues are never dropped
+      trip = normalizePlanTripDraft(applyScaleInference(trip, lastText));
       const nextPayload = syncLegacyFromTrip(
         planDraftPayloadSchema.parse({
           ...draft.payload,
@@ -163,11 +176,33 @@ export async function POST(req: Request) {
       await updatePlanDraftPayload(draft.id, nextPayload);
       draft.payload = nextPayload;
     } catch {
-      // Extraction failure must not block the conversational turn
+      // Still persist scale inference if extractor fails
+      try {
+        const nextPayload = syncLegacyFromTrip(
+          planDraftPayloadSchema.parse({
+            ...draft.payload,
+            trip: normalizePlanTripDraft(trip),
+            step: step === "create" ? "create" : step,
+            messages: rawMessages,
+          }),
+        );
+        await updatePlanDraftPayload(draft.id, nextPayload);
+        draft.payload = nextPayload;
+      } catch {
+        /* ignore */
+      }
     }
   }
 
-  const missingKeys = missingFieldsForStep(trip, step);
+  const scale = resolvePlanScale({
+    householdCount: trip.householdCount,
+    headcount: trip.headcount,
+  });
+  let missingKeys = missingFieldsForStep(trip, step);
+  // Solo/duo: never surface "Households" as a follow-up question
+  if (scale === "solo" || scale === "duo") {
+    missingKeys = missingKeys.filter((k) => k !== "householdCount");
+  }
 
   const modelMessages = await convertToModelMessages(
     rawMessages as Parameters<typeof convertToModelMessages>[0],
@@ -178,6 +213,7 @@ export async function POST(req: Request) {
     known: formatKnownBlock(trip),
     missing: missingKeys.map((k) => FIELD_LABELS[k] ?? k),
     workingFrom: formatWorkingFromLine(trip),
+    scaleHint: scalePromptHint(scale),
   });
 
   const draftId = draft.id;

@@ -4,6 +4,10 @@ import {
   type PublishedItinerary,
 } from "@/lib/itinerary";
 import { normalizeLocationOptions } from "@/lib/locations";
+import {
+  householdCountForTripCapabilities,
+  planCapabilities,
+} from "@/lib/planMode";
 import type { BallotStatus } from "@/lib/venues";
 
 export type OrganizerTripResume = {
@@ -23,6 +27,7 @@ export function organizerTripResume(input: {
   ballotStatus: BallotStatus | string | null | undefined;
   publishedItinerary: PublishedItinerary | null | unknown;
   surveyResponseCount: number;
+  planHeadcount?: number | null;
 }): OrganizerTripResume {
   const places = normalizeLocationOptions(input.locationOptions);
   const hasPlaces = places.length > 0;
@@ -38,55 +43,72 @@ export function organizerTripResume(input: {
   const ballotActive =
     input.ballotStatus === "open" || input.ballotStatus === "closed";
 
+  const capabilities = planCapabilities({
+    householdCount: householdCountForTripCapabilities({
+      surveyResponseCount: input.surveyResponseCount,
+      planHeadcount: input.planHeadcount,
+    }),
+    headcount: input.planHeadcount,
+  });
+
   if (!hasPlaces) {
     return {
-      step: "locations",
+      step: "destinations",
       stageLabel: hasWeekends ? "Add destinations" : "Set places & weekends",
       ctaLabel: "Continue with WandrAI",
-      href: `/t/${input.slug}?step=locations`,
+      href: `/t/${input.slug}?stop=destinations`,
     };
   }
 
-  if (input.surveyResponseCount === 0) {
+  if (capabilities.survey && input.surveyResponseCount === 0) {
     return {
       step: "survey",
-      stageLabel: "Survey ready",
-      ctaLabel: "Share survey",
-      href: `/t/${input.slug}?step=survey`,
+      stageLabel: "Ready to ask",
+      ctaLabel: "Ask the family",
+      href: `/t/${input.slug}?stop=survey`,
+    };
+  }
+
+  if (capabilities.survey && !locked) {
+    return {
+      step: "decision",
+      stageLabel: "Review family answers",
+      ctaLabel: "Continue deciding",
+      href: `/t/${input.slug}?stop=decision`,
     };
   }
 
   if (!locked) {
     return {
-      step: "survey",
-      stageLabel: "Review family answers",
-      ctaLabel: "Continue deciding",
-      href: `/t/${input.slug}?step=survey`,
+      step: "decision",
+      stageLabel: "Pick a place",
+      ctaLabel: "Decide",
+      href: `/t/${input.slug}?stop=decision`,
     };
   }
 
   if (!ballotActive && !published) {
     return {
-      step: "ballot",
+      step: "weekend",
       stageLabel: "Shape lodging",
       ctaLabel: "Continue shaping",
-      href: `/t/${input.slug}?step=ballot`,
+      href: `/t/${input.slug}?stop=weekend`,
     };
   }
 
   if (!published) {
     return {
-      step: "blueprint",
+      step: "weekend",
       stageLabel: "Build the weekend",
       ctaLabel: "Continue planning",
-      href: `/t/${input.slug}?step=blueprint`,
+      href: `/t/${input.slug}?stop=weekend`,
     };
   }
 
   return {
-    step: "confirmations",
+    step: "share",
     stageLabel: "Plan published",
     ctaLabel: "Open hub",
-    href: `/t/${input.slug}?step=confirmations`,
+    href: `/t/${input.slug}?stop=share`,
   };
 }

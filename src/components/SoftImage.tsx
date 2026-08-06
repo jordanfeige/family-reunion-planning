@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Image with letter fallback — never shows a broken-image glyph.
- * Photo fades in on load; stays hidden on error.
+ * Photo fades in on load; stays hidden on error / missing src.
  */
 export function SoftImage({
   src,
@@ -14,15 +14,22 @@ export function SoftImage({
   width,
   height,
 }: {
-  src: string;
+  src?: string | null;
   alt?: string;
   letter: string;
   className?: string;
   width?: number;
   height?: number;
 }) {
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const resolved = typeof src === "string" ? src.trim() : "";
+  const [state, setState] = useState<"loading" | "ready" | "error">(
+    resolved ? "loading" : "error",
+  );
   const glyph = (letter.trim().charAt(0) || "?").toUpperCase();
+
+  useEffect(() => {
+    setState(resolved ? "loading" : "error");
+  }, [resolved]);
 
   return (
     <div
@@ -36,10 +43,11 @@ export function SoftImage({
       <span className="soft-image-fallback" aria-hidden>
         {glyph}
       </span>
-      {state !== "error" ? (
+      {resolved && state !== "error" ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          key={resolved}
+          src={resolved}
           alt={alt}
           width={width}
           height={height}

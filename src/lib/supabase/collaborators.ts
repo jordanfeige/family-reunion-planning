@@ -70,10 +70,11 @@ export type TripListItem = {
   ballotStatus: string;
   publishedItinerary: unknown;
   surveyResponseCount: number;
+  planHeadcount: number | null;
 };
 
 const TRIP_LIST_SELECT =
-  "id, name, slug, tagline, created_at, location_options, proposed_date_slots, selected_location_id, selected_weekend_friday, ballot_status, published_itinerary";
+  "id, name, slug, tagline, created_at, location_options, proposed_date_slots, selected_location_id, selected_weekend_friday, ballot_status, published_itinerary, plan_headcount";
 
 function mapTripListRow(
   row: TripRow,
@@ -94,6 +95,7 @@ function mapTripListRow(
     ballotStatus: row.ballot_status ?? "draft",
     publishedItinerary: row.published_itinerary,
     surveyResponseCount,
+    planHeadcount: row.plan_headcount ?? null,
   };
 }
 

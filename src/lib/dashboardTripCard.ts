@@ -3,6 +3,11 @@ import {
   normalizeItinerary,
 } from "@/lib/itinerary";
 import { findLocationById, normalizeLocationOptions } from "@/lib/locations";
+import {
+  householdCountForTripCapabilities,
+  planCapabilities,
+} from "@/lib/planMode";
+import { hubFlowSteps } from "@/lib/planSteps";
 import { placeStillUrl } from "@/lib/placeImages";
 import { formatDateRangeUS } from "@/lib/units";
 import { parseFridayIso, sundayFromFriday } from "@/lib/weekends";
@@ -18,7 +23,7 @@ export type DashboardTripCardMeta = {
   ctaLabel: string;
 };
 
-/** Dashboard card status + 5-segment trail progress for a trip row. */
+/** Dashboard card status + trail progress for a trip row. */
 export function dashboardTripCardMeta(input: {
   slug: string;
   locationOptions: unknown;
@@ -28,6 +33,7 @@ export function dashboardTripCardMeta(input: {
   ballotStatus: string;
   publishedItinerary: unknown;
   surveyResponseCount: number;
+  planHeadcount?: number | null;
 }): DashboardTripCardMeta {
   const places = normalizeLocationOptions(input.locationOptions);
   const hasPlaces = places.length > 0;
@@ -39,35 +45,47 @@ export function dashboardTripCardMeta(input: {
   );
   const ballotOpen = input.ballotStatus === "open";
 
-  const segments = [
-    hasPlaces,
-    hasSurvey,
-    locked,
-    published,
-    published && hasSurvey,
-  ];
+  const capabilities = planCapabilities({
+    householdCount: householdCountForTripCapabilities({
+      surveyResponseCount: input.surveyResponseCount,
+      planHeadcount: input.planHeadcount,
+    }),
+    headcount: input.planHeadcount,
+  });
+  const flow = hubFlowSteps(capabilities);
+  const totalSteps = flow.length;
+
+  const segments = flow.map((s) => {
+    if (s.id === "destinations") return hasPlaces;
+    if (s.id === "survey") return hasSurvey;
+    if (s.id === "decision") return locked;
+    if (s.id === "weekend") return published;
+    if (s.id === "share") return published && (hasSurvey || !capabilities.survey);
+    return false;
+  });
   const filledSegments = segments.filter(Boolean).length;
 
-  let step = 1;
-  if (hasPlaces) step = 2;
-  if (hasPlaces && hasSurvey) step = 3;
-  if (locked) step = 4;
-  if (published) step = 5;
+  let stepIndex = 0;
+  if (hasPlaces) stepIndex = Math.max(stepIndex, 1);
+  if (capabilities.survey && hasSurvey) stepIndex = Math.max(stepIndex, 2);
+  if (locked) stepIndex = Math.max(stepIndex, capabilities.survey ? 3 : 2);
+  if (published) stepIndex = Math.max(stepIndex, totalSteps - 1);
+  const stepDisplay = Math.min(stepIndex + 1, totalSteps);
 
   let statusPrimary = "In progress";
-  let statusSecondary = `Step ${step} of 5`;
+  let statusSecondary = `Step ${stepDisplay} of ${totalSteps}`;
 
-  if (ballotOpen && hasSurvey) {
+  if (ballotOpen && hasSurvey && capabilities.survey) {
     const pending = Math.max(0, input.surveyResponseCount - 1);
     statusPrimary = "Waiting on votes";
     statusSecondary =
       pending > 0 ? `${pending} vote${pending === 1 ? "" : "s"} left` : "Ballot open";
   } else if (locked && !published) {
     statusPrimary = "Itinerary";
-    statusSecondary = "Step 4 of 5";
+    statusSecondary = `Step ${capabilities.survey ? 4 : 3} of ${totalSteps}`;
   } else if (published) {
     statusPrimary = "Plan published";
-    statusSecondary = "Step 5 of 5";
+    statusSecondary = `Step ${totalSteps} of ${totalSteps}`;
   }
 
   const selectedPlace = input.selectedLocationId
@@ -89,7 +107,7 @@ export function dashboardTripCardMeta(input: {
     }
   }
 
-  const households = input.surveyResponseCount;
+  const households = Math.max(input.surveyResponseCount, 1);
   const householdLabel = `${households} household${households === 1 ? "" : "s"}`;
 
   let href = `/t/${input.slug}?stop=destinations`;
@@ -97,9 +115,9 @@ export function dashboardTripCardMeta(input: {
   if (!hasPlaces) {
     href = `/t/${input.slug}?stop=destinations`;
     ctaLabel = "Add places";
-  } else if (!hasSurvey) {
+  } else if (capabilities.survey && !hasSurvey) {
     href = `/t/${input.slug}?stop=survey`;
-    ctaLabel = "Share survey";
+    ctaLabel = "Ask the family";
   } else if (!locked) {
     href = `/t/${input.slug}?stop=decision`;
     ctaLabel = "Decide";

@@ -11,15 +11,31 @@ import { SoftImage } from "@/components/SoftImage";
 import { APP_TAGLINE } from "@/lib/brand";
 
 const APP_LINKS = [
-  { href: "/dashboard", label: "Trips", match: (p: string) => p === "/dashboard" },
   {
     href: "/browse",
     label: "Browse",
-    match: (p: string) => p.startsWith("/browse") || p.startsWith("/inspiration"),
+    match: (p: string) =>
+      p === "/browse" ||
+      (p.startsWith("/browse") && !p.startsWith("/browse/saved")) ||
+      p.startsWith("/inspiration"),
+  },
+  {
+    href: "/browse/saved",
+    label: "Saved",
+    match: (p: string) => p.startsWith("/browse/saved"),
+  },
+  {
+    href: "/dashboard",
+    label: "Trips",
+    match: (p: string) =>
+      p === "/dashboard" || p.startsWith("/plan") || p.startsWith("/t/"),
   },
   { href: "/library", label: "Library", match: (p: string) => p.startsWith("/library") },
   { href: "/guides", label: "Guides", match: (p: string) => p.startsWith("/guides") },
 ] as const;
+
+/** Destinations that mirror the mobile Browse tab bar (desktop header for guests). */
+const BROWSE_SHELL_LINKS = APP_LINKS.slice(0, 3);
 
 function HamburgerIcon({ open }: { open: boolean }) {
   return (
@@ -142,9 +158,25 @@ function HeaderNavLinks({
       ? `nav-drawer-link${active ? " is-active" : ""}`
       : desktopLink(active);
 
+  const isBrowseShell =
+    pathname.startsWith("/browse") || pathname.startsWith("/inspiration");
+
   if (!session?.user) {
     return (
       <>
+        {quietChrome && isBrowseShell
+          ? BROWSE_SHELL_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                className={cls(link.match(pathname))}
+                href={link.href}
+                aria-current={link.match(pathname) ? "page" : undefined}
+                onClick={onNavigate}
+              >
+                {link.label}
+              </Link>
+            ))
+          : null}
         {!isPlan ? (
           <Link className={cls(false)} href="/plan" onClick={onNavigate}>
             Plan a trip

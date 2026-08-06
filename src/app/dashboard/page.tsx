@@ -137,8 +137,7 @@ export default async function DashboardPage({
                 <div className="dashboard-empty">
                   <h2 className="dashboard-empty-title">Plan your next reunion</h2>
                   <p className="muted dashboard-empty-copy">
-                    Chat with WandrAI to shape the trip, pick places, then open your hub
-                    survey link.
+                    Chat with WandrAI to shape the trip, pick places, then build the plan.
                   </p>
                   {hasDraft ? (
                     <Link className="btn btn-berry" href="/plan">
@@ -174,6 +173,7 @@ export default async function DashboardPage({
                     ballotStatus: trip.ballotStatus,
                     publishedItinerary: trip.publishedItinerary,
                     surveyResponseCount: trip.surveyResponseCount,
+                    planHeadcount: trip.planHeadcount,
                   });
                   return (
                     <li key={trip.id} className="dashboard-card">

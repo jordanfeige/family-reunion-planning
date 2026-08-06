@@ -47,9 +47,13 @@ export function deriveBrowseTags(idea: BrowseIdea): BrowseTag[] {
   if (idea.estCostUsd >= 120) tags.add("splurge");
   if ((idea.driveMinutes ?? 0) >= 90) tags.add("long-drive");
 
-  const blob = [idea.title, idea.description, ...idea.pluses, ...idea.cautions].join(
-    " ",
-  );
+  const blob = [
+    idea.title,
+    idea.blurb,
+    idea.description,
+    ...idea.pluses,
+    ...idea.cautions,
+  ].join(" ");
   for (const { re, tag } of KEYWORD_TAGS) {
     if (re.test(blob)) tags.add(tag);
   }

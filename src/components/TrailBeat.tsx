@@ -4,23 +4,44 @@ import { useEffect, useState } from "react";
 
 export type TrailBeatKind = "shortlist" | "decision" | "plan";
 
-const BEAT_COPY: Record<
+const BEAT_COPY_SURVEY: Record<
   TrailBeatKind,
   { title: string; sub: string; cta: string }
 > = {
   shortlist: {
-    title: "Shortlist ready for the family",
-    sub: "Your destinations are on the trail — time to share the survey.",
-    cta: "Continue to Survey",
+    title: "Shortlist ready",
+    sub: "Your destinations are on the trail — send them to the family, or decide yourself.",
+    cta: "Continue",
   },
   decision: {
-    title: "We’re going",
+    title: "We're going",
     sub: "Place and weekend are set. Shape the Fri–Sun plan next.",
     cta: "Plan the weekend",
   },
   plan: {
     title: "Plan is live",
     sub: "Family can open the share link and RSVP on the locked itinerary.",
+    cta: "Open Share",
+  },
+};
+
+const BEAT_COPY_SOLO: Record<
+  TrailBeatKind,
+  { title: string; sub: string; cta: string }
+> = {
+  shortlist: {
+    title: "Shortlist ready",
+    sub: "Your picks are set — time to build the plan.",
+    cta: "Continue",
+  },
+  decision: {
+    title: "We're going",
+    sub: "Place and weekend are set. Shape the Fri–Sun plan next.",
+    cta: "Plan the weekend",
+  },
+  plan: {
+    title: "Plan is live",
+    sub: "Share the link when you're ready for RSVPs.",
     cta: "Open Share",
   },
 };
@@ -32,15 +53,17 @@ export function TrailBeat({
   names,
   detail,
   onContinue,
+  survey = true,
   autoMs = 1400,
 }: {
   kind: TrailBeatKind;
   names?: string[];
   detail?: string | null;
   onContinue: () => void;
+  survey?: boolean;
   autoMs?: number;
 }) {
-  const copy = BEAT_COPY[kind];
+  const copy = (survey ? BEAT_COPY_SURVEY : BEAT_COPY_SOLO)[kind];
   const [reduced, setReduced] = useState(false);
 
   useEffect(() => {

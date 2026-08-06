@@ -3,6 +3,14 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import {
+  browseOpeningMessage,
+  browseShortlistKind,
+  deriveBrowseTripName,
+  deriveBrowseVibe,
+  type BrowseKeptSeed,
+} from "@/lib/browseHandoff";
+import type { BrowseTag } from "@/lib/browseTags";
 import { emptyPlanTripDraft } from "@/lib/planTripDraft";
 import {
   ensurePlanDraft,
@@ -13,11 +21,14 @@ export async function startPlanFromBrowseAction(kept: {
   title: string;
   summary?: string;
   category?: string;
+  tags?: BrowseTag[];
 }[]) {
-  const cleaned = kept
+  const cleaned: BrowseKeptSeed[] = kept
     .map((k) => ({
       title: k.title.trim(),
-      summary: k.summary?.trim() || k.category?.trim() || undefined,
+      summary: k.summary?.trim() || undefined,
+      category: k.category?.trim() || undefined,
+      tags: k.tags,
     }))
     .filter((k) => k.title.length > 0)
     .slice(0, 8);
@@ -41,16 +52,30 @@ export async function startPlanFromBrowseAction(kept: {
     selected: true as const,
   }));
 
+  const tripName = deriveBrowseTripName(cleaned);
+  const vibe = deriveBrowseVibe(cleaned);
+  const kind = browseShortlistKind(cleaned);
+
   await updatePlanDraftPayload(draft.id, {
     ...draft.payload,
     step: "places",
-    locationTitles: cleaned,
+    locationTitles: cleaned.map((k) => ({
+      title: k.title,
+      summary: k.summary,
+    })),
+    browseSeed: {
+      kind,
+      count: cleaned.length,
+    },
     trip: {
       ...base,
       ...draft.payload.trip,
       shortlist,
-      tripName: draft.payload.trip?.tripName || "Weekend from Browse",
-      vibe: cleaned.map((c) => c.title).slice(0, 6),
+      // Solo scale from Browse — survey is not a capability
+      householdCount: draft.payload.trip?.householdCount ?? 1,
+      headcount: draft.payload.trip?.headcount ?? 1,
+      ...(tripName ? { tripName } : { tripName: undefined }),
+      ...(vibe ? { vibe } : { vibe: [] }),
     },
     messages: [
       {
@@ -59,7 +84,7 @@ export async function startPlanFromBrowseAction(kept: {
         parts: [
           {
             type: "text",
-            text: `You kept these from Browse:\n${cleaned.map((c) => `• ${c.title}`).join("\n")}\n\nI'll use them as seeds. Want to refine the shortlist or continue?`,
+            text: browseOpeningMessage(cleaned.length),
           },
         ],
       },

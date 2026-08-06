@@ -55,9 +55,12 @@ function displayValue(draft: PlanTripDraft, key: DraftFieldKey): string {
 export function TripDraftPanel({
   draft,
   onChange,
+  showEmptyTripNamePlaceholder = false,
 }: {
   draft: PlanTripDraft;
   onChange: (next: PlanTripDraft) => void;
+  /** Show trip name row with "Name this later" when empty (Browse handoff). */
+  showEmptyTripNamePlaceholder?: boolean;
 }) {
   const [editing, setEditing] = useState<DraftFieldKey | null>(null);
   const [draftValue, setDraftValue] = useState("");
@@ -67,7 +70,7 @@ export function TripDraftPanel({
     key,
     label: FIELD_LABELS[key],
     value: displayValue(draft, key),
-  })).filter((r) => r.value);
+  })).filter((r) => r.value || (r.key === "tripName" && showEmptyTripNamePlaceholder));
 
   const vibe = (draft.vibe ?? []).join(", ");
   if (vibe) rows.push({ key: "vibe", label: FIELD_LABELS.vibe, value: vibe });
@@ -149,7 +152,8 @@ export function TripDraftPanel({
                 className="trip-draft-panel-value"
                 onClick={() => startEdit(row.key, row.value)}
               >
-                {row.value}
+                {row.value ||
+                  (row.key === "tripName" ? "Name this later" : "")}
               </button>
             )}
           </li>

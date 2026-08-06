@@ -34,7 +34,13 @@ function beatFromPayload(kind: TrailBeatKind, payload: string): ActiveBeat {
  * Renders trail celebration beats. Listens for live queue events and
  * sessionStorage leftovers after navigation/refresh.
  */
-export function TripHubTrailBeats({ slug }: { slug: string }) {
+export function TripHubTrailBeats({
+  slug,
+  survey = true,
+}: {
+  slug: string;
+  survey?: boolean;
+}) {
   const [beat, setBeat] = useState<ActiveBeat | null>(null);
 
   useEffect(() => {
@@ -73,6 +79,7 @@ export function TripHubTrailBeats({ slug }: { slug: string }) {
       kind={beat.kind}
       names={beat.names}
       detail={beat.detail}
+      survey={survey}
       onContinue={dismiss}
     />
   );

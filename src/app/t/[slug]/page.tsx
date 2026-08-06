@@ -49,6 +49,10 @@ import { DAY_KEYS, itineraryHasContent, normalizeItinerary, type DayKey } from "
 import { loadChatThread } from "@/lib/supabase/chatHistory";
 import type { UIMessage } from "ai";
 import { partyTotal } from "@/lib/partyCount";
+import {
+  householdCountForTripCapabilities,
+  planCapabilities,
+} from "@/lib/planMode";
 import { normalizeTrailStopId } from "@/lib/trailStops";
 import { filterValidFridays, formatWeekendLabel } from "@/lib/weekends";
 
@@ -170,10 +174,26 @@ export default async function TripHubPage({
     DAY_KEYS.map((day, i) => [day, itineraryDayThreads[i] ?? []]),
   ) as Record<DayKey, UIMessage[]>;
 
-  const initialStop =
+  const capabilities = planCapabilities({
+    householdCount: householdCountForTripCapabilities({
+      surveyResponseCount: responses.length,
+      planHeadcount: trip.planHeadcount,
+    }),
+    headcount: trip.planHeadcount,
+  });
+
+  const rawInitialStop =
     normalizeTrailStopId(stopParam) ??
     normalizeTrailStopId(stepParam) ??
-    (locationOptions.length > 0 && responses.length === 0 ? "survey" : undefined);
+    (locationOptions.length > 0 &&
+    responses.length === 0 &&
+    capabilities.survey
+      ? "survey"
+      : undefined);
+  const initialStop =
+    rawInitialStop === "survey" && !capabilities.survey
+      ? "decision"
+      : rawInitialStop;
 
   const lockedChip =
     lockedLocationTitle || lockedWeekendLabel
@@ -182,12 +202,17 @@ export default async function TripHubPage({
 
   return (
     <div className="trip-hub-page">
-      <TripHubTrailBeats slug={trip.slug} />
+      <TripHubTrailBeats slug={trip.slug} survey={capabilities.survey} />
       <TripHubMenu
         tripName={trip.name}
         tagline={trip.tagline}
         slug={trip.slug}
         role={role}
+        askFamilyHref={
+          capabilities.survey && locationOptions.length > 0
+            ? `/t/${trip.slug}?stop=survey`
+            : undefined
+        }
         initialSheet={
           initialSheet === "manage" && role !== "owner" ? "collaborators" : initialSheet
         }
@@ -209,6 +234,7 @@ export default async function TripHubPage({
         <TripHubWizard
           slug={trip.slug}
           initialStepId={initialStop}
+          capabilities={capabilities}
           completion={{
             destinations: locationOptions.length > 0,
             survey: responses.length > 0,
@@ -229,6 +255,7 @@ export default async function TripHubPage({
               initialMessages={locationsChatMessages}
               aiEnabled={hasAnthropicApiKey()}
               surveyUrl={surveyUrl || undefined}
+              capabilities={capabilities}
               nudgeSlot={
                 <p className="dest-nudge-copy">
                   Okoboji is the shortest drive for most of the family but fills up on
@@ -238,7 +265,11 @@ export default async function TripHubPage({
               }
               basicsSlot={
                 <details className="trail-basics-fold">
-                  <summary>Trip name &amp; survey weekends</summary>
+                  <summary>
+                    {capabilities.survey
+                      ? "Trip name & survey weekends"
+                      : "Trip name & weekends"}
+                  </summary>
                   <form action={updateTripBasicsAction} className="stack trip-basics-form">
                     <input type="hidden" name="slug" value={trip.slug} />
                     <div className="field">
@@ -273,22 +304,24 @@ export default async function TripHubPage({
             />
           }
           survey={
-            survey ? (
-              <HubSurvey
-                slug={trip.slug}
-                surveyUrl={surveyUrl}
-                previewHref={`/r/${survey.publicToken}`}
-                placesCount={locationOptions.length}
-                weekendSlots={weekendSlots}
-                locations={locationOptions}
-                responses={responses}
-                totalAttendees={totalAttendees}
-                signedIn={Boolean(session?.user?.id)}
-                autoSend={sendParam === "1"}
-              />
-            ) : (
-              <p className="muted">Survey record missing—contact support.</p>
-            )
+            capabilities.survey ? (
+              survey ? (
+                <HubSurvey
+                  slug={trip.slug}
+                  surveyUrl={surveyUrl}
+                  previewHref={`/r/${survey.publicToken}`}
+                  placesCount={locationOptions.length}
+                  weekendSlots={weekendSlots}
+                  locations={locationOptions}
+                  responses={responses}
+                  totalAttendees={totalAttendees}
+                  signedIn={Boolean(session?.user?.id)}
+                  autoSend={sendParam === "1"}
+                />
+              ) : (
+                <p className="muted">Survey record missing—contact support.</p>
+              )
+            ) : null
           }
           decision={
             <div className="stack">

@@ -13,6 +13,7 @@ export function TripHubMenu({
   collaborators,
   manage,
   initialSheet,
+  askFamilyHref,
 }: {
   tripName: string;
   tagline?: string | null;
@@ -22,6 +23,8 @@ export function TripHubMenu({
   manage: React.ReactNode;
   /** Open collaborators (or manage) sheet on mount — e.g. dashboard invite deep link. */
   initialSheet?: SheetView | null;
+  /** Persistent group-scale survey entry (R10). */
+  askFamilyHref?: string;
 }) {
   const menuId = useId();
   const [open, setOpen] = useState(Boolean(initialSheet));
@@ -91,15 +94,22 @@ export function TripHubMenu({
               <span className="pill trip-hub-role-pill">Co-planner</span>
             ) : null}
           </div>
-          <button
-            type="button"
-            className="trip-hub-collaborators-btn"
-            aria-expanded={open && view === "collaborators"}
-            aria-controls={menuId}
-            onClick={() => openSheet("collaborators")}
-          >
-            Collaborators
-          </button>
+          <div className="trip-hub-header-actions">
+            {askFamilyHref ? (
+              <a href={askFamilyHref} className="trip-hub-ask-family">
+                Ask the family
+              </a>
+            ) : null}
+            <button
+              type="button"
+              className="trip-hub-collaborators-btn"
+              aria-expanded={open && view === "collaborators"}
+              aria-controls={menuId}
+              onClick={() => openSheet("collaborators")}
+            >
+              Collaborators
+            </button>
+          </div>
         </div>
       </header>
 

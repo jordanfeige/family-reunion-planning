@@ -21,6 +21,8 @@ import { CtaRequirementHint } from "@/components/CtaRequirementHint";
 import { LiveShortlist } from "@/components/LiveShortlist";
 import { ManualAddDrawer } from "@/components/ManualAddDrawer";
 import { queueTrailBeat } from "@/components/TrailBeat";
+import type { PlanCapabilities } from "@/lib/planMode";
+import { hubStopAfterShortlist } from "@/lib/planSteps";
 import {
   normalizePlacesDraft,
   placesDraftSchema,
@@ -57,14 +59,16 @@ function placesFromMessages(messages: UIMessage[]): PlacesDraftItem[] | null {
   return latest;
 }
 
-function starterMessage(tripName: string): UIMessage {
+function starterMessage(tripName: string, survey: boolean): UIMessage {
   return {
     id: "places-starter",
     role: "assistant",
     parts: [
       {
         type: "text",
-        text: `I’ll help you find the right US destinations for “${tripName}.”\n\nWhat kind of weekend are you imagining — lake, mountain, beach, or city-break?`,
+        text: survey
+          ? `I'll help you find the right US destinations for “${tripName}.”\n\nWhat kind of weekend are you imagining — lake, mountain, beach, or city-break?`
+          : `I'll help you find the right places for “${tripName}.”\n\nWhat kind of weekend are you imagining — lake, mountain, beach, or city-break?`,
       },
     ],
   };
@@ -77,6 +81,7 @@ export function PlacesConcierge({
   initialMessages = [],
   aiEnabled,
   surveyUrl,
+  capabilities,
   basicsSlot,
   nudgeSlot,
 }: {
@@ -86,11 +91,13 @@ export function PlacesConcierge({
   initialMessages?: UIMessage[];
   aiEnabled: boolean;
   surveyUrl?: string;
+  capabilities: PlanCapabilities;
   basicsSlot?: React.ReactNode;
   nudgeSlot?: React.ReactNode;
 }) {
   const router = useRouter();
   const [refining, setRefining] = useState(locations.length === 0 && aiEnabled);
+  const afterShortlist = hubStopAfterShortlist(capabilities);
 
   useEffect(() => {
     if (locations.length === 0 && aiEnabled) setRefining(true);
@@ -102,7 +109,9 @@ export function PlacesConcierge({
         <header className="dest-places-head">
           <h2 className="dest-places-title">Places</h2>
           <p className="dest-places-lede">
-            Shortlist is on the survey — refine anytime with WandrAI.
+            {capabilities.survey
+              ? "Shortlist ready — refine anytime with WandrAI, or ask the family."
+              : "Shortlist ready — refine anytime with WandrAI, or build the plan."}
           </p>
         </header>
         {basicsSlot}
@@ -117,15 +126,25 @@ export function PlacesConcierge({
           ))}
         </ul>
         <div className="places-concierge-ready-actions">
-          {surveyUrl ? (
-            <CopyButton text={surveyUrl} label="Copy survey link" className="btn-berry" />
+          {capabilities.survey ? (
+            surveyUrl ? (
+              <CopyButton text={surveyUrl} label="Ask the family" className="btn-berry" />
+            ) : (
+              <button
+                type="button"
+                className="btn btn-berry"
+                onClick={() => goToTripHubStep(slug, "survey")}
+              >
+                Ask the family
+              </button>
+            )
           ) : (
             <button
               type="button"
               className="btn btn-berry"
-              onClick={() => goToTripHubStep(slug, "survey")}
+              onClick={() => goToTripHubStep(slug, "decision")}
             >
-              Open survey
+              Build the plan →
             </button>
           )}
           <button
@@ -142,7 +161,7 @@ export function PlacesConcierge({
             AI needs an API key before you can refine destinations.
           </CtaRequirementHint>
         ) : null}
-        <ManualAddOnly slug={slug} />
+        <ManualAddOnly slug={slug} survey={capabilities.survey} />
       </div>
     );
   }
@@ -161,28 +180,30 @@ export function PlacesConcierge({
           slug={slug}
           tripName={tripName}
           initialMessages={initialMessages}
+          capabilities={capabilities}
           seedPlaces={locations.map((l) => ({
             title: l.title,
             summary: l.summary,
             selected: true,
           }))}
-          onPublished={(names) => {
+          onPublished={(names, nextStop) => {
             queueTrailBeat(slug, "shortlist", names.join("|"));
-            goToTripHubStep(slug, "survey");
+            goToTripHubStep(slug, nextStop);
             router.refresh();
           }}
+          afterShortlist={afterShortlist}
           onCancelRefine={
             locations.length > 0 ? () => setRefining(false) : undefined
           }
         />
       ) : (
-        <ManualAddOnly slug={slug} />
+        <ManualAddOnly slug={slug} survey={capabilities.survey} />
       )}
     </div>
   );
 }
 
-function ManualAddOnly({ slug }: { slug: string }) {
+function ManualAddOnly({ slug, survey }: { slug: string; survey: boolean }) {
   return (
     <div className="places-fullpage-manual">
       <ManualAddDrawer title="Add location" triggerLabel="Add manually">
@@ -213,7 +234,7 @@ function ManualAddOnly({ slug }: { slug: string }) {
               />
             </div>
             <button type="submit" className="btn btn-berry" style={{ alignSelf: "flex-start" }}>
-              Add to survey
+              {survey ? "Add to shortlist" : "Add place"}
             </button>
           </form>
         )}
@@ -227,6 +248,8 @@ function PlacesFullPlanner({
   tripName,
   initialMessages,
   seedPlaces,
+  capabilities,
+  afterShortlist,
   onPublished,
   onCancelRefine,
 }: {
@@ -234,7 +257,9 @@ function PlacesFullPlanner({
   tripName: string;
   initialMessages: UIMessage[];
   seedPlaces: PlacesDraftItem[];
-  onPublished: (names: string[]) => void;
+  capabilities: PlanCapabilities;
+  afterShortlist: string;
+  onPublished: (names: string[], nextStop: string) => void;
   onCancelRefine?: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -256,7 +281,9 @@ function PlacesFullPlanner({
   );
 
   const seeded =
-    initialMessages.length > 0 ? initialMessages : [starterMessage(tripName)];
+    initialMessages.length > 0
+      ? initialMessages
+      : [starterMessage(tripName, capabilities.survey)];
 
   const { messages, sendMessage, status, error, clearError, setMessages } = useChat({
     transport,
@@ -281,7 +308,7 @@ function PlacesFullPlanner({
     el.scrollTop = el.scrollHeight;
   }, [messages, streamingAssistant]);
 
-  function publish() {
+  function publish(nextStop: string = afterShortlist) {
     const selected = places.filter((p) => p.selected !== false);
     if (selected.length === 0) {
       setPublishError("Select at least one place.");
@@ -291,7 +318,10 @@ function PlacesFullPlanner({
     startTransition(async () => {
       try {
         await publishPlacesDraftAction(slug, selected);
-        onPublished(selected.map((p) => p.title));
+        onPublished(
+          selected.map((p) => p.title),
+          nextStop,
+        );
       } catch (err) {
         setPublishError(err instanceof Error ? err.message : "Could not publish places.");
       }
@@ -329,7 +359,9 @@ function PlacesFullPlanner({
         <header className="dest-places-head">
           <h2 className="dest-places-title">Places</h2>
           <p className="dest-places-lede">
-            I’ll help you find the right US destinations for the family survey.
+            {capabilities.survey
+              ? "I'll help you find destinations. Send them to the family, or decide yourself."
+              : "I'll help you find the right places for this trip."}
           </p>
         </header>
         <div className="dest-chat-pane">
@@ -352,13 +384,34 @@ function PlacesFullPlanner({
             onSubmit={() => send(draftText)}
           />
         </div>
+        {places.length > 0 && capabilities.survey ? (
+          <div className="plan-equal-doors dest-places-equal-doors">
+            <button
+              type="button"
+              className="btn btn-berry btn-sm"
+              onClick={() => publish("survey")}
+            >
+              Send these to the family
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm plan-equal-door-secondary"
+              onClick={() => publish("decision")}
+            >
+              I&apos;ll just decide
+            </button>
+            <p className="plan-equal-doors-hint">
+              You don&apos;t have to ask anyone. Deciding now is faster.
+            </p>
+          </div>
+        ) : null}
         <div className="dest-places-foot">
           <button
             type="button"
             className="btn btn-secondary btn-sm"
             disabled={busy}
             onClick={() => {
-              setMessages([starterMessage(tripName)]);
+              setMessages([starterMessage(tripName, capabilities.survey)]);
               setUnchecked({});
               setIgnoreChatDraft(true);
             }}
@@ -370,7 +423,7 @@ function PlacesFullPlanner({
               Cancel refine
             </button>
           ) : null}
-          <ManualAddOnly slug={slug} />
+          <ManualAddOnly slug={slug} survey={capabilities.survey} />
         </div>
       </section>
 
@@ -386,7 +439,10 @@ function PlacesFullPlanner({
               return next;
             });
           }}
-          onConfirm={publish}
+          onConfirm={() => publish()}
+          confirmLabel={
+            capabilities.survey ? undefined : "Build the plan →"
+          }
           confirmBusy={pending}
           onDifferentIdeas={() => void send("Show me different ideas")}
         />

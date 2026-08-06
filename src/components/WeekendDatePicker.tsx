@@ -50,8 +50,7 @@ export function WeekendDatePicker({
     <div className="field" style={{ gridColumn: "1 / -1" }}>
       <label>Candidate Fri–Sun weekends</label>
       <p className="muted" style={{ margin: "0.35rem 0 0.75rem", fontSize: "0.9rem" }}>
-        Each option is a full Fri–Sun weekend for your family survey—same format
-        guests see when they RSVP.
+        Each option is a full Fri–Sun weekend—same format guests see when they RSVP.
       </p>
 
       <input type="hidden" name={name} value={sortedSelected.join(",")} />

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import type { Session } from "next-auth";
 
+import { PlanBrowseSwitch } from "@/components/PlanBrowseSwitch";
 import { SiteHeader } from "@/components/SiteHeader";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 
@@ -15,17 +16,23 @@ export function SiteChrome({
 }) {
   const pathname = usePathname();
   const isMarketingHome = pathname === "/";
+  const isPlanRoute =
+    pathname === "/plan" || Boolean(pathname?.startsWith("/plan/"));
+  const isBrowseRoute =
+    Boolean(pathname?.startsWith("/browse")) ||
+    Boolean(pathname?.startsWith("/inspiration"));
   const isAppShell =
     pathname === "/dashboard" ||
-    pathname === "/plan" ||
-    pathname?.startsWith("/plan/") ||
-    pathname?.startsWith("/t/") ||
-    pathname?.startsWith("/browse") ||
-    pathname?.startsWith("/inspiration") ||
-    pathname?.startsWith("/people") ||
-    pathname?.startsWith("/library") ||
-    pathname?.startsWith("/guides") ||
-    pathname?.startsWith("/profile");
+    isPlanRoute ||
+    Boolean(pathname?.startsWith("/t/")) ||
+    isBrowseRoute ||
+    Boolean(pathname?.startsWith("/people")) ||
+    Boolean(pathname?.startsWith("/library")) ||
+    Boolean(pathname?.startsWith("/guides")) ||
+    Boolean(pathname?.startsWith("/profile"));
+  const hideFooter = isMarketingHome || isPlanRoute || isBrowseRoute;
+  /** Shared top slot so /plan ↔ /browse doesn't teleport the two-door switch. */
+  const showDoorSwitch = isPlanRoute || isBrowseRoute;
 
   return (
     <div
@@ -33,13 +40,23 @@ export function SiteChrome({
         "site-chrome",
         isMarketingHome ? "site-chrome--marketing" : "",
         isAppShell ? "site-chrome--app" : "",
+        isPlanRoute ? "site-chrome--plan" : "",
+        isBrowseRoute ? "site-chrome--browse" : "",
+        showDoorSwitch ? "site-chrome--doors" : "",
       ]
         .filter(Boolean)
         .join(" ")}
     >
       <SiteHeader session={session} />
+      {showDoorSwitch ? (
+        <div className="entry-door-rail">
+          <div className="entry-door-rail-inner">
+            <PlanBrowseSwitch active={isPlanRoute ? "plan" : "browse"} />
+          </div>
+        </div>
+      ) : null}
       <main>{children}</main>
-      {isMarketingHome ? null : (
+      {hideFooter ? null : (
         <footer className="shell footer muted">
           {APP_NAME} · {APP_TAGLINE}
         </footer>

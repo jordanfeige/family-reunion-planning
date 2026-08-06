@@ -49,6 +49,14 @@ export const planDraftPayloadSchema = z.object({
       proposedWeekends: z.array(z.string()).optional(),
     })
     .optional(),
+  /** Browse → plan handoff metadata (R10). */
+  browseSeed: z
+    .object({
+      kind: z.enum(["ideas", "places"]),
+      count: z.number().int().positive(),
+      partnerName: z.string().optional(),
+    })
+    .optional(),
 });
 
 export type PlanDraftPayload = z.infer<typeof planDraftPayloadSchema>;

@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { claimPlanDraftForUser } from "@/app/actions/planDraft";
+import { planCapabilities } from "@/lib/planMode";
+import { claimStopForCapabilities } from "@/lib/planSteps";
+import {
+  getPlanDraftBySecret,
+  readPlanDraftCookieSecret,
+} from "@/lib/supabase/planDrafts";
 
 export const runtime = "nodejs";
 
@@ -17,13 +23,23 @@ export async function GET(request: Request) {
     return NextResponse.redirect(login);
   }
 
+  // Peek household count before claim clears the cookie
+  const secret = await readPlanDraftCookieSecret();
+  const peek = secret ? await getPlanDraftBySecret(secret) : null;
+  const householdCount = peek?.payload.trip?.householdCount ?? 1;
+  const capabilities = planCapabilities({
+    householdCount,
+    headcount: peek?.payload.trip?.headcount,
+  });
+
   const result = await claimPlanDraftForUser();
 
   if ("slug" in result) {
     const send = new URL(request.url).searchParams.get("send");
     const dest = new URL(`/t/${result.slug}`, origin);
-    dest.searchParams.set("stop", "survey");
-    if (send === "1") dest.searchParams.set("send", "1");
+    const stop = claimStopForCapabilities(capabilities);
+    dest.searchParams.set("stop", stop);
+    if (send === "1" && capabilities.survey) dest.searchParams.set("send", "1");
     return NextResponse.redirect(dest);
   }
 

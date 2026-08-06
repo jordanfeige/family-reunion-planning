@@ -43,6 +43,8 @@ export function LiveShortlist({
   groupDriveSummary,
   farthestHouseholds,
   confirmBusy,
+  title = "Live shortlist",
+  confirmLabel,
 }: {
   places: PlacesDraftItem[];
   onToggle: (title: string) => void;
@@ -52,6 +54,8 @@ export function LiveShortlist({
   farthestHouseholds?: string;
   confirmBusy?: boolean;
   emptyHint?: string;
+  title?: string;
+  confirmLabel?: string;
 }) {
   const [hint, setHint] = useState<string | null>(null);
   const picked = places.filter((p) => p.selected !== false);
@@ -72,9 +76,9 @@ export function LiveShortlist({
   }
 
   return (
-    <aside className="live-shortlist" aria-label="Live shortlist">
+    <aside className="live-shortlist" aria-label={title}>
       <header className="live-shortlist-head">
-        <h3 className="live-shortlist-title">Live shortlist</h3>
+        <h3 className="live-shortlist-title">{title}</h3>
         <span className="live-shortlist-count" aria-live="polite">
           {pickedCount} of {total} picked
         </span>
@@ -154,9 +158,11 @@ export function LiveShortlist({
         >
           {confirmBusy
             ? "Saving…"
-            : pickedCount > 0
-              ? `These ${pickedCount} feel right →`
-              : "These feel right →"}
+            : confirmLabel
+              ? confirmLabel
+              : pickedCount > 0
+                ? `These ${pickedCount} feel right →`
+                : "These feel right →"}
         </button>
         {onDifferentIdeas ? (
           <button

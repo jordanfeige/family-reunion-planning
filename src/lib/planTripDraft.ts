@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { resolvePlanScale } from "@/lib/planMode";
 import { placesDraftItemSchema, type PlacesDraftItem } from "@/lib/placesDraft";
 
 /** Single source of truth for /plan conversation memory (Prompt R2). */
@@ -197,7 +198,17 @@ export function missingFieldsForStep(
   draft: PlanTripDraft,
   step: PlanStepId,
 ): DraftFieldKey[] {
-  return requiredFieldsForStep(step).filter((k) => !fieldPresent(draft, k));
+  const scale = resolvePlanScale({
+    householdCount: draft.householdCount,
+    headcount: draft.headcount,
+  });
+
+  return requiredFieldsForStep(step).filter((k) => {
+    if (k === "householdCount" && (scale === "solo" || scale === "duo")) {
+      return false;
+    }
+    return !fieldPresent(draft, k);
+  });
 }
 
 export function formatKnownBlock(draft: PlanTripDraft): string {

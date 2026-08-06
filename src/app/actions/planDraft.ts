@@ -127,17 +127,25 @@ export async function claimPlanDraftForUser(): Promise<{ slug: string } | { erro
 
   const name =
     draft.payload.trip?.tripName?.trim() || draft.payload.name?.trim();
-  if (!name) {
-    return { error: "needs_name" };
-  }
+  // Allow empty name from Browse ("Name this later") — use a soft fallback for DB NOT NULL
+  const resolvedName =
+    name ||
+    draft.payload.trip?.shortlist?.[0]?.title?.trim() ||
+    draft.payload.locationTitles?.[0]?.title?.trim() ||
+    "Untitled plan";
 
   const slug = newTripSlug();
   const shareOptionsToken = newSecretToken();
   const surveyToken = newSecretToken();
 
+  const householdCount = draft.payload.trip?.householdCount ?? 1;
+  const headcount =
+    draft.payload.trip?.headcount ??
+    (householdCount <= 1 ? 1 : null);
+
   const trip = await createTrip({
     slug,
-    name,
+    name: resolvedName,
     tagline: draft.payload.tagline?.trim() || draft.payload.trip?.vibe?.[0] || null,
     destinationNotes:
       draft.payload.destinationNotes?.trim() ||
@@ -161,21 +169,30 @@ export async function claimPlanDraftForUser(): Promise<{ slug: string } | { erro
     })) ??
     draft.payload.locationTitles ??
     [];
+
+  const claimPatch: {
+    locationOptions?: { id: string; title: string; summary?: string }[];
+    originMetro?: string;
+    planHeadcount?: number | null;
+  } = {
+    planHeadcount: headcount,
+  };
   if (places.length > 0) {
-    await updateTripById(trip.id, {
-      locationOptions: places.map((p) => ({
-        id: crypto.randomUUID(),
-        title: p.title.trim(),
-        summary: p.summary?.trim() || undefined,
-      })),
-      ...(draft.payload.trip?.originMetro
-        ? { originMetro: draft.payload.trip.originMetro }
-        : {}),
-    });
-  } else if (draft.payload.trip?.originMetro) {
-    await updateTripById(trip.id, {
-      originMetro: draft.payload.trip.originMetro,
-    });
+    claimPatch.locationOptions = places.map((p) => ({
+      id: crypto.randomUUID(),
+      title: p.title.trim(),
+      summary: p.summary?.trim() || undefined,
+    }));
+  }
+  if (draft.payload.trip?.originMetro) {
+    claimPatch.originMetro = draft.payload.trip.originMetro;
+  }
+  if (
+    claimPatch.locationOptions ||
+    claimPatch.originMetro ||
+    claimPatch.planHeadcount != null
+  ) {
+    await updateTripById(trip.id, claimPatch);
   }
 
   const surveyPrefs = draft.payload.surveyPrefs;

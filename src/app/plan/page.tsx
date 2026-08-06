@@ -7,6 +7,7 @@ import {
   getPlanDraftBySecret,
   readPlanDraftCookieSecret,
 } from "@/lib/supabase/planDrafts";
+import { listTripsForUser } from "@/lib/supabase/queries";
 
 export default async function PlanPage({
   searchParams,
@@ -25,6 +26,19 @@ export default async function PlanPage({
     redirect(`/api/plan/start${qs}`);
   }
 
+  let activeTrip: { name: string; href: string } | null = null;
+  if (session?.user?.id) {
+    try {
+      const trips = await listTripsForUser(session.user.id);
+      const first = trips[0];
+      if (first) {
+        activeTrip = { name: first.name, href: `/t/${first.slug}` };
+      }
+    } catch {
+      activeTrip = null;
+    }
+  }
+
   return (
     <div className="shell plan-shell">
       <PlanExperience
@@ -33,6 +47,7 @@ export default async function PlanPage({
         aiEnabled={hasAnthropicApiKey()}
         errorCode={error}
         signedIn={Boolean(session?.user?.id)}
+        activeTrip={activeTrip}
       />
     </div>
   );
