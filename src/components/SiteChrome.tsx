@@ -20,7 +20,9 @@ export function SiteChrome({
     pathname === "/plan" ||
     pathname?.startsWith("/plan/") ||
     pathname?.startsWith("/t/") ||
+    pathname?.startsWith("/browse") ||
     pathname?.startsWith("/inspiration") ||
+    pathname?.startsWith("/people") ||
     pathname?.startsWith("/library") ||
     pathname?.startsWith("/guides") ||
     pathname?.startsWith("/profile");

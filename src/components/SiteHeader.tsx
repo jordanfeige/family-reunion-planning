@@ -13,9 +13,9 @@ import { APP_TAGLINE } from "@/lib/brand";
 const APP_LINKS = [
   { href: "/dashboard", label: "Trips", match: (p: string) => p === "/dashboard" },
   {
-    href: "/inspiration",
-    label: "Inspiration",
-    match: (p: string) => p.startsWith("/inspiration"),
+    href: "/browse",
+    label: "Browse",
+    match: (p: string) => p.startsWith("/browse") || p.startsWith("/inspiration"),
   },
   { href: "/library", label: "Library", match: (p: string) => p.startsWith("/library") },
   { href: "/guides", label: "Guides", match: (p: string) => p.startsWith("/guides") },
@@ -223,7 +223,9 @@ export function SiteHeader({ session }: { session: Session | null }) {
     isPlan ||
     pathname === "/dashboard" ||
     isTripHub ||
+    pathname.startsWith("/browse") ||
     pathname.startsWith("/inspiration") ||
+    pathname.startsWith("/people") ||
     pathname.startsWith("/library") ||
     pathname.startsWith("/guides") ||
     pathname.startsWith("/profile");
