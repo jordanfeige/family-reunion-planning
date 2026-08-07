@@ -1,5 +1,7 @@
 import {
   convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   stepCountIs,
   streamText,
   tool,
@@ -17,6 +19,7 @@ import {
 } from "@/lib/planDraft";
 import {
   applyScaleInference,
+  deriveMode,
   resolvePlanScale,
   scalePromptHint,
 } from "@/lib/planMode";
@@ -28,6 +31,7 @@ import {
   normalizePlanTripDraft,
   planTripDraftFromLegacy,
   type PlanStepId,
+  type PlanTripDraft,
   FIELD_LABELS,
 } from "@/lib/planTripDraft";
 import { textFromMessage } from "@/lib/chatMessage";
@@ -90,7 +94,36 @@ ${missingLine}
 
 ${stepTask}
 
-You do not own structured state; an extractor does. Still call update_places_draft when you propose or revise destinations so the shortlist UI updates. Keep replies short. No emoji unless they use them.`;
+You do not own structured state; an extractor does. Still call update_places_draft when you propose or revise destinations so the shortlist UI updates. Keep replies short. No emoji unless they use them. Forbidden from inventing numbers not present in the draft.`;
+}
+
+type ThinkingEvent =
+  | "extracting"
+  | `mode:${string}`
+  | `graph:loaded${string}`
+  | `tool:${string}`
+  | "filtering"
+  | "generating";
+
+type StreamWriter = {
+  write: (part: Record<string, unknown>) => void;
+  merge: (stream: ReadableStream) => void;
+};
+
+function writeThinking(writer: StreamWriter, event: ThinkingEvent) {
+  writer.write({
+    type: "data-thinking",
+    data: { event },
+    transient: true,
+  });
+}
+
+function writeDraft(writer: StreamWriter, trip: PlanTripDraft) {
+  writer.write({
+    type: "data-draft",
+    data: { trip: normalizePlanTripDraft(trip) },
+    transient: true,
+  });
 }
 
 export async function POST(req: Request) {
@@ -145,62 +178,28 @@ export async function POST(req: Request) {
   const last = rawMessages[rawMessages.length - 1] as UIMessage | undefined;
   const lastText = last ? textFromMessage(last) : "";
   const isAdvanceMarker = lastText.startsWith("⟦advance:");
+  const shouldExtract =
+    Boolean(last?.role === "user" && lastText && !isAdvanceMarker);
 
   if (!signedIn && last?.role === "user" && !isAdvanceMarker) {
     await incrementPlanDraftMessages(draft.id);
   }
 
-  // R3: deterministic scale first so missing-fields / system prompt match the turn
-  if (last?.role === "user" && lastText && !isAdvanceMarker) {
+  // Deterministic scale first so converse system prompt matches the turn
+  if (shouldExtract) {
     trip = normalizePlanTripDraft(applyScaleInference(trip, lastText));
   }
 
-  // Extractor: after each real user message (not step markers)
-  if (last?.role === "user" && lastText && !isAdvanceMarker) {
-    try {
-      trip = await extractPlanTripDraft({
-        prior: trip,
-        message: lastText,
-        role: "user",
-      });
-      // Re-apply heuristics after LLM extract so duo/solo cues are never dropped
-      trip = normalizePlanTripDraft(applyScaleInference(trip, lastText));
-      const nextPayload = syncLegacyFromTrip(
-        planDraftPayloadSchema.parse({
-          ...draft.payload,
-          trip: normalizePlanTripDraft(trip),
-          step: step === "create" ? "create" : step,
-          messages: rawMessages,
-        }),
-      );
-      await updatePlanDraftPayload(draft.id, nextPayload);
-      draft.payload = nextPayload;
-    } catch {
-      // Still persist scale inference if extractor fails
-      try {
-        const nextPayload = syncLegacyFromTrip(
-          planDraftPayloadSchema.parse({
-            ...draft.payload,
-            trip: normalizePlanTripDraft(trip),
-            step: step === "create" ? "create" : step,
-            messages: rawMessages,
-          }),
-        );
-        await updatePlanDraftPayload(draft.id, nextPayload);
-        draft.payload = nextPayload;
-      } catch {
-        /* ignore */
-      }
-    }
-  }
+  const draftId = draft.id;
+  let payloadSnap = draft.payload;
+  let tripRef = trip;
 
-  const scale = resolvePlanScale({
-    householdCount: trip.householdCount,
-    headcount: trip.headcount,
+  const scaleForPrompt = resolvePlanScale({
+    householdCount: tripRef.householdCount,
+    headcount: tripRef.headcount,
   });
-  let missingKeys = missingFieldsForStep(trip, step);
-  // Solo/duo: never surface "Households" as a follow-up question
-  if (scale === "solo" || scale === "duo") {
+  let missingKeys = missingFieldsForStep(tripRef, step);
+  if (scaleForPrompt === "solo" || scaleForPrompt === "duo" || scaleForPrompt === "small") {
     missingKeys = missingKeys.filter((k) => k !== "householdCount");
   }
 
@@ -210,80 +209,151 @@ export async function POST(req: Request) {
 
   const system = buildSystem({
     step,
-    known: formatKnownBlock(trip),
+    known: formatKnownBlock(tripRef),
     missing: missingKeys.map((k) => FIELD_LABELS[k] ?? k),
-    workingFrom: formatWorkingFromLine(trip),
-    scaleHint: scalePromptHint(scale),
+    workingFrom: formatWorkingFromLine(tripRef),
+    scaleHint: scalePromptHint(scaleForPrompt),
   });
 
-  const draftId = draft.id;
-  let payloadSnap = draft.payload;
-
-  const result = streamText({
-    model: plannerModel(),
-    system,
-    messages: modelMessages,
-    stopWhen: stepCountIs(5),
-    tools: {
-      update_places_draft: tool({
-        description:
-          "Update destination shortlist. Titles as 'Place, ST' with US meta when known.",
-        inputSchema: placesDraftSchema,
-        execute: async (input) => {
-          const shortlist = input.places.map((p) => ({
-            ...p,
-            title: p.title.trim(),
-            summary: p.summary?.trim() || undefined,
-            selected: p.selected !== false,
-          }));
-          const nextTrip = normalizePlanTripDraft({
-            ...trip,
-            shortlist,
-          });
-          trip = nextTrip;
-          const next = syncLegacyFromTrip(
-            planDraftPayloadSchema.parse({
-              ...payloadSnap,
-              trip: nextTrip,
-              step: "places",
-              locationTitles: shortlist.map((p) => ({
-                title: p.title,
-                summary: p.summary,
-              })),
-            }),
-          );
-          payloadSnap = next;
-          await updatePlanDraftPayload(draftId, next);
-          return { ok: true as const, draft: input };
-        },
-      }),
-    },
-    onFinish: async ({ text }) => {
-      try {
-        if (text?.trim()) {
-          const extracted = await extractPlanTripDraft({
-            prior: trip,
-            message: text,
-            role: "assistant",
-          });
-          trip = extracted;
-        }
-        const next = syncLegacyFromTrip(
-          planDraftPayloadSchema.parse({
-            ...payloadSnap,
-            trip: normalizePlanTripDraft(trip),
-            step: step === "create" ? "create" : step,
-            messages: rawMessages,
-          }),
-        );
-        await updatePlanDraftPayload(draftId, next);
-      } catch {
-        /* ignore persist errors on finish */
-      }
-    },
-  });
-
-  return result.toUIMessageStreamResponse({
+  const stream = createUIMessageStream({
     originalMessages: rawMessages as UIMessage[],
+    execute: async ({ writer }) => {
+      const w = writer as unknown as StreamWriter;
+
+      // Real mode from deterministic scale inference (work that already ran)
+      const inferredMode = deriveMode(tripRef);
+      if (inferredMode !== "unresolved") {
+        writeThinking(w, `mode:${inferredMode}`);
+      }
+
+      // §5: EXTRACT + CONVERSE in parallel — thinking events only for work that runs
+      const extractPromise = shouldExtract
+        ? (async () => {
+            writeThinking(w, "extracting");
+            try {
+              let next = await extractPlanTripDraft({
+                prior: tripRef,
+                message: lastText,
+                role: "user",
+              });
+              next = normalizePlanTripDraft(applyScaleInference(next, lastText));
+              tripRef = next;
+              const mode = deriveMode(next);
+              if (mode !== "unresolved") {
+                writeThinking(w, `mode:${mode}`);
+              }
+              writeDraft(w, next);
+              const nextPayload = syncLegacyFromTrip(
+                planDraftPayloadSchema.parse({
+                  ...payloadSnap,
+                  trip: next,
+                  step: step === "create" ? "create" : step,
+                  messages: rawMessages,
+                }),
+              );
+              await updatePlanDraftPayload(draftId, nextPayload);
+              payloadSnap = nextPayload;
+              return next;
+            } catch {
+              try {
+                const nextPayload = syncLegacyFromTrip(
+                  planDraftPayloadSchema.parse({
+                    ...payloadSnap,
+                    trip: normalizePlanTripDraft(tripRef),
+                    step: step === "create" ? "create" : step,
+                    messages: rawMessages,
+                  }),
+                );
+                await updatePlanDraftPayload(draftId, nextPayload);
+                payloadSnap = nextPayload;
+              } catch {
+                /* ignore */
+              }
+              return tripRef;
+            }
+          })()
+        : Promise.resolve(tripRef);
+
+      writeThinking(w, "generating");
+
+      const result = streamText({
+        model: plannerModel(),
+        system,
+        messages: modelMessages,
+        stopWhen: stepCountIs(5),
+        tools: {
+          update_places_draft: tool({
+            description:
+              "Update destination shortlist. Titles as 'Place, ST' with US meta when known.",
+            inputSchema: placesDraftSchema,
+            execute: async (input) => {
+              writeThinking(w, `tool:places:${input.places.length}`);
+              const shortlist = input.places.map((p) => ({
+                ...p,
+                title: p.title.trim(),
+                summary: p.summary?.trim() || undefined,
+                selected: p.selected !== false,
+              }));
+              const nextTrip = normalizePlanTripDraft({
+                ...tripRef,
+                shortlist,
+              });
+              tripRef = nextTrip;
+              writeThinking(w, "filtering");
+              const next = syncLegacyFromTrip(
+                planDraftPayloadSchema.parse({
+                  ...payloadSnap,
+                  trip: nextTrip,
+                  step: "places",
+                  locationTitles: shortlist.map((p) => ({
+                    title: p.title,
+                    summary: p.summary,
+                  })),
+                }),
+              );
+              payloadSnap = next;
+              await updatePlanDraftPayload(draftId, next);
+              writeDraft(w, nextTrip);
+              return { ok: true as const, draft: input };
+            },
+          }),
+        },
+        onFinish: async ({ text }) => {
+          await extractPromise;
+          try {
+            if (text?.trim()) {
+              const extracted = await extractPlanTripDraft({
+                prior: tripRef,
+                message: text,
+                role: "assistant",
+              });
+              tripRef = extracted;
+              writeDraft(w, extracted);
+            }
+            const next = syncLegacyFromTrip(
+              planDraftPayloadSchema.parse({
+                ...payloadSnap,
+                trip: normalizePlanTripDraft(tripRef),
+                step: step === "create" ? "create" : step,
+                messages: rawMessages,
+              }),
+            );
+            await updatePlanDraftPayload(draftId, next);
+          } catch {
+            /* ignore persist errors on finish */
+          }
+        },
+      });
+
+      writer.merge(
+        result.toUIMessageStream({
+          originalMessages: rawMessages as UIMessage[],
+        }),
+      );
+
+      void extractPromise;
+    },
   });
+
+  return createUIMessageStreamResponse({ stream });
 }

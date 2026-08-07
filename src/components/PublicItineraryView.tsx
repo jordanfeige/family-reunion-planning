@@ -32,12 +32,12 @@ export function PublicItineraryView({
           className="card"
           style={{
             padding: "1rem",
-            background: "rgba(94, 234, 212, 0.12)",
+            background: "var(--warm)",
             marginBottom: "0.25rem",
           }}
         >
           {published.locationTitle ? (
-            <p style={{ margin: 0, fontWeight: 600, color: "var(--color-fjord)" }}>
+            <p style={{ margin: 0, fontWeight: 600, color: "var(--ink)" }}>
               {published.locationTitle}
             </p>
           ) : null}
@@ -65,7 +65,7 @@ export function PublicItineraryView({
 
       {currentDay ? (
         <article className="card">
-          <h2 style={{ marginTop: 0, color: "var(--color-fjord)" }}>{currentDay.label}</h2>
+          <h2 style={{ marginTop: 0, color: "var(--ink)" }}>{currentDay.label}</h2>
           {currentDay.blocks.length === 0 ? (
             <p className="muted">Nothing scheduled this day.</p>
           ) : (
@@ -77,7 +77,7 @@ export function PublicItineraryView({
                 <li
                   key={block.id}
                   style={{
-                    borderTop: "1px solid rgba(28,61,90,0.08)",
+                    borderTop: "1px solid var(--hairline)",
                     paddingTop: "0.75rem",
                   }}
                 >

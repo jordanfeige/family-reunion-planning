@@ -53,7 +53,6 @@ export function dashboardTripCardMeta(input: {
     headcount: input.planHeadcount,
   });
   const flow = hubFlowSteps(capabilities);
-  const totalSteps = flow.length;
 
   const segments = flow.map((s) => {
     if (s.id === "destinations") return hasPlaces;
@@ -65,27 +64,27 @@ export function dashboardTripCardMeta(input: {
   });
   const filledSegments = segments.filter(Boolean).length;
 
-  let stepIndex = 0;
-  if (hasPlaces) stepIndex = Math.max(stepIndex, 1);
-  if (capabilities.survey && hasSurvey) stepIndex = Math.max(stepIndex, 2);
-  if (locked) stepIndex = Math.max(stepIndex, capabilities.survey ? 3 : 2);
-  if (published) stepIndex = Math.max(stepIndex, totalSteps - 1);
-  const stepDisplay = Math.min(stepIndex + 1, totalSteps);
-
   let statusPrimary = "In progress";
-  let statusSecondary = `Step ${stepDisplay} of ${totalSteps}`;
+  let statusSecondary = hasPlaces
+    ? (input.selectedLocationId
+        ? findLocationById(places, input.selectedLocationId)?.title
+        : null) ??
+      places[0]?.title ??
+      "Shortlist ready"
+    : "Add places";
 
   if (ballotOpen && hasSurvey && capabilities.survey) {
-    const pending = Math.max(0, input.surveyResponseCount - 1);
     statusPrimary = "Waiting on votes";
     statusSecondary =
-      pending > 0 ? `${pending} vote${pending === 1 ? "" : "s"} left` : "Ballot open";
+      input.surveyResponseCount > 0 ? "Ballot open" : "No replies yet";
   } else if (locked && !published) {
     statusPrimary = "Itinerary";
-    statusSecondary = `Step ${capabilities.survey ? 4 : 3} of ${totalSteps}`;
+    statusSecondary = "Build the weekend";
   } else if (published) {
     statusPrimary = "Plan published";
-    statusSecondary = `Step ${totalSteps} of ${totalSteps}`;
+    statusSecondary = "Ready to share";
+  } else if (!locked && hasPlaces) {
+    statusSecondary = "Decide next";
   }
 
   const selectedPlace = input.selectedLocationId

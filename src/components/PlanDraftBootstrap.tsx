@@ -11,7 +11,11 @@ import { useEffect } from "react";
  */
 export function PlanDraftBootstrap({ error }: { error?: string }) {
   useEffect(() => {
-    const qs = error ? `?error=${encodeURIComponent(error)}` : "";
+    const params = new URLSearchParams();
+    if (error) params.set("error", error);
+    const seed = new URLSearchParams(window.location.search).get("seed");
+    if (seed) params.set("seed", seed);
+    const qs = params.toString() ? `?${params.toString()}` : "";
     window.location.replace(`/api/plan/start${qs}`);
   }, [error]);
 

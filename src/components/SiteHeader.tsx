@@ -8,21 +8,13 @@ import type { Session } from "next-auth";
 import { signOutAction } from "@/app/actions/auth";
 import { BrandMark } from "@/components/BrandMark";
 import { SoftImage } from "@/components/SoftImage";
-import { APP_TAGLINE } from "@/lib/brand";
 
+/** §2b / §4b — Home · Trips · Saved · People only */
 const APP_LINKS = [
   {
-    href: "/browse",
-    label: "Browse",
-    match: (p: string) =>
-      p === "/browse" ||
-      (p.startsWith("/browse") && !p.startsWith("/browse/saved")) ||
-      p.startsWith("/inspiration"),
-  },
-  {
-    href: "/browse/saved",
-    label: "Saved",
-    match: (p: string) => p.startsWith("/browse/saved"),
+    href: "/",
+    label: "Home",
+    match: (p: string) => p === "/",
   },
   {
     href: "/dashboard",
@@ -30,12 +22,17 @@ const APP_LINKS = [
     match: (p: string) =>
       p === "/dashboard" || p.startsWith("/plan") || p.startsWith("/t/"),
   },
-  { href: "/library", label: "Library", match: (p: string) => p.startsWith("/library") },
-  { href: "/guides", label: "Guides", match: (p: string) => p.startsWith("/guides") },
+  {
+    href: "/browse/saved",
+    label: "Saved",
+    match: (p: string) => p.startsWith("/browse/saved"),
+  },
+  {
+    href: "/people",
+    label: "People",
+    match: (p: string) => p.startsWith("/people"),
+  },
 ] as const;
-
-/** Destinations that mirror the mobile Browse tab bar (desktop header for guests). */
-const BROWSE_SHELL_LINKS = APP_LINKS.slice(0, 3);
 
 function HamburgerIcon({ open }: { open: boolean }) {
   return (
@@ -65,7 +62,9 @@ function AvatarMenu({ session }: { session: Session }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
-  const letter = (session.user?.name ?? session.user?.email ?? "?").slice(0, 1).toUpperCase();
+  const letter = (session.user?.name ?? session.user?.email ?? "?")
+    .slice(0, 1)
+    .toUpperCase();
 
   useEffect(() => {
     if (!open) return;
@@ -132,66 +131,35 @@ function AvatarMenu({ session }: { session: Session }) {
 function HeaderNavLinks({
   session,
   pathname,
-  isPlan,
-  isMarketingHome,
-  quietChrome,
   forDrawer,
   onNavigate,
 }: {
   session: Session | null;
   pathname: string;
-  isPlan: boolean;
-  isMarketingHome: boolean;
-  quietChrome: boolean;
   forDrawer?: boolean;
   onNavigate?: () => void;
 }) {
-  const desktopLink = (active: boolean) =>
-    isMarketingHome
-      ? "landing-nav-link"
-      : quietChrome
-        ? `nav-text-link${active ? " nav-text-link--emphasis" : ""}`
-        : "btn btn-secondary";
-
   const cls = (active: boolean) =>
     forDrawer
       ? `nav-drawer-link${active ? " is-active" : ""}`
-      : desktopLink(active);
-
-  const isBrowseShell =
-    pathname.startsWith("/browse") || pathname.startsWith("/inspiration");
+      : `nav-text-link${active ? " is-active" : ""}`;
 
   if (!session?.user) {
     return (
       <>
-        {quietChrome && isBrowseShell
-          ? BROWSE_SHELL_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                className={cls(link.match(pathname))}
-                href={link.href}
-                aria-current={link.match(pathname) ? "page" : undefined}
-                onClick={onNavigate}
-              >
-                {link.label}
-              </Link>
-            ))
-          : null}
-        {!isPlan ? (
-          <a className={cls(false)} href="/api/plan/start" onClick={onNavigate}>
-            Plan a trip
-          </a>
-        ) : null}
+        {APP_LINKS.map((link) => (
+          <Link
+            key={link.href}
+            className={cls(link.match(pathname))}
+            href={link.href}
+            aria-current={link.match(pathname) ? "page" : undefined}
+            onClick={onNavigate}
+          >
+            {link.label}
+          </Link>
+        ))}
         <Link
-          className={
-            forDrawer
-              ? "nav-drawer-link"
-              : isMarketingHome
-                ? "landing-nav-link"
-                : quietChrome
-                  ? "nav-text-link nav-text-link--emphasis"
-                  : "btn btn-primary"
-          }
+          className={forDrawer ? "nav-drawer-link" : "nav-text-link is-active"}
           href="/login"
           onClick={onNavigate}
         >
@@ -214,27 +182,15 @@ function HeaderNavLinks({
           {link.label}
         </Link>
       ))}
-      {!isPlan ? (
-        <a className={cls(false)} href="/api/plan/start" onClick={onNavigate}>
-          Plan a trip
-        </a>
-      ) : null}
       {forDrawer ? (
-        <div className="nav-drawer-account">
-          <Link
-            href="/profile"
-            className="nav-drawer-link"
-            onClick={onNavigate}
-            aria-current={pathname.startsWith("/profile") ? "page" : undefined}
-          >
-            Profile
-          </Link>
+        <>
+          <hr className="nav-drawer-rule" style={{ border: "none", borderTop: "1px solid var(--hairline)", margin: "8px 0" }} />
           <form action={signOutAction} className="nav-drawer-signout">
             <button type="submit" className="nav-drawer-link nav-drawer-link--signout">
               Sign out
             </button>
           </form>
-        </div>
+        </>
       ) : (
         <AvatarMenu session={session} />
       )}
@@ -248,20 +204,7 @@ export function SiteHeader({ session }: { session: Session | null }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isSurveyLink = pathname.startsWith("/r/");
-  const isMarketingHome = pathname === "/";
-  const isPlan = pathname === "/plan" || pathname.startsWith("/plan/");
   const isTripHub = pathname.startsWith("/t/");
-  const isAppSurface =
-    isPlan ||
-    pathname === "/dashboard" ||
-    isTripHub ||
-    pathname.startsWith("/browse") ||
-    pathname.startsWith("/inspiration") ||
-    pathname.startsWith("/people") ||
-    pathname.startsWith("/library") ||
-    pathname.startsWith("/guides") ||
-    pathname.startsWith("/profile");
-  const quietChrome = isAppSurface;
 
   useEffect(() => {
     if (!drawerOpen) {
@@ -279,58 +222,47 @@ export function SiteHeader({ session }: { session: Session | null }) {
     };
   }, [drawerOpen]);
 
-  const topbarClass = [
-    "topbar",
-    "topbar--full",
-    isMarketingHome ? "topbar--marketing" : "",
-    quietChrome ? "topbar--quiet" : "",
-    isSurveyLink ? "topbar--survey-link" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
   const closeDrawer = () => setDrawerOpen(false);
 
+  if (isSurveyLink) {
+    return (
+      <header className="topbar topbar--full topbar--quiet topbar--survey-link">
+        <div className="topbar-inner">
+          <div className="topbar-bar">
+            <BrandMark variant="compact" showTagline={false} />
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  // Trip hub: back + title chrome handled in page; keep compact brand + hamburger
   return (
-    <header className={topbarClass}>
+    <header className="topbar topbar--full topbar--quiet">
       <div className="topbar-inner">
         <div className="topbar-bar">
-          <BrandMark
-            variant={quietChrome || isMarketingHome ? "compact" : "default"}
-            showTagline={!isMarketingHome && !quietChrome && !isSurveyLink}
-            tagline={APP_TAGLINE}
-          />
-          {isSurveyLink ? null : (
-            <button
-              type="button"
-              className="nav-hamburger"
-              aria-label={drawerOpen ? "Close menu" : "Open menu"}
-              aria-expanded={drawerOpen}
-              aria-controls={drawerId}
-              onClick={() => setDrawerOpen((o) => !o)}
-            >
-              <HamburgerIcon open={drawerOpen} />
-            </button>
-          )}
+          <BrandMark variant="compact" showTagline={false} />
+          <button
+            type="button"
+            className="nav-hamburger"
+            aria-label={drawerOpen ? "Close menu" : "Open menu"}
+            aria-expanded={drawerOpen}
+            aria-controls={drawerId}
+            onClick={() => setDrawerOpen((o) => !o)}
+          >
+            <HamburgerIcon open={drawerOpen} />
+          </button>
         </div>
 
-        {isSurveyLink ? null : (
-          <nav
-            className={`nav-actions nav-actions--desktop${quietChrome ? " nav-actions--quiet" : ""}`}
-            aria-label="Primary"
-          >
-            <HeaderNavLinks
-              session={session}
-              pathname={pathname}
-              isPlan={isPlan}
-              isMarketingHome={isMarketingHome}
-              quietChrome={quietChrome}
-            />
-          </nav>
-        )}
+        <nav
+          className="nav-actions nav-actions--desktop nav-actions--quiet nav-actions--r12"
+          aria-label="Primary"
+        >
+          <HeaderNavLinks session={session} pathname={pathname} />
+        </nav>
       </div>
 
-      {isSurveyLink || !drawerOpen ? null : (
+      {drawerOpen ? (
         <>
           <button
             type="button"
@@ -342,15 +274,13 @@ export function SiteHeader({ session }: { session: Session | null }) {
             <HeaderNavLinks
               session={session}
               pathname={pathname}
-              isPlan={isPlan}
-              isMarketingHome={isMarketingHome}
-              quietChrome={quietChrome}
               forDrawer
               onNavigate={closeDrawer}
             />
           </nav>
         </>
-      )}
+      ) : null}
+      {isTripHub ? null : null}
     </header>
   );
 }

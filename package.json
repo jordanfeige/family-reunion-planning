@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "drizzle-kit push"
+    "test:r12": "tsx --test scripts/r12-asserts.test.ts",
+    "db:push": "drizzle-kit push",
+    "postinstall": "node scripts/patch-next-router-state.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

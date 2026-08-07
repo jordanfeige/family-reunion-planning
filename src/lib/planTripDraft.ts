@@ -204,7 +204,10 @@ export function missingFieldsForStep(
   });
 
   return requiredFieldsForStep(step).filter((k) => {
-    if (k === "householdCount" && (scale === "solo" || scale === "duo")) {
+    if (
+      k === "householdCount" &&
+      (scale === "solo" || scale === "duo" || scale === "small")
+    ) {
       return false;
     }
     return !fieldPresent(draft, k);

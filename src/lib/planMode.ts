@@ -1,37 +1,142 @@
-/** Plan-scale capability flags (R3 / R9 / R10 / R11). */
+/**
+ * Sole party-size branching (§6). Nothing else may branch on headcount/households.
+ */
+
+export type PlanMode = "solo" | "duo" | "small" | "group";
+
+/** @deprecated Prefer PlanMode — kept for call-site compatibility. */
+export type PlanScale = PlanMode | "unresolved";
+
+export type PlanDepth = "single-outing" | "day-or-weekend" | "multi-day";
 
 export type PlanCapabilities = {
-  /** Group survey / "ask the family" — offered only at multi-household scale. */
   survey: boolean;
   voting: boolean;
   budgetFloors: boolean;
+  nudges: boolean;
+  households: boolean;
+  maxQuestions: number;
+  optionCount: number;
+  depth: PlanDepth;
+  requireAuth: boolean;
+  /** Alias of households — legacy hub UI. */
   splitLabels: boolean;
+  /** Alias of households — legacy hub UI. */
   farthestHousehold: boolean;
 };
 
-/** Resolved party scale for prompts and gating. */
-export type PlanScale = "solo" | "duo" | "group" | "unresolved";
-
-export function planCapabilities(input: {
-  householdCount: number;
+export type PlanModeDraft = {
+  partySize?: number | null;
   headcount?: number | null;
-}): PlanCapabilities {
-  const households = Math.max(0, input.householdCount);
-  const group = households >= 2;
-  return {
-    survey: group,
-    voting: group,
-    budgetFloors: group,
-    splitLabels: group,
-    farthestHousehold: group,
-  };
+  households?: number | null;
+  householdCount?: number | null;
+};
+
+function partySizeOf(draft: PlanModeDraft): number | null {
+  const n = draft.partySize ?? draft.headcount ?? null;
+  if (n == null || !Number.isFinite(n) || n < 0) return null;
+  return Math.floor(n);
+}
+
+function householdsOf(draft: PlanModeDraft): number | null {
+  const n = draft.households ?? draft.householdCount ?? null;
+  if (n == null || !Number.isFinite(n) || n < 0) return null;
+  return Math.floor(n);
+}
+
+/** Derive plan mode from draft fields — the only branching point for scale. */
+export function deriveMode(draft: PlanModeDraft): PlanMode | "unresolved" {
+  const partySize = partySizeOf(draft);
+  const households = householdsOf(draft);
+
+  if (households != null && households >= 3) return "group";
+  if (partySize != null && partySize >= 6) return "group";
+  if (partySize != null && partySize >= 3 && partySize <= 5) return "small";
+  if (partySize === 2) return "duo";
+  if (partySize != null && partySize <= 1) return "solo";
+
+  if (households != null && households >= 2) {
+    // Two households without a clear headcount → treat as group (multi-household).
+    return "group";
+  }
+  if (households === 1 && partySize == null) return "solo";
+
+  return "unresolved";
+}
+
+const CAPS: Record<PlanMode, PlanCapabilities> = {
+  solo: {
+    survey: false,
+    voting: false,
+    budgetFloors: false,
+    nudges: false,
+    households: false,
+    maxQuestions: 1,
+    optionCount: 3,
+    depth: "single-outing",
+    requireAuth: false,
+    splitLabels: false,
+    farthestHousehold: false,
+  },
+  duo: {
+    survey: false,
+    voting: false,
+    budgetFloors: false,
+    nudges: false,
+    households: false,
+    maxQuestions: 1,
+    optionCount: 3,
+    depth: "single-outing",
+    requireAuth: false,
+    splitLabels: false,
+    farthestHousehold: false,
+  },
+  small: {
+    survey: false,
+    voting: true,
+    budgetFloors: false,
+    nudges: false,
+    households: false,
+    maxQuestions: 2,
+    optionCount: 3,
+    depth: "day-or-weekend",
+    requireAuth: false,
+    splitLabels: false,
+    farthestHousehold: false,
+  },
+  group: {
+    survey: true,
+    voting: true,
+    budgetFloors: true,
+    nudges: true,
+    households: true,
+    maxQuestions: 2,
+    optionCount: 3,
+    depth: "multi-day",
+    requireAuth: true,
+    splitLabels: true,
+    farthestHousehold: true,
+  },
+};
+
+export function capabilitiesForMode(mode: PlanMode | "unresolved"): PlanCapabilities {
+  if (mode === "unresolved") return CAPS.duo; // safe default: no survey/family chrome
+  return CAPS[mode];
+}
+
+/**
+ * Capability flags from draft — sole entry for survey/voting/budget gates.
+ * Accepts legacy { householdCount, headcount } or R12 { partySize, households }.
+ */
+export function planCapabilities(input: PlanModeDraft): PlanCapabilities {
+  return capabilitiesForMode(deriveMode(input));
 }
 
 /**
  * Household count for capability flags on an owned trip.
  * - 2+ survey responses → that count
  * - planHeadcount 1–2 with fewer than 2 responses → solo/duo (no survey)
- * - otherwise default to group (classic family-reunion trips)
+ * - otherwise default toward group (classic multi-household trips)
  */
 export function householdCountForTripCapabilities(input: {
   surveyResponseCount: number;
@@ -40,40 +145,21 @@ export function householdCountForTripCapabilities(input: {
   const responses = Math.max(0, input.surveyResponseCount);
   if (responses >= 2) return responses;
   if (input.planHeadcount != null && input.planHeadcount <= 2) return 1;
-  return Math.max(responses, 2);
+  if (input.planHeadcount != null && input.planHeadcount <= 5) return 1;
+  return Math.max(responses, 3);
 }
 
-/** Duo (not group): one household, two people — lightweight share OK, no survey. */
-export function isDuoScale(input: {
-  householdCount: number;
-  headcount?: number | null;
-}): boolean {
-  return resolvePlanScale(input) === "duo";
+export function isDuoScale(input: PlanModeDraft): boolean {
+  return deriveMode(input) === "duo";
 }
 
-/** Derive scale from structured draft fields (R3 sufficiency). */
-export function resolvePlanScale(input: {
-  householdCount?: number | null;
-  headcount?: number | null;
-}): PlanScale {
-  const hh = input.householdCount ?? null;
-  const hc = input.headcount ?? null;
-
-  if (hh != null && hh >= 2) return "group";
-  if (hh != null && hh <= 1) {
-    if (hc === 1) return "solo";
-    if (hc === 2) return "duo";
-    if (hc != null && hc > 2) return "group";
-    return "solo";
-  }
-  if (hc === 1) return "solo";
-  if (hc === 2) return "duo";
-  if (hc != null && hc >= 3) return "group";
-  return "unresolved";
+/** @deprecated Prefer deriveMode. */
+export function resolvePlanScale(input: PlanModeDraft): PlanScale {
+  return deriveMode(input);
 }
 
 export type ScaleInference = {
-  scale: Exclude<PlanScale, "unresolved">;
+  scale: PlanMode;
   householdCount: number;
   headcount: number;
 };
@@ -101,6 +187,19 @@ export function inferScaleFromText(text: string): ScaleInference | null {
     return { scale: "solo", householdCount: 1, headcount: 1 };
   }
 
+  const peopleMatch = t.match(
+    /\b(\d{1,2})\s*(people|persons|folks|of us|guests)\b/,
+  );
+  if (peopleMatch) {
+    const n = Number(peopleMatch[1]);
+    if (Number.isFinite(n) && n >= 6) {
+      return { scale: "group", householdCount: 3, headcount: n };
+    }
+    if (Number.isFinite(n) && n >= 3 && n <= 5) {
+      return { scale: "small", householdCount: 1, headcount: n };
+    }
+  }
+
   if (
     /\b(reunion|family reunion|extended family|whole family|our family|my family|the family|cousins?|households?|multi[- ]household|relatives)\b/.test(
       t,
@@ -108,11 +207,11 @@ export function inferScaleFromText(text: string): ScaleInference | null {
     /\b(\d{1,2})\s*(households?|families)\b/.test(t)
   ) {
     const m = t.match(/\b(\d{1,2})\s*(households?|families)\b/);
-    const n = m ? Number(m[1]) : 2;
+    const n = m ? Number(m[1]) : 3;
     return {
       scale: "group",
-      householdCount: Math.max(2, Number.isFinite(n) ? n : 2),
-      headcount: Math.max(2, Number.isFinite(n) ? n * 2 : 4),
+      householdCount: Math.max(3, Number.isFinite(n) ? n : 3),
+      headcount: Math.max(6, Number.isFinite(n) ? n * 2 : 8),
     };
   }
 
@@ -126,12 +225,12 @@ export function applyScaleInference<
   const inferred = inferScaleFromText(message);
   if (!inferred) return prior;
 
-  const current = resolvePlanScale({
+  const current = deriveMode({
     householdCount: prior.householdCount,
     headcount: prior.headcount,
   });
 
-  // Never downgrade an established group to solo/duo from a later cue.
+  // Never downgrade an established group to solo/duo/small from a later cue.
   if (current === "group" && inferred.scale !== "group") return prior;
 
   return {
@@ -141,15 +240,49 @@ export function applyScaleInference<
   };
 }
 
+/** One-line announcement when mode tier changes mid-conversation. */
+export function modeChangeLine(
+  from: PlanMode | "unresolved",
+  to: PlanMode,
+): string | null {
+  if (from === to || from === "unresolved") return null;
+  if (to === "group") {
+    return "Thirty people — turning on households, budget floors and reminders.";
+  }
+  if (to === "small") {
+    return "A few of you — turning on voting so everyone can weigh in.";
+  }
+  if (to === "duo") {
+    return "Just the two of you — keeping this light, no survey.";
+  }
+  if (to === "solo") {
+    return "Just you — skipping anything that needs a group.";
+  }
+  return null;
+}
+
 export function scalePromptHint(scale: PlanScale): string {
   if (scale === "duo") {
-    return "Scale: duo (2 people, 1 household). Do NOT ask about households, family size, surveys, voting, or who else is coming. Ask only trip-facing details (dates, place, vibe, budget).";
+    return "Scale: duo (2 people, 1 household). Do NOT ask about households, family size, surveys, voting, or who else is coming. Ask only trip-facing details (dates, place, vibe, budget). Output venues priced for two.";
   }
   if (scale === "solo") {
     return "Scale: solo (1 person). Do NOT ask about households, family, surveys, or voting. Ask only trip-facing details.";
   }
+  if (scale === "small") {
+    return "Scale: small (3–5 people). Voting may apply; no survey, no household budget floors. Depth: day or weekend.";
+  }
   if (scale === "group") {
-    return "Scale: group / multi-household. Survey and voting capabilities may apply. Ask household count only if still unknown.";
+    return "Scale: group / multi-household. Survey (offered, not required), voting, budget floors, and nudges apply. Ask household count only if still unknown. Output multi-day itineraries with lodging that sleeps the headcount.";
   }
   return "Scale: unresolved. Ask what they're planning in neutral terms — do not presume a reunion, family gathering, or voting until scale is clear.";
+}
+
+/** Step-count eyebrow derived from capabilities — never invent steps. */
+export function stepEyebrow(
+  currentIndex: number,
+  capabilities: PlanCapabilities,
+): string {
+  const total = capabilities.survey ? 3 : 2;
+  const n = Math.min(Math.max(1, currentIndex), total);
+  return `STEP ${n} OF ${total}`;
 }

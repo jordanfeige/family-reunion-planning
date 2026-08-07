@@ -12,6 +12,8 @@ export async function GET(request: Request) {
   const dest = new URL("/plan", url.origin);
   const error = url.searchParams.get("error");
   if (error) dest.searchParams.set("error", error);
+  const seed = url.searchParams.get("seed");
+  if (seed) dest.searchParams.set("seed", seed);
 
   return NextResponse.redirect(dest);
 }

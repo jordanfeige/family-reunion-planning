@@ -64,13 +64,13 @@ export default async function DashboardPage({
           {showPlanning && list.length > 0 ? (
             <div className="dashboard-toolbar">
               {hasDraft ? (
-                <Link className="btn btn-secondary" href="/plan">
+                <a className="btn btn-secondary" href="/api/plan/start">
                   Resume draft
-                </Link>
+                </a>
               ) : null}
-              <Link className="btn btn-berry" href="/plan">
+              <a className="btn btn-berry" href="/api/plan/start">
                 + New trip
-              </Link>
+              </a>
             </div>
           ) : null}
         </div>
@@ -140,13 +140,13 @@ export default async function DashboardPage({
                     Chat with WandrAI to shape the trip, pick places, then build the plan.
                   </p>
                   {hasDraft ? (
-                    <Link className="btn btn-berry" href="/plan">
+                    <a className="btn btn-berry" href="/api/plan/start">
                       Resume your draft
-                    </Link>
+                    </a>
                   ) : (
-                    <Link className="btn btn-berry" href="/plan">
+                    <a className="btn btn-berry" href="/api/plan/start">
                       Start with WandrAI
-                    </Link>
+                    </a>
                   )}
                 </div>
               </div>
@@ -225,10 +225,10 @@ export default async function DashboardPage({
                   );
                 })}
                 <li className="dashboard-card dashboard-card--new">
-                  <Link href="/plan" className="dashboard-card-new-link">
+                  <a href="/api/plan/start" className="dashboard-card-new-link">
                     <span className="dashboard-card-new-title">Start something new</span>
                     <span className="muted dashboard-card-new-copy">A prompt is enough</span>
-                  </Link>
+                  </a>
                 </li>
               </ul>
             </>

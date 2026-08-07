@@ -3,22 +3,24 @@
 import type { UIMessage } from "ai";
 
 import { ChatMarkdown } from "@/components/ChatMarkdown";
+import { Orb } from "@/components/Orb";
 import { textFromMessage } from "@/lib/chatMessage";
 
 export function ChatBubble({
   message,
   streaming,
+  orbState = "idle",
 }: {
   message: UIMessage;
   streaming?: boolean;
+  orbState?: "idle" | "thinking" | "speaking";
 }) {
   const text = textFromMessage(message);
   if (!text && !streaming) return null;
   if (text.startsWith("⟦advance:")) return null;
 
   const isDivider =
-    message.id.startsWith("divider-") ||
-    /^—— .+ ——$/.test(text.trim());
+    message.id.startsWith("divider-") || /^—— .+ ——$/.test(text.trim());
 
   if (isDivider) {
     return (
@@ -30,31 +32,20 @@ export function ChatBubble({
 
   const isUser = message.role === "user";
 
+  if (isUser) {
+    return (
+      <div className="wa-bubble-user wa-msg-enter">
+        <p style={{ margin: 0 }}>{text}</p>
+      </div>
+    );
+  }
+
   return (
-    <div className={`chat-row chat-row--${message.role}`}>
-      {!isUser ? (
-        <span className="chat-avatar" aria-hidden>
-          W
-        </span>
-      ) : null}
-      <div className={`chat-bubble chat-bubble--${message.role}`}>
-        {isUser ? (
-          <p className="chat-bubble-text">{text}</p>
-        ) : (
-          <>
-            {text ? <ChatMarkdown text={text} /> : null}
-            {streaming ? (
-              <p className="chat-bubble-thinking" aria-live="polite">
-                <span className="chat-typing-dots" aria-hidden>
-                  <span />
-                  <span />
-                  <span />
-                </span>
-                Thinking…
-              </p>
-            ) : null}
-          </>
-        )}
+    <div className="wa-asst-row wa-msg-enter">
+      <Orb state={streaming ? "speaking" : orbState} size="md" />
+      <div className="wa-bubble-asst">
+        {text ? <ChatMarkdown text={text} /> : null}
+        {streaming ? <span className="wa-caret" aria-hidden /> : null}
       </div>
     </div>
   );

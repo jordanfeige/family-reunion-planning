@@ -21,7 +21,7 @@ export default async function LibraryPage() {
       {trips.length === 0 ? (
         <p className="muted">
           No trips yet.{" "}
-          <Link href="/plan">Start planning</Link> to fill this shelf.
+          <a href="/api/plan/start">Start planning</a> to fill this shelf.
         </p>
       ) : (
         <ul className="library-list">

@@ -38,9 +38,9 @@ export default async function ProfilePage() {
         <Link className="btn btn-secondary" href="/dashboard">
           Your trips
         </Link>
-        <Link className="btn btn-berry" href="/plan">
+        <a className="btn btn-berry" href="/api/plan/start">
           Plan a trip
-        </Link>
+        </a>
         <form action={signOutAction}>
           <button type="submit" className="btn btn-secondary">
             Sign out

@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { APP_NAME } from "@/lib/brand";
 
 export function BrandMark({
@@ -35,9 +33,10 @@ export function BrandMark({
     </>
   );
 
+  // Hard nav: `/` always server-redirects, and soft-nav after deploys can 500 (Next E10).
   return (
-    <Link href={href} className={className}>
+    <a href={href} className={className}>
       {inner}
-    </Link>
+    </a>
   );
 }

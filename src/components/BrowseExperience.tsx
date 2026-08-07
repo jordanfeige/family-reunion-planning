@@ -217,9 +217,28 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setCoords({ lat, lng });
-        setAreaLabel("Near you");
-        writeBrowseArea({ label: "Near you", lat, lng });
-        setGeoStatus("ready");
+        void fetch("/api/geo/reverse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat, lng }),
+        })
+          .then((r) => r.json())
+          .then((data: { label?: string | null }) => {
+            const label = data.label?.trim();
+            if (label) {
+              setAreaLabel(label);
+              writeBrowseArea({ label, lat, lng });
+            } else {
+              setAreaLabel("Near you");
+              writeBrowseArea({ label: "Near you", lat, lng });
+            }
+            setGeoStatus("ready");
+          })
+          .catch(() => {
+            setAreaLabel("Near you");
+            writeBrowseArea({ label: "Near you", lat, lng });
+            setGeoStatus("ready");
+          });
       },
       () => {
         setGeoStatus("denied");
@@ -309,6 +328,7 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
         promptId?: string;
         thin?: boolean;
         message?: string;
+        countLine?: string;
         areaLabel?: string | null;
         lat?: number | null;
         lng?: number | null;
@@ -360,6 +380,8 @@ export function BrowseExperience({ signedIn }: { signedIn: boolean }) {
       }
       setPromptId(data.promptId || crypto.randomUUID());
       if (data.thin) setThinMessage(data.message ?? null);
+      else if (data.countLine) setThinMessage(data.countLine);
+      else setThinMessage(null);
       setLoadUi(ideas.length > 0 ? "ready" : "idle");
     } catch (err) {
       const timedOut =

@@ -5,18 +5,13 @@ import { z } from "zod";
 import { extractorModel, hasAnthropicApiKey } from "@/lib/ai";
 import {
   BROWSE_GENERATE_AREA_BUDGET_MS,
-  BROWSE_GENERATE_IMAGE_BUDGET_MS,
   BROWSE_GENERATE_MODEL_TIMEOUT_MS,
   BROWSE_GENERATE_PROD_MAX_IDEAS,
 } from "@/lib/browseGenerate";
-import { attachBrowseImages } from "@/lib/browseImages";
-import {
-  BROWSE_CATEGORIES,
-  BROWSE_DEAL_MORE,
-  BROWSE_DECK_SIZE,
-  composeBrowseStack,
-} from "@/lib/browseIdeas";
+import { BROWSE_CATEGORIES, BROWSE_DEAL_MORE, BROWSE_DECK_SIZE } from "@/lib/browseIdeas";
+import { gateAndIllustrateIdeas } from "@/lib/browseResolve";
 import { geocodeArea } from "@/lib/lodging/geocode";
+import { ideaProposalSchema } from "@/lib/resolvedPlace";
 
 export const runtime = "nodejs";
 /** Must be a static literal for Next.js segment config (prod Vercel limit). */
@@ -26,23 +21,10 @@ const bodySchema = z.object({
   prompt: z.string().min(1).max(280),
   skippedTitles: z.array(z.string()).max(200).optional(),
   refine: z.enum(["cheaper", "closer", "weirder"]).optional(),
-  /** Append/refill size — default full deck. */
   count: z.number().int().min(4).max(12).optional(),
   lat: z.number().min(-90).max(90).optional().nullable(),
   lng: z.number().min(-180).max(180).optional().nullable(),
   areaLabel: z.string().max(120).optional().nullable(),
-});
-
-/** Lean schema — full browseIdeaSchema JSON Schema is too large/slow for Haiku under gateway limits. */
-const leanIdeaSchema = z.object({
-  title: z.string().min(1).max(52),
-  category: z.enum(BROWSE_CATEGORIES),
-  blurb: z.string().min(8).max(140),
-  durationMins: z.number().positive(),
-  estCostUsd: z.number().min(0),
-  costNote: z.string().min(1).max(48),
-  driveMinutes: z.number().nonnegative().nullable().optional(),
-  placeName: z.string().max(80).nullable().optional(),
 });
 
 function isTimeoutError(err: unknown): boolean {
@@ -176,61 +158,88 @@ export async function POST(request: Request) {
       }.`
     : area.lat != null && area.lng != null
       ? `User coordinates: ${area.lat.toFixed(3)}, ${area.lng.toFixed(3)}.`
-      : "User area unknown — prefer generic US stay-home / stay-local ideas, not exotic destinations.";
+      : "User area unknown — prefer stay-home ideas with real proper nouns.";
+
+  const proposeCount = Math.min(count + 4, 12);
 
   try {
-    // AI SDK generateObject ignores `timeout` — must use abortSignal.
     const { object } = await generateObject({
       model: extractorModel(),
       schema: z.object({
-        ideas: z.array(leanIdeaSchema).min(Math.min(4, count)).max(count),
+        ideas: z.array(ideaProposalSchema).min(Math.min(4, proposeCount)).max(proposeCount),
       }),
       maxRetries: 0,
-      maxOutputTokens: 1_600,
-      temperature: 0.7,
+      maxOutputTokens: 2_800,
+      temperature: 0.65,
       abortSignal: AbortSignal.timeout(BROWSE_GENERATE_MODEL_TIMEOUT_MS),
-      prompt: `Invent ${count} concrete local weekend/evening ideas (US). No exotic far-away destinations unless the user asked for that place.
+      prompt: `Propose ${proposeCount} concrete local weekend/evening ideas (US).
 User prompt: ${body.prompt}
 ${locationLine}
 ${refineNote}
 
-Return JSON ideas with: title, category (stay-home|stay-local|day-trip|overnight|go-somewhere), blurb (~110 chars), durationMins, estCostUsd, costNote, optional driveMinutes (null for stay-home), optional placeName.
-Local-first: mostly stay-home / stay-local / day-trip. At most 1 overnight, at most 1 go-somewhere (regional only).
-Skip titles: ${skipped.slice(0, 24).join(" | ") || "(none)"}
+Schema rules (strict):
+- placeQuery: search string for a REAL place (null ONLY when category is stay-home). NEVER invent a final place name — placeQuery is a lookup key.
+- category: ${BROWSE_CATEGORIES.join("|")}
+- properNouns: min 1 (games/dish/film for stay-home; named features otherwise). Stay-home must NOT name a local business.
+- scaleFact: optional concrete fact (sleeps 6 / 2.4 mi of trail / opens at 8) or null
+- durationHours, estCostUsd, costNote (costNote includes provenance: "free", "$22 for two")
+- description: ≥80 chars with ≥2 verifiable specifics (road, hours, named feature, distance)
+- pluses 1-3, cautions min 1 REQUIRED
+- imageQuery: "<name> <locality>" or activity noun for stay-home
+Local-first. Skip titles: ${skipped.slice(0, 24).join(" | ") || "(none)"}
 ${isRefill ? "Refill cards — keep variety." : ""}`,
     });
 
-    const stack = composeBrowseStack(object.ideas, count);
-    // Prod: skip Places/Mapbox on the critical path — SoftImage letter fallback.
-    const withImages = await withBudget(
-      attachBrowseImages(stack, {
-        lat: area.lat,
-        lng: area.lng,
-        areaLabel: area.areaLabel,
-      }),
-      BROWSE_GENERATE_IMAGE_BUDGET_MS,
-      () =>
-        stack.map((idea) => ({
-          ...idea,
-          imageUrl: idea.imageUrl ?? null,
-        })),
-    );
+    const origin =
+      area.lat != null && area.lng != null
+        ? { lat: area.lat, lng: area.lng, locality: area.areaLabel }
+        : null;
 
-    if (withImages.length < Math.min(4, count)) {
-      return NextResponse.json({
-        ideas: withImages,
-        thin: true,
-        message: `Only found ${withImages.length} good ones for that. Want to loosen it up?`,
-        areaLabel: area.areaLabel,
-        lat: area.lat,
-        lng: area.lng,
-      });
-    }
+    const gated = await gateAndIllustrateIdeas(object.ideas, origin, {
+      promptContext: body.prompt,
+    });
+    const ideas = gated.cards.slice(0, count).map((c) => ({
+      id: c.id,
+      title: c.title,
+      category: c.category,
+      place: c.placeName,
+      placeName: c.placeName,
+      driveMinutes: c.driveMinutes,
+      scaleFact: c.scaleFact,
+      durationHours: c.durationHours,
+      durationMins: c.durationMins,
+      estCostUsd: c.estCostUsd,
+      costNote: c.costNote,
+      metaLine: c.metaLine,
+      blurb: c.description.slice(0, 140),
+      description: c.description,
+      pluses: c.pluses,
+      cautions: c.cautions,
+      imageQuery: c.imageQuery,
+      tags: [] as string[],
+      imageUrl: c.imageUrl,
+      sourceId: c.sourceId,
+      imageAttribution: c.image.artist
+        ? `${c.image.artist}${c.image.license ? ` · ${c.image.license}` : ""}`
+        : c.image.photographer
+          ? `${c.image.photographer} · Unsplash`
+          : null,
+      imageAttributionUrl: c.image.attributionUrl ?? c.image.profileUrl,
+    }));
 
     return NextResponse.json({
-      ideas: withImages,
+      ideas,
       promptId: crypto.randomUUID(),
-      thin: false,
+      thin: ideas.length < Math.min(4, count),
+      countLine: gated.countLine,
+      proposed: gated.proposed,
+      dropped: gated.dropped,
+      message:
+        gated.dropped > 0
+          ? gated.countLine
+          : ideas.length < Math.min(4, count)
+            ? `Only found ${ideas.length} good ones for that. Want to loosen it up?`
+            : undefined,
       areaLabel: area.areaLabel,
       lat: area.lat,
       lng: area.lng,

@@ -41,11 +41,11 @@ export function SurveyReviewCard({
       className="card"
       style={{
         padding: "1rem 1.1rem",
-        background: "rgba(94, 234, 212, 0.08)",
-        border: "1px solid rgba(31, 74, 61, 0.15)",
+        background: "var(--warm)",
+        border: "1px solid var(--hairline)",
       }}
     >
-      <h3 style={{ margin: "0 0 0.35rem", color: "var(--color-fjord)", fontSize: "1.05rem" }}>
+      <h3 style={{ margin: "0 0 0.35rem", color: "var(--ink)", fontSize: "1.05rem" }}>
         Review your responses
       </h3>
       <p className="muted" style={{ margin: "0 0 1rem", fontSize: "0.9rem" }}>

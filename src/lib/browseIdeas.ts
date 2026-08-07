@@ -41,10 +41,14 @@ export type BrowseIdea = {
   place: string | null;
   placeName: string | null;
   driveMinutes: number | null;
+  /** Concrete scale fact for §13b meta triad. */
+  scaleFact?: string | null;
   durationHours: number;
   durationMins: number;
   estCostUsd: number;
   costNote: string;
+  /** Prebuilt §13b meta line when provided by resolver. */
+  metaLine?: string | null;
   blurb: string;
   description: string;
   pluses: string[];
@@ -53,6 +57,7 @@ export type BrowseIdea = {
   tags: string[];
   /** Resolved photo URL — never invent; null → letter-block. */
   imageUrl: string | null;
+  sourceId?: string | null;
 };
 
 export const browseStackSchema = z.object({
@@ -229,14 +234,18 @@ export function formatDriveLabel(minutes: number | null | undefined): string | n
   return rem > 0 ? `${h} hr ${rem} min` : `${h} hr`;
 }
 
-/** Card face meta: duration · ~$cost · drive */
+/** Card face meta §13b: drive · scale fact · cost provenance — omit unresolved. */
 export function formatBrowseMeta(idea: BrowseIdea): string {
-  const parts: string[] = [formatDurationLabel(idea)];
-  parts.push(
-    idea.estCostUsd === 0 ? "free" : `~$${Math.round(idea.estCostUsd)}`,
-  );
+  if (idea.metaLine?.trim()) return idea.metaLine.trim();
+  const parts: string[] = [];
   const drive = formatDriveLabel(idea.driveMinutes);
   if (drive) parts.push(drive);
+  const scale = idea.scaleFact?.trim();
+  if (scale) parts.push(scale);
+  const cost =
+    idea.costNote?.trim() ||
+    (idea.estCostUsd === 0 ? "free" : `~$${Math.round(idea.estCostUsd)}`);
+  if (cost) parts.push(cost);
   return parts.join(" · ");
 }
 

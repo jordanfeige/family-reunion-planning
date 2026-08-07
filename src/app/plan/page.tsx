@@ -11,10 +11,10 @@ import { listTripsForUser } from "@/lib/supabase/queries";
 export default async function PlanPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; seed?: string }>;
 }) {
   const session = await auth();
-  const { error } = await searchParams;
+  const { error, seed } = await searchParams;
 
   const secret = await readPlanDraftCookieSecret();
   let draft = null;
@@ -54,6 +54,7 @@ export default async function PlanPage({
         errorCode={error}
         signedIn={Boolean(session?.user?.id)}
         activeTrip={activeTrip}
+        seedMessage={seed?.trim() || null}
       />
     </div>
   );
